@@ -1,74 +1,190 @@
+// store/index.js
 import { createStore } from 'vuex'
+import { 
+  getUser, 
+  isAuthenticated, 
+  getCurrentUser, 
+  logout as authLogout, 
+  login as authLogin, 
+  setUser, 
+  setToken 
+} from '../services/auth'
 
 export default createStore({
   state: {
-    user: null,
-    token: localStorage.getItem('token') || null,
-    isAdmin: false
+    // Auth
+    user: getUser(),
+    isAuthenticated: isAuthenticated(),
+    
+    // UI
+    sidebarOpen: false,
+    loading: false,
+    
+    // Notifications
+    notifications: [],
+    
+    // Navigation
+    currentFolder: null,
+    breadcrumbs: [{ name: 'Racine', id: null }]
   },
+
+  getters: {
+    isAdmin: (state) => state.user?.role === 'admin',
+    username: (state) => state.user?.username || '',
+    userEmail: (state) => state.user?.email || '',
+    userQuota: (state) => state.user?.quota_mb || 0,
+    currentFolderId: (state) => state.currentFolder?.id || null
+  },
+
   mutations: {
-    setUser(state, user) {
+    // Auth mutations
+    SET_USER(state, user) {
       state.user = user
-      state.isAdmin = user && user.role === 'ADMIN'
+      state.isAuthenticated = !!user
     },
-    setToken(state, token) {
-      state.token = token
-      if (token) {
-        localStorage.setItem('token', token)
-      } else {
-        localStorage.removeItem('token')
-      }
-    },
-    logout(state) {
+
+    LOGOUT(state) {
       state.user = null
-      state.token = null
-      state.isAdmin = false
-      localStorage.removeItem('token')
+      state.isAuthenticated = false
+      state.currentFolder = null
+      state.breadcrumbs = [{ name: 'Racine', id: null }]
+    },
+
+    // UI mutations
+    SET_LOADING(state, loading) {
+      state.loading = loading
+    },
+
+    TOGGLE_SIDEBAR(state) {
+      state.sidebarOpen = !state.sidebarOpen
+    },
+
+    SET_SIDEBAR(state, open) {
+      state.sidebarOpen = open
+    },
+
+    // Navigation mutations
+    SET_CURRENT_FOLDER(state, folder) {
+      state.currentFolder = folder
+    },
+
+    SET_BREADCRUMBS(state, breadcrumbs) {
+      state.breadcrumbs = breadcrumbs
+    },
+
+    // Notifications mutations
+    ADD_NOTIFICATION(state, notification) {
+      const id = Date.now()
+      state.notifications.push({
+        id,
+        type: notification.type || 'info',
+        title: notification.title || '',
+        message: notification.message || '',
+        timeout: notification.timeout || 5000
+      })
+
+      // Auto-remove notification
+      setTimeout(() => {
+        state.notifications = state.notifications.filter(n => n.id !== id)
+      }, notification.timeout || 5000)
+    },
+
+    REMOVE_NOTIFICATION(state, id) {
+      state.notifications = state.notifications.filter(n => n.id !== id)
     }
   },
+
   actions: {
-    async login({ commit }, credentials) {
+    // 🔑 Connexion (via axios dans auth.js)
+    async login({ commit }, { username, password, rememberMe }) {
+      commit('SET_LOADING', true)
       try {
-        const response = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(credentials)
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          commit('setToken', data.access_token)
-          
-          const userResponse = await fetch('/api/users/me', {
-            headers: { 'Authorization': `Bearer ${data.access_token}` }
-          })
-          
-          if (userResponse.ok) {
-            const user = await userResponse.json()
-            commit('setUser', user)
-            return { success: true }
-          }
-        }
-        return { success: false, error: 'Identifiants invalides' }
+        const user = await authLogin(username, password, rememberMe)
+        commit('SET_USER', user)
+        return user
       } catch (error) {
-        return { success: false, error: 'Erreur de connexion' }
+        commit('LOGOUT')
+        throw error
+      } finally {
+        commit('SET_LOADING', false)
       }
     },
-    async fetchUser({ commit, state }) {
-      if (state.token) {
-        try {
-          const response = await fetch('/api/users/me', {
-            headers: { 'Authorization': `Bearer ${state.token}` }
-          })
-          
-          if (response.ok) {
-            const user = await response.json()
-            commit('setUser', user)
-          }
-        } catch (error) {
-          console.error('Erreur lors de la récupération des infos utilisateur')
-        }
+
+    // Récupération utilisateur (si token déjà en mémoire)
+    async fetchCurrentUser({ commit }) {
+      commit('SET_LOADING', true)
+      try {
+        const user = await getCurrentUser()
+        commit('SET_USER', user)
+        return user
+      } catch (error) {
+        commit('LOGOUT')
+        throw error
+      } finally {
+        commit('SET_LOADING', false)
       }
+    },
+
+    // Déconnexion
+    logout({ commit }) {
+      authLogout()
+      commit('LOGOUT')
+    },
+
+    // Navigation actions
+    navigateToFolder({ commit }, folder) {
+      commit('SET_CURRENT_FOLDER', folder)
+      
+      let breadcrumbs = [{ name: 'Racine', id: null }]
+      if (folder) {
+        breadcrumbs.push({ name: folder.name, id: folder.id })
+      }
+      commit('SET_BREADCRUMBS', breadcrumbs)
+    },
+
+    navigateToRoot({ dispatch }) {
+      dispatch('navigateToFolder', null)
+    },
+
+    // Notification actions
+    showNotification({ commit }, notification) {
+      commit('ADD_NOTIFICATION', notification)
+    },
+
+    showSuccess({ commit }, message) {
+      commit('ADD_NOTIFICATION', {
+        type: 'success',
+        title: 'Succès',
+        message,
+        timeout: 3000
+      })
+    },
+
+    showError({ commit }, message) {
+      commit('ADD_NOTIFICATION', {
+        type: 'error',
+        title: 'Erreur',
+        message,
+        timeout: 5000
+      })
+    },
+
+    showWarning({ commit }, message) {
+      commit('ADD_NOTIFICATION', {
+        type: 'warning',
+        title: 'Attention',
+        message,
+        timeout: 4000
+      })
+    },
+
+    showInfo({ commit }, message) {
+      commit('ADD_NOTIFICATION', {
+        type: 'info',
+        title: 'Information',
+        message,
+        timeout: 4000
+      })
     }
   }
 })

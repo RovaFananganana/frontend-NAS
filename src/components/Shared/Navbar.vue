@@ -40,10 +40,10 @@ export default {
     
     const user = computed(() => store.state.user || { username: '', role: '' })
     
-    const logout = () => {
-      store.commit('logout')
-      router.push('/login')
-    }
+    const logout = async () => {
+        await store.dispatch('logout')
+        router.push('/login')
+}
     
     return {
       user,

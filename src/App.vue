@@ -20,9 +20,7 @@ import Notification from './components/Shared/Notification.vue'
 
 export default {
   name: 'App',
-  components: {
-    Notification
-  },
+  components: { Notification },
   setup() {
     const store = useStore()
     const notification = ref({
@@ -31,17 +29,9 @@ export default {
       type: 'info'
     })
 
-    // Fournir la fonction de notification aux composants enfants
     const showNotification = (message, type = 'info') => {
-      notification.value = {
-        show: true,
-        message,
-        type
-      }
-      
-      setTimeout(() => {
-        hideNotification()
-      }, 5000)
+      notification.value = { show: true, message, type }
+      setTimeout(() => hideNotification(), 5000)
     }
 
     const hideNotification = () => {
@@ -68,6 +58,7 @@ export default {
   }
 }
 </script>
+
 
 <style>
 /* Styles globaux */

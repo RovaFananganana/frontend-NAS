@@ -24,14 +24,25 @@
 
         <div>
           <label class="block text-gray-600 font-medium mb-1" for="password">Mot de passe</label>
-          <input
-            type="password"
-            id="password"
-            v-model="password"
-            placeholder="Entrez votre mot de passe"
-            class="w-full px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring focus:ring-indigo-200"
-            required
-          >
+          <div class="relative">
+            <input
+              :type="showPassword ? 'text' : 'password'"
+              id="password"
+              v-model="password"
+              placeholder="Entrez votre mot de passe"
+              class="w-full px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring focus:ring-indigo-200 pr-10"
+              required
+            >
+            <!-- Bouton œil -->
+            <button 
+              type="button"
+              @click="togglePassword"
+              class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700"
+            >
+              <span v-if="showPassword">👁️‍🗨️</span>
+              <span v-else>👁️</span>
+            </button>
+          </div>
         </div>
 
         <!-- Se souvenir de moi -->
@@ -61,10 +72,11 @@
 
 <script setup>
 import { ref } from 'vue'
-import { login } from '../services/auth'
 import { useRouter } from 'vue-router'
+import { useStore } from 'vuex'
 
 const router = useRouter()
+const store = useStore()
 
 // Variables du formulaire
 const username = ref('')
@@ -73,6 +85,11 @@ const rememberMe = ref(false)
 const loading = ref(false)
 const error = ref('')
 
+// 👁️ état de l'affichage du mot de passe
+const showPassword = ref(false)
+const togglePassword = () => {
+  showPassword.value = !showPassword.value
+}
 // Nom de l'application
 const appName = "Documents NAS"
 
@@ -81,17 +98,26 @@ const handleLogin = async () => {
   loading.value = true
   error.value = ''
   try {
-    // Appel à la fonction login (auth.js)
-    const user = await login(username.value, password.value, rememberMe.value)
+    // On passe par Vuex → store/index.js
+    const user = await store.dispatch('login', {
+      username: username.value,
+      password: password.value,
+      rememberMe: rememberMe.value
+    })
+
+    if (!user || !user.role) {
+      throw new Error("Rôle utilisateur non défini")
+    }
 
     // Redirection selon rôle
-    if (user.role === 'admin') {
+    if (user.role.toLowerCase() === 'admin') {
       router.push('/admin')
     } else {
       router.push('/user')
     }
   } catch (err) {
-    error.value = 'Nom d’utilisateur ou mot de passe incorrect'
+    console.error("Erreur login:", err)
+    error.value = err.message || 'Nom d’utilisateur ou mot de passe incorrect'
   } finally {
     loading.value = false
   }
@@ -99,7 +125,6 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-/* Couleurs douces et design propre */
 body {
   font-family: 'Inter', sans-serif;
 }

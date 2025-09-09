@@ -1,53 +1,92 @@
-// src/services/auth.js
-import { authAPI } from "./api";
+// services/auth.js
+import { authAPI } from './api'
 
-/**
- * Fonction de connexion
- * @param {string} username
- * @param {string} password 
- * @returns {Promise<Object>} user (avec token et role)
- */
-export async function login(username, password) {
-  try {
-    // Appel à l'API login
-    const response = await authAPI.login({ username, password });
+const TOKEN_KEY = 'auth_token'
+const USER_KEY = 'user_data'
 
-    // Backend renvoie { access_token, user }
-    const { access_token, user } = response;
+// Gestion du token
+export const getToken = () => {
+  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY)
+}
 
-    if (!access_token) throw new Error('Token non reçu');
-
-    // Sauvegarde du token et des infos utilisateur
-    localStorage.setItem('token', access_token);
-    localStorage.setItem('user', JSON.stringify(user));
-
-    return user;
-  } catch (error) {
-    console.error('Erreur de connexion:', error);
-    throw error;
+export const setToken = (token, rememberMe = true) => {
+  if (rememberMe) {
+    localStorage.setItem(TOKEN_KEY, token)
+  } else {
+    sessionStorage.setItem(TOKEN_KEY, token)
   }
 }
 
-/**
- * Déconnexion : suppression du token et user
- */
-export function logout() {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  window.location.href = '/login'; // redirection après logout
+export const removeToken = () => {
+  localStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(TOKEN_KEY)
 }
 
-/**
- * Récupère le token actuel
- */
-export function getToken() {
-  return localStorage.getItem('token');
+// Gestion des données utilisateur
+export const getUser = () => {
+  const userData = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY)
+  return userData ? JSON.parse(userData) : null
 }
 
-/**
- * Récupère les infos utilisateur actuel
- */
-export function getCurrentUser() {
-  const user = localStorage.getItem('user');
-  return user ? JSON.parse(user) : null;
+export const setUser = (user, rememberMe = true) => {
+  if (rememberMe) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user))
+  } else {
+    sessionStorage.setItem(USER_KEY, JSON.stringify(user))
+  }
+}
+
+export const removeUser = () => {
+  localStorage.removeItem(USER_KEY)
+  sessionStorage.removeItem(USER_KEY)
+}
+
+// Fonction de connexion
+export const login = async (username, password, rememberMe = false) => {
+  try {
+    const response = await authAPI.login(username, password)
+    const { access_token, user } = response.data
+
+    // Stockage cohérent
+    setToken(access_token, rememberMe)
+    setUser(user, rememberMe)
+
+    return user
+  } catch (error) {
+    throw new Error(error.response?.data?.msg || 'Erreur de connexion')
+  }
+}
+
+// Fonction de déconnexion
+export const logout = () => {
+  removeToken()
+  removeUser()
+}
+
+// Vérifier si l'utilisateur est authentifié
+export const isAuthenticated = () => {
+  return !!getToken()
+}
+
+// Récupérer les données utilisateur courantes
+export const getCurrentUser = async () => {
+  try {
+    const response = await authAPI.getCurrentUser()
+    const user = response.data
+
+    // récupérer rememberMe en fonction de là où est stocké le token
+    const rememberMe = !!localStorage.getItem(TOKEN_KEY)
+    setUser(user, rememberMe)
+
+    return user
+  } catch (error) {
+    logout()
+    throw error
+  }
+}
+
+// Vérifier si l'utilisateur est admin
+export const isAdmin = () => {
+  const user = getUser()
+  return user?.role === 'admin'
 }
