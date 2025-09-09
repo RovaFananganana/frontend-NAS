@@ -7,8 +7,10 @@ import Login from '../views/Login.vue'
 import Admin from '../views/Admin.vue'
 import User from '../views/User.vue'
 import NotFound from '../views/NotFound.vue'
+import TestModal from '../views/TestModal.vue'
 
 const routes = [
+   { path: "/test-modal", component: TestModal },
   {
     path: '/',
     redirect: to => {

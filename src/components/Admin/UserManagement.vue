@@ -1,278 +1,456 @@
+<!-- components/Admin/UserManagement.vue -->
 <template>
   <div class="p-6">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">Gestion des utilisateurs</h1>
-      <button 
-        @click="showCreateModal = true"
-        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center transition-colors"
-      >
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-        </svg>
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+      <h1 class="text-3xl font-bold mb-4 md:mb-0">Gestion des utilisateurs</h1>
+      <button class="btn btn-primary" @click="openCreateModal">
+        <i class="fas fa-plus mr-2"></i>
         Nouvel utilisateur
       </button>
     </div>
 
-    <!-- Tableau des utilisateurs -->
-    <div class="bg-white shadow-md rounded-lg overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rôle</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quota</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Groupes</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="user in users" :key="user.id">
-            <td class="px-6 py-4 whitespace-nowrap">
-              <div class="text-sm font-medium text-gray-900">{{ user.username }}</div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <div class="text-sm text-gray-500">{{ user.email || 'N/A' }}</div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full" 
-                :class="user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'">
-                {{ user.role }}
-              </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ user.quota_mb }} MB
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              <span v-for="(group, index) in user.groups" :key="index" class="mr-1 bg-gray-200 px-2 py-1 rounded text-xs">
-                {{ group }}
-              </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-              <button @click="editUser(user)" class="text-blue-600 hover:text-blue-900 mr-3">Modifier</button>
-              <button @click="confirmDelete(user)" class="text-red-600 hover:text-red-900">Supprimer</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Search Bar -->
+    <div class="flex flex-col md:flex-row gap-4 mb-6">
+      <div class="form-control flex-1">
+        <div class="input-group">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Rechercher par nom ou email..."
+            class="input input-bordered w-full"
+          >
+          <button class="btn btn-square">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+      </div>
+      <select v-model="roleFilter" class="select select-bordered">
+        <option value="">Tous les rôles</option>
+        <option value="ADMIN">Administrateurs</option>
+        <option value="SIMPLE_USER">Utilisateurs simples</option>
+      </select>
     </div>
 
-    <!-- Modal de création/édition -->
-    <Modal :show="showCreateModal || showEditModal" @close="closeModal">
-      <template #header>
-        <h3 class="text-lg font-medium text-gray-900">
-          {{ isEditing ? 'Modifier l\'utilisateur' : 'Créer un utilisateur' }}
-        </h3>
-      </template>
-      
-      <form @submit.prevent="saveUser">
-        <div class="space-y-4">
-          <div>
-            <label for="username" class="block text-sm font-medium text-gray-700">Nom d'utilisateur</label>
-            <input 
-              type="text" 
-              id="username" 
-              v-model="currentUser.username" 
-              required
-              class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-          </div>
-          
-          <div>
-            <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-            <input 
-              type="email" 
-              id="email" 
-              v-model="currentUser.email" 
-              class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-          </div>
-          
-          <div>
-            <label for="password" class="block text-sm font-medium text-gray-700">
-              {{ isEditing ? 'Nouveau mot de passe (laisser vide pour ne pas changer)' : 'Mot de passe' }}
-            </label>
-            <input 
-              type="password" 
-              id="password" 
-              v-model="currentUser.password" 
-              :required="!isEditing"
-              class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-          </div>
-          
-          <div>
-            <label for="role" class="block text-sm font-medium text-gray-700">Rôle</label>
-            <select 
-              id="role" 
-              v-model="currentUser.role" 
-              required
-              class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-              <option value="SIMPLE_USER">Utilisateur simple</option>
-              <option value="ADMIN">Administrateur</option>
-            </select>
-          </div>
-          
-          <div>
-            <label for="quota" class="block text-sm font-medium text-gray-700">Quota (MB)</label>
-            <input 
-              type="number" 
-              id="quota" 
-              v-model.number="currentUser.quota_mb" 
-              required
-              min="1"
-              class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-          </div>
-        </div>
-        
-        <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
-          <button 
-            type="submit" 
-            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:col-start-2 sm:text-sm"
-          >
-            {{ isEditing ? 'Modifier' : 'Créer' }}
-          </button>
-          <button 
-            type="button" 
-            @click="closeModal"
-            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm"
-          >
-            Annuler
-          </button>
-        </div>
-      </form>
-    </Modal>
+    <!-- Loading State -->
+    <div v-if="loading" class="flex justify-center py-12">
+      <span class="loading loading-spinner loading-lg"></span>
+    </div>
 
-    <!-- Modal de confirmation de suppression -->
-    <Modal :show="showDeleteModal" @close="showDeleteModal = false">
-      <template #header>
-        <h3 class="text-lg font-medium text-gray-900">Confirmer la suppression</h3>
-      </template>
-      
-      <p class="text-sm text-gray-500">
-        Êtes-vous sûr de vouloir supprimer l'utilisateur "{{ currentUser.username }}" ? Cette action est irréversible.
-      </p>
-      
-      <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
-        <button 
-          @click="deleteUser" 
-          class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:col-start-2 sm:text-sm"
-        >
-          Supprimer
-        </button>
-        <button 
-          @click="showDeleteModal = false" 
-          class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm"
-        >
-          Annuler
-        </button>
+    <!-- Users Table -->
+    <div v-else class="card bg-base-100 shadow-xl">
+      <div class="card-body p-0">
+        <div class="overflow-x-auto">
+          <table class="table table-zebra w-full">
+            <thead>
+              <tr>
+                <th>Utilisateur</th>
+                <th>Email</th>
+                <th>Rôle</th>
+                <th>Quota</th>
+                <th>Groupes</th>
+                <th>Créé le</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="user in filteredUsers" :key="user.id">
+                <td>
+                  <div class="flex items-center space-x-3">
+                    <div class="avatar">
+                      <div class="mask mask-squircle w-12 h-12 bg-primary text-primary-content flex items-center justify-center">
+                        {{ user.username.charAt(0).toUpperCase() }}
+                      </div>
+                    </div>
+                    <div>
+                      <div class="font-bold">{{ user.username }}</div>
+                      <div class="text-sm opacity-50">#{{ user.id }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>{{ user.email || 'Non défini' }}</td>
+                <td>
+                  <div class="badge" :class="user.role === 'ADMIN' ? 'badge-primary' : 'badge-secondary'">
+                    {{ user.role === 'ADMIN' ? 'Admin' : 'Utilisateur' }}
+                  </div>
+                </td>
+                <td>{{ user.quota_mb || 2048 }} MB</td>
+                <td>
+                  <div class="flex flex-wrap gap-1">
+                    <div
+                      v-for="group in user.groups?.slice(0, 2) || []"
+                      :key="group"
+                      class="badge badge-outline badge-xs"
+                    >
+                      {{ group }}
+                    </div>
+                    <div
+                      v-if="user.groups?.length > 2"
+                      class="badge badge-outline badge-xs"
+                    >
+                      +{{ user.groups.length - 2 }}
+                    </div>
+                  </div>
+                </td>
+                <td>{{ formatDate(user.created_at) }}</td>
+                <td>
+                  <div class="flex gap-2">
+                    <button
+                      class="btn btn-ghost btn-xs"
+                      @click="openEditModal(user)"
+                      :title="'Modifier ' + user.username"
+                    >
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button
+                      class="btn btn-ghost btn-xs text-error"
+                      @click="confirmDeleteUser(user)"
+                      :title="'Supprimer ' + user.username"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="filteredUsers.length === 0 && !loading" class="text-center py-12">
+          <i class="fas fa-users text-6xl opacity-30 mb-4"></i>
+          <p class="text-xl opacity-70 mb-2">Aucun utilisateur trouvé</p>
+          <p class="opacity-50">{{ searchQuery ? 'Essayez de modifier votre recherche' : 'Créez votre premier utilisateur' }}</p>
+        </div>
       </div>
-    </Modal>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div v-if="showModal" class="modal modal-open">
+      <div class="modal-box max-w-2xl">
+        <h3 class="font-bold text-lg mb-4">
+          {{ editingUser ? 'Modifier l\'utilisateur' : 'Créer un utilisateur' }}
+        </h3>
+
+        <form @submit.prevent="saveUser" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Username -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Nom d'utilisateur *</span>
+              </label>
+              <input
+                v-model="userForm.username"
+                type="text"
+                class="input input-bordered"
+                :class="{ 'input-error': errors.username }"
+                required
+              >
+              <label v-if="errors.username" class="label">
+                <span class="label-text-alt text-error">{{ errors.username }}</span>
+              </label>
+            </div>
+
+            <!-- Email -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Email</span>
+              </label>
+              <input
+                v-model="userForm.email"
+                type="email"
+                class="input input-bordered"
+                :class="{ 'input-error': errors.email }"
+              >
+              <label v-if="errors.email" class="label">
+                <span class="label-text-alt text-error">{{ errors.email }}</span>
+              </label>
+            </div>
+
+            <!-- Password -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">
+                  {{ editingUser ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe *' }}
+                </span>
+              </label>
+              <div class="input-group">
+                <input
+                  v-model="userForm.password"
+                  :type="showPassword ? 'text' : 'password'"
+                  class="input input-bordered flex-1"
+                  :class="{ 'input-error': errors.password }"
+                  :required="!editingUser"
+                >
+                <button
+                  type="button"
+                  class="btn btn-square"
+                  @click="showPassword = !showPassword"
+                >
+                  <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                </button>
+              </div>
+              <label v-if="errors.password" class="label">
+                <span class="label-text-alt text-error">{{ errors.password }}</span>
+              </label>
+            </div>
+
+            <!-- Role -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Rôle</span>
+              </label>
+              <select v-model="userForm.role" class="select select-bordered">
+                <option value="SIMPLE_USER">Utilisateur simple</option>
+                <option value="ADMIN">Administrateur</option>
+              </select>
+            </div>
+
+            <!-- Quota -->
+            <div class="form-control md:col-span-2">
+              <label class="label">
+                <span class="label-text">Quota de stockage (MB)</span>
+              </label>
+              <input
+                v-model.number="userForm.quota_mb"
+                type="number"
+                min="1"
+                class="input input-bordered"
+              >
+            </div>
+          </div>
+
+          <div class="modal-action">
+            <button type="button" class="btn" @click="closeModal">Annuler</button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              :disabled="saving"
+            >
+              <span v-if="saving" class="loading loading-spinner loading-xs mr-2"></span>
+              {{ editingUser ? 'Modifier' : 'Créer' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="userToDelete" class="modal modal-open">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">Confirmer la suppression</h3>
+        <p class="py-4">
+          Êtes-vous sûr de vouloir supprimer l'utilisateur <strong>{{ userToDelete.username }}</strong> ?
+          Cette action est irréversible.
+        </p>
+        <div class="modal-action">
+          <button class="btn" @click="userToDelete = null">Annuler</button>
+          <button
+            class="btn btn-error"
+            @click="deleteUser"
+            :disabled="deleting"
+          >
+            <span v-if="deleting" class="loading loading-spinner loading-xs mr-2"></span>
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
-<script>
-import { ref, onMounted } from 'vue'
-import Modal from '../Shared/Modal.vue'
-import { adminAPI } from '../../services/api'
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { adminAPI } from '@/services/api'
+import { useStore } from 'vuex'
 
-export default {
-  name: 'UserManagement',
-  components: {
-    Modal
-  },
-  setup() {
-    const users = ref([])
-    const showCreateModal = ref(false)
-    const showEditModal = ref(false)
-    const showDeleteModal = ref(false)
-    const isEditing = ref(false)
-    const currentUser = ref({
-      id: null,
-      username: '',
-      email: '',
-      password: '',
-      role: 'SIMPLE_USER',
-      quota_mb: 2048
-    })
+const store = useStore()
 
-    const loadUsers = async () => {
-      try {
-        users.value = await adminAPI.getUsers()
-      } catch (error) {
-        console.error('Erreur lors du chargement des utilisateurs:', error)
-      }
-    }
+// Reactive data
+const users = ref([])
+const loading = ref(false)
+const saving = ref(false)
+const deleting = ref(false)
+const showModal = ref(false)
+const showPassword = ref(false)
+const editingUser = ref(null)
+const userToDelete = ref(null)
+const searchQuery = ref('')
+const roleFilter = ref('')
 
-    const editUser = (user) => {
-      currentUser.value = { ...user, password: '' }
-      isEditing.value = true
-      showEditModal.value = true
-    }
+// Form data
+const userForm = ref({
+  username: '',
+  email: '',
+  password: '',
+  role: 'SIMPLE_USER',
+  quota_mb: 2048
+})
 
-    const confirmDelete = (user) => {
-      currentUser.value = { ...user }
-      showDeleteModal.value = true
-    }
+const errors = ref({})
 
-    const saveUser = async () => {
-      try {
-        if (isEditing.value) {
-          await adminAPI.updateUser(currentUser.value.id, currentUser.value)
-        } else {
-          await adminAPI.createUser(currentUser.value)
-        }
-        
-        closeModal()
-        loadUsers()
-      } catch (error) {
-        console.error('Erreur lors de la sauvegarde:', error)
-      }
-    }
+// Computed properties
+const filteredUsers = computed(() => {
+  let filtered = users.value
 
-    const deleteUser = async () => {
-      try {
-        await adminAPI.deleteUser(currentUser.value.id)
-        showDeleteModal.value = false
-        loadUsers()
-      } catch (error) {
-        console.error('Erreur lors de la suppression:', error)
-      }
-    }
+  // Filter by search query
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(user =>
+      user.username.toLowerCase().includes(query) ||
+      (user.email && user.email.toLowerCase().includes(query))
+    )
+  }
 
-    const closeModal = () => {
-      showCreateModal.value = false
-      showEditModal.value = false
-      currentUser.value = {
-        id: null,
-        username: '',
-        email: '',
-        password: '',
-        role: 'SIMPLE_USER',
-        quota_mb: 2048
-      }
-      isEditing.value = false
-    }
+  // Filter by role
+  if (roleFilter.value) {
+    filtered = filtered.filter(user => user.role === roleFilter.value)
+  }
 
-    onMounted(() => {
-      loadUsers()
-    })
+  return filtered
+})
 
-    return {
-      users,
-      showCreateModal,
-      showEditModal,
-      showDeleteModal,
-      isEditing,
-      currentUser,
-      editUser,
-      confirmDelete,
-      saveUser,
-      deleteUser,
-      closeModal
-    }
+// Methods
+const formatDate = (dateString) => {
+  return new Intl.DateTimeFormat('fr-FR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  }).format(new Date(dateString))
+}
+
+const loadUsers = async () => {
+  loading.value = true
+  try {
+    const response = await adminAPI.getUsers()
+    users.value = response.data || []
+  } catch (error) {
+    console.error('Error loading users:', error)
+    store.dispatch('showError', 'Erreur lors du chargement des utilisateurs')
+  } finally {
+    loading.value = false
   }
 }
+
+const openCreateModal = () => {
+  editingUser.value = null
+  userForm.value = {
+    username: '',
+    email: '',
+    password: '',
+    role: 'SIMPLE_USER',
+    quota_mb: 2048
+  }
+  errors.value = {}
+  showModal.value = true
+}
+
+const openEditModal = (user) => {
+  editingUser.value = user
+  userForm.value = {
+    username: user.username,
+    email: user.email || '',
+    password: '',
+    role: user.role,
+    quota_mb: user.quota_mb || 2048
+  }
+  errors.value = {}
+  showModal.value = true
+}
+
+const closeModal = () => {
+  showModal.value = false
+  editingUser.value = null
+  showPassword.value = false
+  errors.value = {}
+}
+
+const validateForm = () => {
+  errors.value = {}
+
+  if (!userForm.value.username.trim()) {
+    errors.value.username = 'Le nom d\'utilisateur est requis'
+  }
+
+  if (!editingUser.value && !userForm.value.password) {
+    errors.value.password = 'Le mot de passe est requis'
+  }
+
+  if (userForm.value.email && !isValidEmail(userForm.value.email)) {
+    errors.value.email = 'Format d\'email invalide'
+  }
+
+  return Object.keys(errors.value).length === 0
+}
+
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+const saveUser = async () => {
+  if (!validateForm()) return
+
+  saving.value = true
+  try {
+    const userData = { ...userForm.value }
+    
+    // Ne pas envoyer le mot de passe vide lors de la modification
+    if (editingUser.value && !userData.password) {
+      delete userData.password
+    }
+
+    if (editingUser.value) {
+      await adminAPI.updateUser(editingUser.value.id, userData)
+      store.dispatch('showSuccess', 'Utilisateur modifié avec succès')
+    } else {
+      await adminAPI.createUser(userData)
+      store.dispatch('showSuccess', 'Utilisateur créé avec succès')
+    }
+
+    await loadUsers()
+    closeModal()
+  } catch (error) {
+    console.error('Error saving user:', error)
+    const message = error.response?.data?.msg || 'Erreur lors de la sauvegarde'
+    store.dispatch('showError', message)
+  } finally {
+    saving.value = false
+  }
+}
+
+const confirmDeleteUser = (user) => {
+  userToDelete.value = user
+}
+
+const deleteUser = async () => {
+  if (!userToDelete.value) return
+
+  deleting.value = true
+  try {
+    await adminAPI.deleteUser(userToDelete.value.id)
+    await loadUsers()
+    userToDelete.value = null
+    store.dispatch('showSuccess', 'Utilisateur supprimé avec succès')
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    const message = error.response?.data?.msg || 'Erreur lors de la suppression'
+    store.dispatch('showError', message)
+  } finally {
+    deleting.value = false
+  }
+}
+
+// Lifecycle
+onMounted(() => {
+  loadUsers()
+})
 </script>
+
+<style scoped>
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+</style>

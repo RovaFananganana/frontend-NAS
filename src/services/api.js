@@ -79,6 +79,12 @@ export const userAPI = {
 
   // Storage
   getStorageInfo: () => api.get("/users/storage-info"),
+  
+  //fileupload
+  uploadFile: (formData) =>
+    api.post("/users/files/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
 
   // Logs
   getLogs: (page = 1, perPage = 20) =>
@@ -115,6 +121,11 @@ export const adminAPI = {
       parent_id: parentId,
     }),
   deleteAdminFolder: (folderId) => api.delete(`/admin/folders/${folderId}`),
+  
+  uploadFile: (formData) =>
+    api.post("/admin/files/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
 
   // Logs and Stats
   getLogs: (page = 1, perPage = 50) =>

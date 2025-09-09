@@ -1,26 +1,33 @@
 <template>
-  <div class="flex h-screen bg-gray-100">
-    <Sidebar />
-    <div class="flex-1 flex flex-col overflow-hidden">
-      <Navbar />
-      <main class="flex-1 overflow-x-hidden overflow-y-auto">
-        <div class="container mx-auto px-6 py-8">
-          <router-view />
-        </div>
-      </main>
-    </div>
+  <div class="p-4 space-y-4">
+    <nav class="flex gap-2">
+      <button v-for="t in tabs" :key="t.key"
+              :class="['px-3 py-2 rounded border', t.key===tab && 'bg-gray-100']"
+              @click="tab=t.key">{{ t.label }}</button>
+    </nav>
+
+    <component :is="current" />
   </div>
 </template>
 
-<script>
-import Navbar from '../components/Shared/Navbar.vue'
-import Sidebar from '../components/Shared/Sidebar.vue'
+<script setup>
+import { ref, computed } from 'vue'
 
-export default {
-  name: 'Admin',
-  components: {
-    Navbar,
-    Sidebar
-  }
-}
+import Dashboard from '@/components/Admin/Dashboard.vue'
+import UserManagement from '@/components/Admin/UserManagement.vue'
+import GroupManagement from '@/components/Admin/GroupManagement.vue'
+import FileExplorer from '@/components/Admin/FileExplorer.vue'
+import PermissionManager from '@/components/Admin/PermissionManager.vue'
+import AccessLogs from '@/components/Admin/AccessLogs.vue'
+
+const tabs = [
+  { key: 'dash', label: 'Tableau de bord', comp: Dashboard },
+  { key: 'users', label: 'Utilisateurs', comp: UserManagement },
+  { key: 'groups', label: 'Groupes', comp: GroupManagement },
+  { key: 'explorer', label: 'Explorateur', comp: FileExplorer },
+  { key: 'perms', label: 'Permissions', comp: PermissionManager },
+  { key: 'logs', label: 'Journaux', comp: AccessLogs },
+]
+const tab = ref('dash')
+const current = computed(() => tabs.find(t => t.key === tab.value)?.comp || Dashboard)
 </script>
