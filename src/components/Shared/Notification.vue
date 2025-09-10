@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed top-4 right-4 z-50 max-w-sm w-full">
+  <div v-if="visible" class="fixed top-4 right-4 z-50 max-w-sm w-full">
     <div 
       class="rounded-lg p-4 shadow-lg border transform transition-all duration-300 ease-in-out"
       :class="notificationClasses"
@@ -8,51 +8,20 @@
     >
       <div class="flex items-start">
         <div class="flex-shrink-0">
-          <svg 
-            v-if="type === 'success'" 
-            class="h-6 w-6 text-green-400" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
+          <!-- Icônes selon le type -->
+          <svg v-if="type === 'success'" class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
           </svg>
-          <svg 
-            v-else-if="type === 'error'" 
-            class="h-6 w-6 text-red-400" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
+          <svg v-else-if="type === 'error'" class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-          <svg 
-            v-else-if="type === 'warning'" 
-            class="h-6 w-6 text-yellow-400" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <svg 
-            v-else 
-            class="h-6 w-6 text-blue-400" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
         <div class="ml-3 w-0 flex-1 pt-0.5">
-          <p class="text-sm font-medium" :class="textClasses">
-            {{ message }}
-          </p>
+          <p class="text-sm font-medium" :class="textClasses">{{ message }}</p>
         </div>
         <div class="ml-4 flex-shrink-0 flex">
           <button 
-            @click="$emit('close')"
+            @click="closeNotification"
             class="inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             aria-label="Fermer"
           >
@@ -67,7 +36,7 @@
 </template>
 
 <script>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 
 export default {
   name: 'Notification',
@@ -78,43 +47,26 @@ export default {
     },
     type: {
       type: String,
-      default: 'info',
-      validator: (value) => ['info', 'success', 'warning', 'error'].includes(value)
+      default: 'success',
+      validator: (value) => ['success', 'error'].includes(value)
     }
   },
-  emits: ['close'],
-  setup(props) {
+  setup() {
+    const visible = ref(true)
+
     const notificationClasses = computed(() => {
-      const baseClasses = 'bg-white'
-      switch (props.type) {
-        case 'success':
-          return `${baseClasses} border-green-200`
-        case 'error':
-          return `${baseClasses} border-red-200`
-        case 'warning':
-          return `${baseClasses} border-yellow-200`
-        default:
-          return `${baseClasses} border-blue-200`
-      }
+      return 'bg-white border ' + (type === 'success' ? 'border-green-200' : 'border-red-200')
     })
 
     const textClasses = computed(() => {
-      switch (props.type) {
-        case 'success':
-          return 'text-green-800'
-        case 'error':
-          return 'text-red-800'
-        case 'warning':
-          return 'text-yellow-800'
-        default:
-          return 'text-blue-800'
-      }
+      return type === 'success' ? 'text-green-800' : 'text-red-800'
     })
 
-    return {
-      notificationClasses,
-      textClasses
+    const closeNotification = () => {
+      visible.value = false
     }
+
+    return { visible, notificationClasses, textClasses, closeNotification }
   }
 }
 </script>

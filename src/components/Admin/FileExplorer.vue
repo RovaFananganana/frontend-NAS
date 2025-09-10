@@ -3,7 +3,7 @@
   <div class="p-6">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-3xl font-bold">Explorateur de fichiers (Admin)</h1>
+      <h1 class="text-3xl font-bold">Explorateur de fichiers</h1>
       <button class="btn btn-primary" @click="openCreateFolderModal">
         <i class="fas fa-plus mr-2"></i>
         Nouveau dossier
@@ -16,7 +16,7 @@
         <div class="stat-figure text-primary">
           <i class="fas fa-folder text-2xl"></i>
         </div>
-        <div class="stat-title">Total Dossiers</div>
+        <div class="stat-title">Nombre total Dossiers</div>
         <div class="stat-value text-primary">{{ folders.length }}</div>
       </div>
       
@@ -24,7 +24,7 @@
         <div class="stat-figure text-secondary">
           <i class="fas fa-file text-2xl"></i>
         </div>
-        <div class="stat-title">Total Fichiers</div>
+        <div class="stat-title">Nombre total de fichiers</div>
         <div class="stat-value text-secondary">{{ files.length }}</div>
         <div class="stat-desc">{{ formatBytes(totalSize) }}</div>
       </div>
@@ -208,7 +208,7 @@
             <!-- Parent Folder -->
             <div class="form-control">
               <label class="label">
-                <span class="label-text">Dossier parent (optionnel)</span>
+                <span class="label-text">Dossier parent </span>
               </label>
               <select
                 v-model="folderForm.parent_id"

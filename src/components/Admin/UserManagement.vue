@@ -393,11 +393,20 @@ const saveUser = async () => {
 
   saving.value = true
   try {
-    const userData = { ...userForm.value }
-    
-    // Ne pas envoyer le mot de passe vide lors de la modification
-    if (editingUser.value && !userData.password) {
-      delete userData.password
+    // Construire l'objet à envoyer au backend
+    const userData = {
+      username: userForm.value.username,
+      role: userForm.value.role,
+      quota_mb: userForm.value.quota_mb
+    }
+
+    if (userForm.value.email) {
+      userData.email = userForm.value.email
+    }
+
+    // Mot de passe obligatoire seulement à la création ou si modifié
+    if (!editingUser.value || userForm.value.password) {
+      userData.password = userForm.value.password
     }
 
     if (editingUser.value) {
@@ -412,12 +421,15 @@ const saveUser = async () => {
     closeModal()
   } catch (error) {
     console.error('Error saving user:', error)
-    const message = error.response?.data?.msg || 'Erreur lors de la sauvegarde'
+    const message = error.response?.data?.msg || error.response?.data?.error || 'Erreur lors de la sauvegarde'
     store.dispatch('showError', message)
   } finally {
     saving.value = false
   }
 }
+
+
+
 
 const confirmDeleteUser = (user) => {
   userToDelete.value = user

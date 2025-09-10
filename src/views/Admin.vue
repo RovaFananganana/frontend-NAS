@@ -1,17 +1,39 @@
 <template>
-  <div class="p-4 space-y-4">
-    <nav class="flex gap-2">
-      <button v-for="t in tabs" :key="t.key"
-              :class="['px-3 py-2 rounded border', t.key===tab && 'bg-gray-100']"
-              @click="tab=t.key">{{ t.label }}</button>
-    </nav>
+  <div class="flex h-screen bg-base-100">
+    <!-- Sidebar -->
+    <Sidebar class="w-64 border-r" />
 
-    <component :is="current" />
+    <!-- Main content -->
+    <div class="flex-1 flex flex-col">
+      <!-- Navbar -->
+      <Navbar class="w-full border-b" />
+
+      <!-- Page content -->
+      <div class="p-4 flex-1 overflow-auto space-y-4">
+        <!-- Tabs -->
+        <nav class="flex gap-2 mb-4">
+          <button 
+            v-for="t in tabs" 
+            :key="t.key"
+            :class="['px-3 py-2 rounded border', t.key === tab && 'bg-gray-100']"
+            @click="tab = t.key"
+          >
+            {{ t.label }}
+          </button>
+        </nav>
+
+        <!-- Dynamic component -->
+        <component :is="current" />
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
+
+import Navbar from '../components/Shared/Navbar.vue'
+import Sidebar from '../components/Shared/Sidebar.vue'
 
 import Dashboard from '@/components/Admin/Dashboard.vue'
 import UserManagement from '@/components/Admin/UserManagement.vue'
@@ -28,6 +50,7 @@ const tabs = [
   { key: 'perms', label: 'Permissions', comp: PermissionManager },
   { key: 'logs', label: 'Journaux', comp: AccessLogs },
 ]
+
 const tab = ref('dash')
 const current = computed(() => tabs.find(t => t.key === tab.value)?.comp || Dashboard)
 </script>
