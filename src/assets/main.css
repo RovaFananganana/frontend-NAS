@@ -2,7 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tu peux ajouter tes styles globaux ici */
-body {
-  @apply bg-gray-50 text-gray-900;
+/* Styles personnalisés */
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition-colors duration-200;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded transition-colors duration-200;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded transition-colors duration-200;
+  }
+
+  .card {
+    @apply rounded-lg shadow-md p-6;
+  }
+
+  .form-input {
+    @apply block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none sm:text-sm;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium mb-1;
+  }
 }
