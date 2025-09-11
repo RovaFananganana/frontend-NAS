@@ -3,7 +3,7 @@
   <div class="p-6">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-3xl font-bold">Explorateur de fichiers</h1>
+      <!-- <h1 class="text-3xl font-bold">Explorateur de fichiers</h1> -->
       <button class="btn btn-primary" @click="openCreateFolderModal">
         <i class="fas fa-plus mr-2"></i>
         Nouveau dossier

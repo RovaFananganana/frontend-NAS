@@ -1,7 +1,7 @@
 <!-- components/Admin/GroupManagement.vue -->
 <template>
   <div class="p-6">
-    <h1 class="text-3xl font-bold mb-6">Gestion des groupes</h1>
+    <!-- <h1 class="text-3xl font-bold mb-6">Gestion des groupes</h1> -->
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Left Column: Groups List -->

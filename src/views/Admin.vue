@@ -45,7 +45,7 @@ const tabs = [
   { key: 'users', label: 'Gestion des utilisateurs', comp: UserManagement },
   { key: 'groups', label: 'Gestion des groupes', comp: GroupManagement },
   { key: 'explorer', label: 'Explorateur de fichiers', comp: FileExplorer },
-  { key: 'perms', label: 'Gestionnaire de permissions', comp: PermissionManager },
+  { key: 'perms', label: 'Gestionnaire des droits des utilisateurs', comp: PermissionManager },
   { key: 'logs', label: 'Journaux d\'accès', comp: AccessLogs },
 ]
 

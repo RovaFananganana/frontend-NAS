@@ -1,8 +1,7 @@
 <template>
   <section class="p-4 bg-white rounded-lg border">
     <header class="flex items-center justify-between mb-3">
-      <h3 class="text-lg font-semibold">Journal d'activité</h3>
-      <div class="text-sm text-gray-500">Total : {{ total }}</div>
+       <div class="text-sm text-gray-500">Total : {{ total }}</div>
     </header>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>

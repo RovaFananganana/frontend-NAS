@@ -3,7 +3,7 @@
   <div class="p-6">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-3xl font-bold">Tableau de bord Admin</h1>
+      <!-- <h1 class="text-3xl font-bold">Tableau de bord Admin</h1> -->
       <button 
         class="btn btn-primary btn-sm"
         @click="refreshStats"

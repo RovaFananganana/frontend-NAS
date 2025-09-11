@@ -133,4 +133,54 @@ export const adminAPI = {
   getStats: () => api.get("/admin/stats"),
 };
 
+const permissionAPI = {
+  // Gestion des permissions de dossiers
+  getFolderPermissions: (folderId) => 
+    api.get(`/permissions/folders/${folderId}`),
+  
+  setFolderUserPermission: (folderId, userId, permissions) =>
+    api.post(`/permissions/folders/${folderId}/users/${userId}`, permissions),
+  
+  setFolderGroupPermission: (folderId, groupId, permissions) =>
+    api.post(`/permissions/folders/${folderId}/groups/${groupId}`, permissions),
+  
+  deleteFolderPermission: (folderId, permissionId) =>
+    api.delete(`/permissions/folders/${folderId}/permissions/${permissionId}`),
+
+  // Gestion des permissions de fichiers
+  getFilePermissions: (fileId) => 
+    api.get(`/permissions/files/${fileId}`),
+  
+  setFileUserPermission: (fileId, userId, permissions) =>
+    api.post(`/permissions/files/${fileId}/users/${userId}`, permissions),
+  
+  setFileGroupPermission: (fileId, groupId, permissions) =>
+    api.post(`/permissions/files/${fileId}/groups/${groupId}`, permissions),
+  
+  deleteFilePermission: (fileId, permissionId) =>
+    api.delete(`/permissions/files/${fileId}/permissions/${permissionId}`),
+
+  // Récupération des données
+  getAllResources: () => 
+    api.get('/permissions/resources'),
+  
+  getUserEffectivePermissions: (userId) =>
+    api.get(`/permissions/effective/${userId}`),
+
+  // Permissions en lot
+  setBatchFolderPermissions: (data) =>
+    api.post('/permissions/batch/folders', data),
+
+  // Helpers pour les permissions
+  getPermissionMatrix: () =>
+    api.get('/permissions/matrix'),
+  
+  exportPermissions: () =>
+    api.get('/permissions/export')
+}
+
+// Étendez votre adminAPI existant
+Object.assign(adminAPI, permissionAPI)
+
+export { permissionAPI }
 export default api;

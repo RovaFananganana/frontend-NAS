@@ -3,7 +3,7 @@
   <div class="p-6">
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
-      <h1 class="text-3xl font-bold mb-4 md:mb-0">Gestion des utilisateurs</h1>
+      <!-- <h1 class="text-3xl font-bold mb-4 md:mb-0">Gestion des utilisateurs</h1> -->
       <button class="btn btn-primary" @click="openCreateModal">
         <i class="fas fa-plus mr-2"></i>
         Nouvel utilisateur

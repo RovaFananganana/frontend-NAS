@@ -1,8 +1,6 @@
 <template>
   <section class="p-4 bg-white rounded-lg border">
-    <h3 class="text-lg font-semibold mb-2">Stockage</h3>
-
-    <div v-if="error" class="alert alert-error">{{ error }}</div>
+      <div v-if="error" class="alert alert-error">{{ error }}</div>
 
     <div v-else>
       <div class="flex items-center gap-4">

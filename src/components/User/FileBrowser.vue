@@ -2,8 +2,7 @@
   <section class="p-4 space-y-4">
     <header class="flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold">Mes fichiers</h2>
-        <nav class="text-sm text-gray-500 mt-1">
+       <nav class="text-sm text-gray-500 mt-1">
           <span v-for="(b, i) in breadcrumbs" :key="b.path">
             <button class="underline" @click="goToBreadcrumb(i)">{{ b.name || '/' }}</button>
             <span v-if="i < breadcrumbs.length - 1"> / </span>
