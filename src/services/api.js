@@ -183,4 +183,4 @@ const permissionAPI = {
 Object.assign(adminAPI, permissionAPI)
 
 export { permissionAPI }
-export default api;
+export default adminAPI

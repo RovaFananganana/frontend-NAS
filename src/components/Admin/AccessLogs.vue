@@ -3,7 +3,7 @@
   <div class="p-6">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-3xl font-bold">Journaux d'accès</h1>
+      <!-- <h1 class="text-3xl font-bold">Journaux d'accès</h1> -->
       <div class="flex items-center gap-3">
         <select v-model="perPage" class="select select-bordered select-sm" @change="changePage(1)">
           <option :value="20">20 par page</option>
@@ -399,6 +399,7 @@ const showLogDetails = (log) => {
 // Lifecycle
 onMounted(async () => {
   await Promise.all([loadLogs(), loadUsers()])
+  console.log(permsRes.data)
 })
 </script>
 

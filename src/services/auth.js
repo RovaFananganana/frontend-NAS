@@ -88,5 +88,5 @@ export const getCurrentUser = async () => {
 // Vérifier si l'utilisateur est admin
 export const isAdmin = () => {
   const user = getUser()
-  return user?.role === 'admin'
+  return user?.role === 'ADMIN'
 }

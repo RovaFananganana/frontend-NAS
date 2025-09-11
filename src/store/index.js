@@ -29,7 +29,7 @@ export default createStore({
   },
 
   getters: {
-    isAdmin: (state) => state.user?.role === 'admin',
+    isAdmin: (state) => state.user?.role === 'ADMIN',
     username: (state) => state.user?.username || '',
     userEmail: (state) => state.user?.email || '',
     userQuota: (state) => state.user?.quota_mb || 0,
