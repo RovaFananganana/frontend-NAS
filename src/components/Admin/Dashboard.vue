@@ -1,6 +1,17 @@
 <!-- components/Admin/Dashboard.vue -->
 <template>
   <div class="p-6">
+    <!-- Performance Alert -->
+    <div v-if="performanceIssues.length > 0" class="alert alert-warning mb-6">
+      <i class="fas fa-exclamation-triangle"></i>
+      <div>
+        <h4 class="font-bold">Performance Issues Detected</h4>
+        <p>{{ performanceIssues.length }} performance issues need attention.</p>
+        <button class="btn btn-sm btn-outline mt-2" @click="showPerformanceDashboard = true">
+          View Details
+        </button>
+      </div>
+    </div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <!-- <h1 class="text-3xl font-bold">Tableau de bord Admin</h1> -->
@@ -181,6 +192,17 @@
         </div>
       </div>
     </div>
+
+    <!-- Performance Dashboard Modal -->
+    <div v-if="showPerformanceDashboard" class="modal modal-open">
+      <div class="modal-box max-w-6xl">
+        <h3 class="font-bold text-lg mb-4">Performance Dashboard</h3>
+        <PerformanceDashboard />
+        <div class="modal-action">
+          <button class="btn" @click="showPerformanceDashboard = false">Close</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -188,6 +210,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { adminAPI } from '@/services/api'
 import { useStore } from 'vuex'
+import PerformanceDashboard from './PerformanceDashboard.vue'
 
 const store = useStore()
 
@@ -196,8 +219,14 @@ const stats = ref(null)
 const recentLogs = ref([])
 const loading = ref(false)
 const error = ref('')
+const showPerformanceDashboard = ref(false)
 
 // Computed properties
+const performanceIssues = computed(() => {
+  // Mock performance issues - in real implementation this would come from performance monitoring
+  return []
+})
+
 const totalUsed = computed(() => {
   // Calcul approximatif basé sur les stats
   return (stats.value?.total_files || 0) * 1024 * 1024 // Estimation
@@ -212,6 +241,8 @@ const usagePercentage = computed(() => {
   if (totalQuota.value === 0) return 0
   return Math.round((totalUsed.value / totalQuota.value) * 100)
 })
+
+
 
 // Methods
 const formatBytes = (bytes) => {

@@ -9,6 +9,7 @@ import {
   setUser, 
   setToken 
 } from '../services/auth'
+// Performance monitoring removed for now
 
 export default createStore({
   state: {
@@ -20,12 +21,34 @@ export default createStore({
     sidebarOpen: false,
     loading: false,
     
-    // Notifications
+    // Notifications with enhanced structure
     notifications: [],
     
     // Navigation
     currentFolder: null,
-    breadcrumbs: [{ name: 'Racine', id: null }]
+    breadcrumbs: [{ name: 'Racine', id: null }],
+    
+    // Performance & Caching
+    cache: {
+      permissions: new Map(),
+      files: new Map(),
+      folders: new Map()
+    },
+    
+    // App Performance
+    performance: {
+      apiCalls: [],
+      slowOperations: [],
+      lastUpdate: null
+    },
+    
+    // User Preferences
+    preferences: {
+      theme: localStorage.getItem('theme') || 'light',
+      language: localStorage.getItem('language') || 'fr',
+      fileView: localStorage.getItem('fileView') || 'grid',
+      itemsPerPage: parseInt(localStorage.getItem('itemsPerPage')) || 50
+    }
   },
 
   getters: {
@@ -33,7 +56,22 @@ export default createStore({
     username: (state) => state.user?.username || '',
     userEmail: (state) => state.user?.email || '',
     userQuota: (state) => state.user?.quota_mb || 0,
-    currentFolderId: (state) => state.currentFolder?.id || null
+    currentFolderId: (state) => state.currentFolder?.id || null,
+    
+    // Performance getters
+    recentApiCalls: (state) => state.performance.apiCalls.slice(-10),
+    slowOperationsCount: (state) => state.performance.slowOperations.length,
+    
+    // Cache getters
+    getCachedPermissions: (state) => (resourceId) => state.cache.permissions.get(resourceId),
+    getCachedFile: (state) => (fileId) => state.cache.files.get(fileId),
+    getCachedFolder: (state) => (folderId) => state.cache.folders.get(folderId),
+    
+    // Preferences getters
+    currentTheme: (state) => state.preferences.theme,
+    currentLanguage: (state) => state.preferences.language,
+    preferredFileView: (state) => state.preferences.fileView,
+    preferredItemsPerPage: (state) => state.preferences.itemsPerPage
   },
 
   mutations: {
@@ -72,25 +110,146 @@ export default createStore({
       state.breadcrumbs = breadcrumbs
     },
 
-    // Notifications mutations
+    // Enhanced Notifications mutations
     ADD_NOTIFICATION(state, notification) {
-      const id = Date.now()
-      state.notifications.push({
+      const id = Date.now() + Math.random()
+      const newNotification = {
         id,
         type: notification.type || 'info',
         title: notification.title || '',
         message: notification.message || '',
-        timeout: notification.timeout || 5000
-      })
+        timeout: notification.timeout || 5000,
+        actions: notification.actions || [],
+        persistent: notification.persistent || false,
+        timestamp: new Date().toISOString()
+      }
+      
+      state.notifications.push(newNotification)
 
-      // Auto-remove notification
-      setTimeout(() => {
-        state.notifications = state.notifications.filter(n => n.id !== id)
-      }, notification.timeout || 5000)
+      // Auto-remove notification if not persistent
+      if (!newNotification.persistent && newNotification.timeout > 0) {
+        setTimeout(() => {
+          state.notifications = state.notifications.filter(n => n.id !== id)
+        }, newNotification.timeout)
+      }
     },
 
     REMOVE_NOTIFICATION(state, id) {
       state.notifications = state.notifications.filter(n => n.id !== id)
+    },
+
+    CLEAR_ALL_NOTIFICATIONS(state) {
+      state.notifications = []
+    },
+
+    // Performance mutations
+    ADD_API_CALL(state, apiCall) {
+      state.performance.apiCalls.push({
+        ...apiCall,
+        timestamp: Date.now()
+      })
+      
+      // Keep only last 100 API calls
+      if (state.performance.apiCalls.length > 100) {
+        state.performance.apiCalls = state.performance.apiCalls.slice(-100)
+      }
+      
+      // Track slow operations
+      if (apiCall.duration > 200) {
+        state.performance.slowOperations.push(apiCall)
+        
+        // Keep only last 50 slow operations
+        if (state.performance.slowOperations.length > 50) {
+          state.performance.slowOperations = state.performance.slowOperations.slice(-50)
+        }
+      }
+      
+      state.performance.lastUpdate = Date.now()
+    },
+
+    CLEAR_PERFORMANCE_DATA(state) {
+      state.performance.apiCalls = []
+      state.performance.slowOperations = []
+      state.performance.lastUpdate = Date.now()
+    },
+
+    // Cache mutations
+    SET_CACHED_PERMISSIONS(state, { resourceId, permissions }) {
+      state.cache.permissions.set(resourceId, {
+        data: permissions,
+        timestamp: Date.now(),
+        ttl: 5 * 60 * 1000 // 5 minutes
+      })
+    },
+
+    SET_CACHED_FILE(state, { fileId, file }) {
+      state.cache.files.set(fileId, {
+        data: file,
+        timestamp: Date.now(),
+        ttl: 10 * 60 * 1000 // 10 minutes
+      })
+    },
+
+    SET_CACHED_FOLDER(state, { folderId, folder }) {
+      state.cache.folders.set(folderId, {
+        data: folder,
+        timestamp: Date.now(),
+        ttl: 10 * 60 * 1000 // 10 minutes
+      })
+    },
+
+    CLEAR_CACHE(state, cacheType = 'all') {
+      if (cacheType === 'all' || cacheType === 'permissions') {
+        state.cache.permissions.clear()
+      }
+      if (cacheType === 'all' || cacheType === 'files') {
+        state.cache.files.clear()
+      }
+      if (cacheType === 'all' || cacheType === 'folders') {
+        state.cache.folders.clear()
+      }
+    },
+
+    CLEANUP_EXPIRED_CACHE(state) {
+      const now = Date.now()
+      
+      // Clean permissions cache
+      for (const [key, value] of state.cache.permissions.entries()) {
+        if (now - value.timestamp > value.ttl) {
+          state.cache.permissions.delete(key)
+        }
+      }
+      
+      // Clean files cache
+      for (const [key, value] of state.cache.files.entries()) {
+        if (now - value.timestamp > value.ttl) {
+          state.cache.files.delete(key)
+        }
+      }
+      
+      // Clean folders cache
+      for (const [key, value] of state.cache.folders.entries()) {
+        if (now - value.timestamp > value.ttl) {
+          state.cache.folders.delete(key)
+        }
+      }
+    },
+
+    // Preferences mutations
+    SET_PREFERENCE(state, { key, value }) {
+      state.preferences[key] = value
+      localStorage.setItem(key, value.toString())
+    },
+
+    SET_THEME(state, theme) {
+      state.preferences.theme = theme
+      localStorage.setItem('theme', theme)
+      document.documentElement.setAttribute('data-theme', theme)
+    },
+
+    SET_LANGUAGE(state, language) {
+      state.preferences.language = language
+      localStorage.setItem('language', language)
     }
   },
 
@@ -146,7 +305,7 @@ export default createStore({
       dispatch('navigateToFolder', null)
     },
 
-    // Notification actions
+    // Enhanced Notification actions
     showNotification({ commit }, notification) {
       commit('ADD_NOTIFICATION', notification)
     },
@@ -185,6 +344,99 @@ export default createStore({
         message,
         timeout: 4000
       })
+    },
+
+    showPersistentNotification({ commit }, notification) {
+      commit('ADD_NOTIFICATION', {
+        ...notification,
+        persistent: true,
+        timeout: 0
+      })
+    },
+
+    clearAllNotifications({ commit }) {
+      commit('CLEAR_ALL_NOTIFICATIONS')
+    },
+
+    // Performance actions
+    trackApiCall({ commit }, apiCall) {
+      commit('ADD_API_CALL', apiCall)
+      
+      // Performance monitoring removed for now
+      console.debug('API call tracked:', apiCall.operation, apiCall.duration + 'ms')
+    },
+
+    clearPerformanceData({ commit }) {
+      commit('CLEAR_PERFORMANCE_DATA')
+    },
+
+    // Cache actions
+    getCachedData({ state, commit }, { type, id }) {
+      const cache = state.cache[type]
+      const cached = cache.get(id)
+      
+      if (cached) {
+        const now = Date.now()
+        if (now - cached.timestamp < cached.ttl) {
+          return cached.data
+        } else {
+          // Remove expired cache
+          cache.delete(id)
+        }
+      }
+      
+      return null
+    },
+
+    setCachedData({ commit }, { type, id, data }) {
+      const mutation = {
+        permissions: 'SET_CACHED_PERMISSIONS',
+        files: 'SET_CACHED_FILE',
+        folders: 'SET_CACHED_FOLDER'
+      }[type]
+      
+      if (mutation) {
+        const payload = {}
+        payload[`${type.slice(0, -1)}Id`] = id
+        payload[type.slice(0, -1)] = data
+        commit(mutation, payload)
+      }
+    },
+
+    clearCache({ commit }, cacheType) {
+      commit('CLEAR_CACHE', cacheType)
+    },
+
+    cleanupExpiredCache({ commit }) {
+      commit('CLEANUP_EXPIRED_CACHE')
+    },
+
+    // Preferences actions
+    updatePreference({ commit }, { key, value }) {
+      commit('SET_PREFERENCE', { key, value })
+    },
+
+    setTheme({ commit }, theme) {
+      commit('SET_THEME', theme)
+    },
+
+    setLanguage({ commit }, language) {
+      commit('SET_LANGUAGE', language)
+    },
+
+    // Initialize app
+    async initializeApp({ commit, dispatch }) {
+      // Set initial theme
+      const theme = localStorage.getItem('theme') || 'light'
+      document.documentElement.setAttribute('data-theme', theme)
+      
+      // Start cache cleanup interval
+      setInterval(() => {
+        dispatch('cleanupExpiredCache')
+      }, 5 * 60 * 1000) // Every 5 minutes
+      
+      // Performance tracking removed for now
+      console.log('App initialized successfully')
     }
   }
 })

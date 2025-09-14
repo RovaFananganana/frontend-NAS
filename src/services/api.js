@@ -2,6 +2,7 @@
 import axios from "axios";
 import { getToken, removeToken } from "./auth";
 import router from "../router";
+import { setupApiPerformanceTracking } from "./performance";
 
 // ⚠️ Avec Vite, on utilise import.meta.env
 const API_BASE_URL =
@@ -14,6 +15,9 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+// Setup performance tracking
+setupApiPerformanceTracking(api);
 
 // Intercepteur pour ajouter le token d'authentification
 api.interceptors.request.use(
@@ -76,6 +80,12 @@ export const userAPI = {
   deleteFolder: (folderId) => api.delete(`/users/folders/${folderId}`),
 
   deleteFile: (fileId) => api.delete(`/users/files/${fileId}`),
+
+  updateFile: (fileId, data) => api.put(`/users/files/${fileId}`, data),
+
+  moveFile: (fileId, data) => api.put(`/users/files/${fileId}/move`, data),
+
+  moveFolder: (folderId, data) => api.put(`/users/folders/${folderId}/move`, data),
 
   // Storage
   getStorageInfo: () => api.get("/users/storage-info"),

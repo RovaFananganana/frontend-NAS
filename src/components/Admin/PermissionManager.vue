@@ -1,67 +1,230 @@
 <template>
-  <div class="p-6">
-    <div class="card bg-base-100 shadow-xl">
-      <div class="card-body">
-        <h2 class="text-lg font-bold mb-4">Gestion des permissions par dossier</h2>
+  <div class="p-6 space-y-6">
+    <!-- Header with actions -->
+    <div class="flex items-center justify-between">
+      <h2 class="text-2xl font-bold flex items-center">
+        <i class="fas fa-shield-alt mr-3 text-primary"></i>
+        Permission Management
+      </h2>
+      <div class="flex gap-2">
+        <button 
+          class="btn btn-sm btn-outline"
+          @click="refreshPermissions"
+          :disabled="loading"
+        >
+          <i class="fas fa-sync-alt mr-2" :class="{ 'animate-spin': loading }"></i>
+          Refresh
+        </button>
+        <button 
+          class="btn btn-sm btn-primary"
+          @click="openBulkPermissionModal"
+        >
+          <i class="fas fa-users-cog mr-2"></i>
+          Bulk Permissions
+        </button>
+      </div>
+    </div>
 
-        <!-- Cas aucun dossier -->
-        <div v-if="folders.length === 0" class="text-center text-gray-500">
-          Aucun dossier chargé
+    <!-- Filters and search -->
+    <div class="flex items-center gap-4 flex-wrap">
+      <div class="flex-1 min-w-64">
+        <div class="relative">
+          <input 
+            v-model="searchQuery" 
+            placeholder="Search folders, users, or groups..." 
+            class="input input-bordered w-full pl-10"
+          />
+          <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
         </div>
+      </div>
+      
+      <select v-model="filterType" class="select select-bordered">
+        <option value="all">All Resources</option>
+        <option value="folders">Folders Only</option>
+        <option value="files">Files Only</option>
+      </select>
 
-        <!-- Tableau des dossiers et permissions -->
-        <div v-else class="overflow-x-auto">
-          <table class="table table-zebra w-full">
-            <thead>
-              <tr>
-                <th>Dossier</th>
-                <th>Utilisateur / Groupe</th>
-                <th>Lecture</th>
-                <th>Écriture</th>
-                <th>Suppression</th>
-                <th>Partage</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template v-for="folder in folders" :key="folder.id">
-                <tr v-for="perm in folder.permissions" :key="perm.id">
-                  <td>{{ folder.name }}</td>
-                  <td>{{ perm.target_name }}</td>
-                  <td>
-                    <button
-                      :class="['badge badge-xs cursor-pointer', perm.can_read ? 'badge-success' : 'badge-outline']"
-                      @click="toggleRight(folder, perm, 'can_read')"
-                    >R</button>
-                  </td>
-                  <td>
-                    <button
-                      :class="['badge badge-xs cursor-pointer', perm.can_write ? 'badge-success' : 'badge-outline']"
-                      @click="toggleRight(folder, perm, 'can_write')"
-                    >W</button>
-                  </td>
-                  <td>
-                    <button
-                      :class="['badge badge-xs cursor-pointer', perm.can_delete ? 'badge-success' : 'badge-outline']"
-                      @click="toggleRight(folder, perm, 'can_delete')"
-                    >D</button>
-                  </td>
-                  <td>
-                    <button
-                      :class="['badge badge-xs cursor-pointer', perm.can_share ? 'badge-success' : 'badge-outline']"
-                      @click="toggleRight(folder, perm, 'can_share')"
-                    >S</button>
-                  </td>
-                  <td class="flex gap-1">
-                    <button class="btn btn-xs btn-success" @click="openAddPermissionModal(folder)">+</button>
-                    <button class="btn btn-xs btn-warning" @click="editPermission(folder, perm)">✎</button>
-                    <button class="btn btn-xs btn-error" @click="removePermission(folder, perm)">🗑</button>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
+      <select v-model="filterPermission" class="select select-bordered">
+        <option value="all">All Permissions</option>
+        <option value="read">Read Access</option>
+        <option value="write">Write Access</option>
+        <option value="delete">Delete Access</option>
+        <option value="share">Share Access</option>
+      </select>
+    </div>
+
+    <!-- Loading state -->
+    <div v-if="loading && folders.length === 0" class="space-y-4">
+      <div v-for="i in 5" :key="i" class="skeleton h-16 w-full"></div>
+    </div>
+
+    <!-- Error state -->
+    <div v-else-if="error" class="alert alert-error">
+      <i class="fas fa-exclamation-triangle"></i>
+      <span>{{ error }}</span>
+      <button class="btn btn-sm btn-outline" @click="loadFolders">
+        <i class="fas fa-refresh mr-2"></i>
+        Retry
+      </button>
+    </div>
+
+    <!-- Empty state -->
+    <div v-else-if="filteredFolders.length === 0" class="text-center py-12">
+      <i class="fas fa-folder-open text-6xl text-gray-300 mb-4"></i>
+      <h3 class="text-lg font-semibold text-gray-600 mb-2">No folders found</h3>
+      <p class="text-gray-500">
+        {{ searchQuery ? 'No folders match your search criteria' : 'No folders have been created yet' }}
+      </p>
+    </div>
+
+    <!-- Permission cards view -->
+    <div v-else class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div 
+        v-for="folder in paginatedFolders" 
+        :key="folder.id"
+        class="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow"
+      >
+        <div class="card-body">
+          <!-- Folder header -->
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center">
+              <i class="fas fa-folder text-primary text-xl mr-3"></i>
+              <div>
+                <h3 class="font-semibold text-lg">{{ folder.name }}</h3>
+                <p class="text-sm text-base-content/70">{{ folder.permissions.length }} permission(s)</p>
+              </div>
+            </div>
+            <div class="dropdown dropdown-end">
+              <button tabindex="0" class="btn btn-ghost btn-sm">
+                <i class="fas fa-ellipsis-v"></i>
+              </button>
+              <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52">
+                <li><a @click="openAddPermissionModal(folder)"><i class="fas fa-plus mr-2"></i>Add Permission</a></li>
+                <li><a @click="viewFolderDetails(folder)"><i class="fas fa-eye mr-2"></i>View Details</a></li>
+                <li><a @click="exportFolderPermissions(folder)"><i class="fas fa-download mr-2"></i>Export</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Permissions list -->
+          <div class="space-y-3 max-h-64 overflow-y-auto">
+            <div 
+              v-for="perm in folder.permissions" 
+              :key="perm.id"
+              class="flex items-center justify-between p-3 bg-base-200 rounded-lg"
+            >
+              <div class="flex items-center flex-1">
+                <div class="avatar placeholder mr-3">
+                  <div class="bg-neutral-focus text-neutral-content rounded-full w-8">
+                    <i class="fas" :class="perm.target_type === 'user' ? 'fa-user' : 'fa-users'"></i>
+                  </div>
+                </div>
+                <div class="flex-1">
+                  <div class="font-medium">{{ perm.target_name }}</div>
+                  <div class="text-xs text-base-content/70">{{ perm.target_type }}</div>
+                </div>
+              </div>
+
+              <!-- Permission badges -->
+              <div class="flex gap-1 mr-3">
+                <button
+                  :class="['badge badge-xs cursor-pointer transition-colors', 
+                          perm.can_read ? 'badge-success' : 'badge-outline hover:badge-success']"
+                  @click="toggleRight(folder, perm, 'can_read')"
+                  :title="perm.can_read ? 'Remove read access' : 'Grant read access'"
+                >
+                  R
+                </button>
+                <button
+                  :class="['badge badge-xs cursor-pointer transition-colors', 
+                          perm.can_write ? 'badge-warning' : 'badge-outline hover:badge-warning']"
+                  @click="toggleRight(folder, perm, 'can_write')"
+                  :title="perm.can_write ? 'Remove write access' : 'Grant write access'"
+                >
+                  W
+                </button>
+                <button
+                  :class="['badge badge-xs cursor-pointer transition-colors', 
+                          perm.can_delete ? 'badge-error' : 'badge-outline hover:badge-error']"
+                  @click="toggleRight(folder, perm, 'can_delete')"
+                  :title="perm.can_delete ? 'Remove delete access' : 'Grant delete access'"
+                >
+                  D
+                </button>
+                <button
+                  :class="['badge badge-xs cursor-pointer transition-colors', 
+                          perm.can_share ? 'badge-info' : 'badge-outline hover:badge-info']"
+                  @click="toggleRight(folder, perm, 'can_share')"
+                  :title="perm.can_share ? 'Remove share access' : 'Grant share access'"
+                >
+                  S
+                </button>
+              </div>
+
+              <!-- Actions -->
+              <div class="dropdown dropdown-end">
+                <button tabindex="0" class="btn btn-ghost btn-xs">
+                  <i class="fas fa-cog"></i>
+                </button>
+                <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-48">
+                  <li><a @click="editPermission(folder, perm)"><i class="fas fa-edit mr-2"></i>Edit</a></li>
+                  <li><a @click="duplicatePermission(folder, perm)"><i class="fas fa-copy mr-2"></i>Duplicate</a></li>
+                  <li><hr class="my-1"></li>
+                  <li><a @click="removePermission(folder, perm)" class="text-error"><i class="fas fa-trash mr-2"></i>Remove</a></li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Empty permissions state -->
+            <div v-if="folder.permissions.length === 0" class="text-center py-6 text-base-content/50">
+              <i class="fas fa-lock text-2xl mb-2"></i>
+              <p class="text-sm">No permissions set</p>
+              <button 
+                class="btn btn-xs btn-primary mt-2"
+                @click="openAddPermissionModal(folder)"
+              >
+                Add Permission
+              </button>
+            </div>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="totalPages > 1" class="flex justify-center">
+      <div class="btn-group">
+        <button 
+          class="btn btn-sm"
+          :disabled="currentPage === 1"
+          @click="currentPage = 1"
+        >
+          <i class="fas fa-angle-double-left"></i>
+        </button>
+        <button 
+          class="btn btn-sm"
+          :disabled="currentPage === 1"
+          @click="currentPage--"
+        >
+          <i class="fas fa-angle-left"></i>
+        </button>
+        <span class="btn btn-sm btn-disabled">
+          {{ currentPage }} / {{ totalPages }}
+        </span>
+        <button 
+          class="btn btn-sm"
+          :disabled="currentPage === totalPages"
+          @click="currentPage++"
+        >
+          <i class="fas fa-angle-right"></i>
+        </button>
+        <button 
+          class="btn btn-sm"
+          :disabled="currentPage === totalPages"
+          @click="currentPage = totalPages"
+        >
+          <i class="fas fa-angle-double-right"></i>
+        </button>
       </div>
     </div>
 
@@ -102,15 +265,43 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { permissionAPI } from '@/services/api'
 import { useStore } from 'vuex'
+import { createCachedApiCall, permissionCache, PerformanceMonitor } from '@/services/performance'
 
 const store = useStore()
+
+// Reactive data
 const folders = ref([])
 const users = ref([])
 const groups = ref([])
+const loading = ref(false)
+const error = ref('')
 
+// Filters and search
+const searchQuery = ref('')
+const filterType = ref('all')
+const filterPermission = ref('all')
+
+// Pagination
+const currentPage = ref(1)
+const itemsPerPage = ref(9)
+
+// Cached API calls
+const cachedGetAllResources = createCachedApiCall(
+  permissionAPI.getAllResources,
+  () => 'all-resources',
+  permissionCache
+)
+
+const cachedGetFolderPermissions = createCachedApiCall(
+  permissionAPI.getFolderPermissions,
+  (folderId) => `folder-permissions-${folderId}`,
+  permissionCache
+)
+
+// Modal state
 const modal = ref({
   visible: false,
   editing: false,
@@ -120,13 +311,70 @@ const modal = ref({
   permissions: { can_read: false, can_write: false, can_delete: false, can_share: false }
 })
 
-// Chargement des dossiers + permissions + utilisateurs/groupes
+const bulkModal = ref({
+  visible: false,
+  selectedFolders: [],
+  targetType: 'user',
+  targetName: '',
+  permissions: { can_read: false, can_write: false, can_delete: false, can_share: false }
+})
+
+// Computed properties
+const filteredFolders = computed(() => {
+  let filtered = folders.value
+
+  // Apply search filter
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(folder => {
+      const folderMatch = folder.name.toLowerCase().includes(query)
+      const permissionMatch = folder.permissions.some(p => 
+        p.target_name.toLowerCase().includes(query)
+      )
+      return folderMatch || permissionMatch
+    })
+  }
+
+  // Apply type filter
+  if (filterType.value !== 'all') {
+    // This would be extended for files when file permissions are added
+    filtered = filtered.filter(folder => folder.type === filterType.value || filterType.value === 'folders')
+  }
+
+  // Apply permission filter
+  if (filterPermission.value !== 'all') {
+    filtered = filtered.filter(folder => 
+      folder.permissions.some(p => p[`can_${filterPermission.value}`])
+    )
+  }
+
+  return filtered
+})
+
+const totalPages = computed(() => {
+  return Math.ceil(filteredFolders.value.length / itemsPerPage.value)
+})
+
+const paginatedFolders = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return filteredFolders.value.slice(start, end)
+})
+
+// Methods
 const loadFolders = async () => {
+  const monitor = PerformanceMonitor.start('PermissionManager.loadFolders')
+  
+  loading.value = true
+  error.value = ''
+  
   try {
-    const res = await permissionAPI.getAllResources()
+    const res = await cachedGetAllResources()
+    
     folders.value = res.data.folders.map(f => ({
       id: f.id,
       name: f.name,
+      type: 'folder',
       permissions: (f.permissions || []).map(p => ({
         id: p.id,
         target_name: p.target_name,
@@ -137,12 +385,25 @@ const loadFolders = async () => {
         can_share: p.can_share
       }))
     }))
+    
     users.value = res.data.users || []
     groups.value = res.data.groups || []
+    
   } catch (err) {
-    console.error('Erreur lors du chargement:', err)
-    store.dispatch('showError', 'Impossible de charger les dossiers')
+    console.error('Error loading folders:', err)
+    error.value = 'Failed to load folders and permissions'
+    store.dispatch('showError', error.value)
+  } finally {
+    loading.value = false
+    monitor.end()
   }
+}
+
+const refreshPermissions = async () => {
+  // Clear cache and reload
+  permissionCache.clear()
+  await loadFolders()
+  store.dispatch('showSuccess', 'Permissions refreshed')
 }
 
 // Toggle droit
@@ -237,6 +498,66 @@ const savePermission = async () => {
     store.dispatch('showError', 'Impossible de sauvegarder la permission')
   }
 }
+
+// Additional methods for the enhanced UI
+const openBulkPermissionModal = () => {
+  bulkModal.value.visible = true
+  bulkModal.value.selectedFolders = []
+  bulkModal.value.targetType = 'user'
+  bulkModal.value.targetName = ''
+  bulkModal.value.permissions = { can_read: false, can_write: false, can_delete: false, can_share: false }
+}
+
+const viewFolderDetails = (folder) => {
+  // Navigate to folder details view or open details modal
+  console.log('View folder details:', folder)
+  store.dispatch('showInfo', `Viewing details for ${folder.name}`)
+}
+
+const exportFolderPermissions = (folder) => {
+  // Export folder permissions to CSV or JSON
+  const permissions = folder.permissions.map(p => ({
+    folder: folder.name,
+    target: p.target_name,
+    type: p.target_type,
+    read: p.can_read,
+    write: p.can_write,
+    delete: p.can_delete,
+    share: p.can_share
+  }))
+  
+  const dataStr = JSON.stringify(permissions, null, 2)
+  const dataBlob = new Blob([dataStr], { type: 'application/json' })
+  const url = URL.createObjectURL(dataBlob)
+  
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${folder.name}_permissions.json`
+  link.click()
+  
+  URL.revokeObjectURL(url)
+  store.dispatch('showSuccess', `Permissions exported for ${folder.name}`)
+}
+
+const duplicatePermission = (folder, perm) => {
+  // Open modal with pre-filled permission data for duplication
+  modal.value.visible = true
+  modal.value.editing = false
+  modal.value.folder = folder
+  modal.value.targetType = perm.target_type
+  modal.value.targetName = '' // Clear name for new target
+  modal.value.permissions = { 
+    can_read: perm.can_read,
+    can_write: perm.can_write,
+    can_delete: perm.can_delete,
+    can_share: perm.can_share
+  }
+}
+
+// Watchers
+watch(searchQuery, () => {
+  currentPage.value = 1 // Reset to first page when searching
+})
 
 onMounted(() => loadFolders())
 </script>

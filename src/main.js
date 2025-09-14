@@ -4,15 +4,33 @@ import router from './router'
 import store from './store'
 import './assets/main.css'
 
-
 // Import Tailwind
 import './assets/main.css'
 //Import fontawesome
 import '@fortawesome/fontawesome-free/css/all.css'
 import '@fortawesome/fontawesome-free/js/all.js'
 
-
 const app = createApp(App)
-app.use(router)
+
 app.use(store)
+app.use(router)
+
+// Initialize app-wide features
+store.dispatch('initializeApp')
+
+// Global error handler
+app.config.errorHandler = (error, instance, info) => {
+  console.error('Global error:', error, info)
+  
+  // Show user-friendly error message
+  store.dispatch('showError', 'Une erreur inattendue s\'est produite. Veuillez actualiser la page.')
+}
+
+// Global warning handler
+app.config.warnHandler = (msg, instance, trace) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.warn('Vue warning:', msg, trace)
+  }
+}
+
 app.mount('#app')
