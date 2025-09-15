@@ -142,7 +142,7 @@
                       #{{ file.folder_id }}
                     </span>
                     <span v-else class="text-gray-500">Racine</span>
-                    <FileUpload owner-type="admin" :owner-id="selectedUserId" @uploaded="fetchFiles" />
+                    <FileUpload owner-type="admin" :owner-id="selectedUserId" @uploaded="loadFiles" />
                   </td>
                 </tr>
               </tbody>

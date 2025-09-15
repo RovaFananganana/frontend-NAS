@@ -230,33 +230,120 @@
 
     <!-- Modal pour ajouter/modifier une permission -->
     <div v-if="modal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white p-4 rounded shadow-lg w-96">
-        <h3 class="font-bold mb-2">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <h3 class="font-bold text-lg mb-4">
           {{ modal.editing ? 'Modifier' : 'Ajouter' }} permission pour {{ modal.folder?.name }}
         </h3>
-        <div class="flex flex-col gap-2 mb-4">
-          <label>
-            Type:
-            <select v-model="modal.targetType" class="input input-bordered w-full" :disabled="modal.editing">
+        <div class="flex flex-col gap-4 mb-6">
+          <label class="form-control">
+            <div class="label">
+              <span class="label-text">Type:</span>
+            </div>
+            <select v-model="modal.targetType" class="select select-bordered w-full" :disabled="modal.editing" @change="onTargetTypeChange">
               <option value="user">Utilisateur</option>
               <option value="group">Groupe</option>
             </select>
           </label>
-          <label>
-            Nom:
-            <input v-model="modal.targetName" class="input input-bordered w-full" placeholder="Nom utilisateur ou groupe" :disabled="modal.editing"/>
+          
+          <label class="form-control">
+            <div class="label">
+              <span class="label-text">{{ modal.targetType === 'user' ? 'Utilisateur' : 'Groupe' }}:</span>
+            </div>
+            <select v-model="modal.targetId" class="select select-bordered w-full" :disabled="modal.editing">
+              <option value="">-- Sélectionner --</option>
+              <option 
+                v-for="item in availableTargets" 
+                :key="item.id" 
+                :value="item.id"
+              >
+                {{ item.name }}
+              </option>
+            </select>
           </label>
-          <div class="flex flex-col gap-1">
-            <label><input type="checkbox" v-model="modal.permissions.can_read" /> Lecture</label>
-            <label><input type="checkbox" v-model="modal.permissions.can_write" /> Écriture</label>
-            <label><input type="checkbox" v-model="modal.permissions.can_delete" /> Suppression</label>
-            <label><input type="checkbox" v-model="modal.permissions.can_share" /> Partage</label>
+          
+          <div class="form-control">
+            <div class="label">
+              <span class="label-text">Permissions:</span>
+            </div>
+            <div class="flex flex-col gap-2">
+              <label class="cursor-pointer label justify-start gap-3">
+                <input type="checkbox" v-model="modal.permissions.can_read" class="checkbox checkbox-success" />
+                <span class="label-text">Lecture</span>
+              </label>
+              <label class="cursor-pointer label justify-start gap-3">
+                <input type="checkbox" v-model="modal.permissions.can_write" class="checkbox checkbox-warning" />
+                <span class="label-text">Écriture</span>
+              </label>
+              <label class="cursor-pointer label justify-start gap-3">
+                <input type="checkbox" v-model="modal.permissions.can_delete" class="checkbox checkbox-error" />
+                <span class="label-text">Suppression</span>
+              </label>
+              <label class="cursor-pointer label justify-start gap-3">
+                <input type="checkbox" v-model="modal.permissions.can_share" class="checkbox checkbox-info" />
+                <span class="label-text">Partage</span>
+              </label>
+            </div>
           </div>
         </div>
         <div class="flex justify-end gap-2">
-          <button class="btn btn-sm" @click="closeModal">Annuler</button>
-          <button class="btn btn-sm btn-primary" @click="savePermission">
+          <button class="btn btn-outline" @click="closeModal">Annuler</button>
+          <button class="btn btn-primary" @click="showConfirmationModal" :disabled="!modal.targetId">
             {{ modal.editing ? 'Enregistrer' : 'Ajouter' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de confirmation -->
+    <div v-if="confirmationModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <h3 class="font-bold text-lg mb-4 flex items-center">
+          <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
+          Confirmer l'ajout de permission
+        </h3>
+        <div class="mb-6">
+          <p class="mb-4">Vous êtes sur le point d'ajouter les permissions suivantes :</p>
+          <div class="bg-base-200 p-4 rounded-lg">
+            <div class="font-semibold mb-2">
+              <i class="fas fa-folder mr-2"></i>{{ modal.folder?.name }}
+            </div>
+            <div class="mb-2">
+              <i class="fas mr-2" :class="modal.targetType === 'user' ? 'fa-user' : 'fa-users'"></i>
+              {{ getTargetName() }} ({{ modal.targetType === 'user' ? 'Utilisateur' : 'Groupe' }})
+            </div>
+            <div class="flex gap-2 flex-wrap">
+              <span v-if="modal.permissions.can_read" class="badge badge-success">Lecture</span>
+              <span v-if="modal.permissions.can_write" class="badge badge-warning">Écriture</span>
+              <span v-if="modal.permissions.can_delete" class="badge badge-error">Suppression</span>
+              <span v-if="modal.permissions.can_share" class="badge badge-info">Partage</span>
+              <span v-if="!hasAnyPermission" class="badge badge-outline">Aucune permission</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-outline" @click="closeConfirmationModal">Annuler</button>
+          <button class="btn btn-primary" @click="confirmSavePermission">
+            <i class="fas fa-check mr-2"></i>
+            Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de succès -->
+    <div v-if="successModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <div class="text-center">
+          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-success text-success-content mb-4">
+            <i class="fas fa-check text-xl"></i>
+          </div>
+          <h3 class="font-bold text-lg mb-2">Permission ajoutée avec succès !</h3>
+          <p class="text-base-content/70 mb-6">
+            La permission a été accordée à {{ successModal.targetName }} pour le dossier {{ successModal.folderName }}.
+          </p>
+          <button class="btn btn-primary" @click="closeSuccessModal">
+            <i class="fas fa-thumbs-up mr-2"></i>
+            Parfait !
           </button>
         </div>
       </div>
@@ -307,15 +394,25 @@ const modal = ref({
   editing: false,
   folder: null,
   targetType: 'user',
-  targetName: '',
+  targetId: '',
   permissions: { can_read: false, can_write: false, can_delete: false, can_share: false }
+})
+
+const confirmationModal = ref({
+  visible: false
+})
+
+const successModal = ref({
+  visible: false,
+  targetName: '',
+  folderName: ''
 })
 
 const bulkModal = ref({
   visible: false,
   selectedFolders: [],
   targetType: 'user',
-  targetName: '',
+  targetId: '',
   permissions: { can_read: false, can_write: false, can_delete: false, can_share: false }
 })
 
@@ -359,6 +456,21 @@ const paginatedFolders = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage.value
   const end = start + itemsPerPage.value
   return filteredFolders.value.slice(start, end)
+})
+
+const availableTargets = computed(() => {
+  if (modal.value.targetType === 'user') {
+    return users.value.map(u => ({ id: u.id, name: u.username }))
+  } else {
+    return groups.value.map(g => ({ id: g.id, name: g.name }))
+  }
+})
+
+const hasAnyPermission = computed(() => {
+  return modal.value.permissions.can_read || 
+         modal.value.permissions.can_write || 
+         modal.value.permissions.can_delete || 
+         modal.value.permissions.can_share
 })
 
 // Methods
@@ -435,13 +547,13 @@ const removePermission = async (folder, perm) => {
   }
 }
 
-// Modal
+// Modal methods
 const openAddPermissionModal = (folder) => {
   modal.value.visible = true
   modal.value.editing = false
   modal.value.folder = folder
   modal.value.targetType = 'user'
-  modal.value.targetName = ''
+  modal.value.targetId = ''
   modal.value.permissions = { can_read: false, can_write: false, can_delete: false, can_share: false }
 }
 
@@ -450,7 +562,7 @@ const editPermission = (folder, perm) => {
   modal.value.editing = true
   modal.value.folder = folder
   modal.value.targetType = perm.target_type
-  modal.value.targetName = perm.target_name
+  modal.value.targetId = perm.target_id
   modal.value.permissions = { 
     can_read: perm.can_read,
     can_write: perm.can_write,
@@ -464,8 +576,36 @@ const closeModal = () => {
   modal.value.visible = false
 }
 
-const savePermission = async () => {
-  if (!modal.value.targetName) return
+const onTargetTypeChange = () => {
+  modal.value.targetId = ''
+}
+
+const getTargetName = () => {
+  if (modal.value.targetType === 'user') {
+    const user = users.value.find(u => u.id === modal.value.targetId)
+    return user ? user.username : ''
+  } else {
+    const group = groups.value.find(g => g.id === modal.value.targetId)
+    return group ? group.name : ''
+  }
+}
+
+const showConfirmationModal = () => {
+  if (!modal.value.targetId) return
+  confirmationModal.value.visible = true
+}
+
+const closeConfirmationModal = () => {
+  confirmationModal.value.visible = false
+}
+
+const closeSuccessModal = () => {
+  successModal.value.visible = false
+  closeModal()
+  loadFolders()
+}
+
+const confirmSavePermission = async () => {
   try {
     if (modal.value.editing) {
       // Modification
@@ -476,26 +616,28 @@ const savePermission = async () => {
         await permissionAPI.setFolderGroupPermission(modal.value.folder.id, permId, modal.value.permissions)
       }
       store.dispatch('showSuccess', 'Permission modifiée')
+      closeConfirmationModal()
+      closeModal()
+      loadFolders()
     } else {
       // Ajout
-      let targetId
+      const targetId = modal.value.targetId
       if (modal.value.targetType === 'user') {
-        const user = users.value.find(u => u.username === modal.value.targetName)
-        if (!user) return store.dispatch('showError', 'Utilisateur introuvable')
-        targetId = user.id
+        await permissionAPI.setFolderUserPermission(modal.value.folder.id, targetId, modal.value.permissions)
       } else {
-        const group = groups.value.find(g => g.name === modal.value.targetName)
-        if (!group) return store.dispatch('showError', 'Groupe introuvable')
-        targetId = group.id
+        await permissionAPI.setFolderGroupPermission(modal.value.folder.id, targetId, modal.value.permissions)
       }
-      await permissionAPI.setFolderUserPermission(modal.value.folder.id, targetId, modal.value.permissions)
-      store.dispatch('showSuccess', 'Permission ajoutée')
+      
+      // Show success modal
+      successModal.value.visible = true
+      successModal.value.targetName = getTargetName()
+      successModal.value.folderName = modal.value.folder.name
+      closeConfirmationModal()
     }
-    closeModal()
-    loadFolders()
   } catch (err) {
     console.error(err)
     store.dispatch('showError', 'Impossible de sauvegarder la permission')
+    closeConfirmationModal()
   }
 }
 
@@ -504,7 +646,7 @@ const openBulkPermissionModal = () => {
   bulkModal.value.visible = true
   bulkModal.value.selectedFolders = []
   bulkModal.value.targetType = 'user'
-  bulkModal.value.targetName = ''
+  bulkModal.value.targetId = ''
   bulkModal.value.permissions = { can_read: false, can_write: false, can_delete: false, can_share: false }
 }
 
@@ -545,7 +687,7 @@ const duplicatePermission = (folder, perm) => {
   modal.value.editing = false
   modal.value.folder = folder
   modal.value.targetType = perm.target_type
-  modal.value.targetName = '' // Clear name for new target
+  modal.value.targetId = '' // Clear ID for new target
   modal.value.permissions = { 
     can_read: perm.can_read,
     can_write: perm.can_write,

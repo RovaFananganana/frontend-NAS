@@ -437,6 +437,24 @@ export default createStore({
       
       // Performance tracking removed for now
       console.log('App initialized successfully')
+    },
+
+    // Storage info action
+    async fetchStorageInfo({ commit }) {
+      try {
+        const { userAPI } = await import('../services/api')
+        const response = await userAPI.getStorageInfo()
+        const data = response.data
+        
+        const used = data.used_mb || 0
+        const total = data.quota_mb || 0
+        const usage = `${used}/${total} MB`
+        
+        return usage
+      } catch (error) {
+        console.error('Error fetching storage info:', error)
+        return '0/0 MB'
+      }
     }
   }
 })

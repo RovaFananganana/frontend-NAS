@@ -66,8 +66,8 @@ class PerformanceTracker {
       console.warn(`Slow API request: ${requestData.method} ${requestData.url} took ${duration}ms`);
     }
 
-    // Send to backend if enabled
-    if (import.meta.env.VITE_ENABLE_FRONTEND_METRICS === 'true') {
+    // Send to backend if enabled (temporarily disabled for debugging)
+    if (import.meta.env.VITE_ENABLE_FRONTEND_METRICS === 'true' && false) {
       this.sendMetricToBackend({
         endpoint,
         method: requestData.method,
@@ -103,21 +103,36 @@ class PerformanceTracker {
   async sendMetricToBackend(metric) {
     try {
       // Don't track the metrics endpoint itself to avoid recursion
-      if (metric.endpoint.includes('/metrics')) return;
+      if (metric.endpoint && metric.endpoint.includes('/metrics')) return;
 
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
       
-      await fetch(`${API_BASE_URL}/api/metrics/frontend`, {
+      // Ensure all required fields are present
+      const cleanMetric = {
+        endpoint: metric.endpoint || 'unknown',
+        method: metric.method || 'GET',
+        duration: Number(metric.duration) || 0,
+        timestamp: metric.timestamp || new Date().toISOString(),
+        success: metric.success !== false,
+        userAgent: metric.userAgent || navigator.userAgent,
+        url: metric.url || 'unknown'
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/metrics/frontend`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
+          'Authorization': `Bearer ${getToken() || ''}`
         },
-        body: JSON.stringify(metric)
+        body: JSON.stringify(cleanMetric)
       });
+
+      if (!response.ok) {
+        console.debug(`Metrics API returned ${response.status}: ${response.statusText}`);
+      }
     } catch (error) {
       // Silently fail - don't break the app for metrics
-      console.debug('Failed to send frontend metric:', error);
+      console.debug('Failed to send frontend metric:', error.message);
     }
   }
 

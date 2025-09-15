@@ -149,10 +149,10 @@ const permissionAPI = {
     api.get(`/permissions/folders/${folderId}`),
   
   setFolderUserPermission: (folderId, userId, permissions) =>
-    api.post(`/permissions/folders/${folderId}/users/${userId}`, permissions),
+    api.post(`/permissions/folders/${folderId}/user/${userId}`, permissions),
   
   setFolderGroupPermission: (folderId, groupId, permissions) =>
-    api.post(`/permissions/folders/${folderId}/groups/${groupId}`, permissions),
+    api.post(`/permissions/folders/${folderId}/group/${groupId}`, permissions),
   
   deleteFolderPermission: (folderId, permissionId) =>
     api.delete(`/permissions/folders/${folderId}/permissions/${permissionId}`),
@@ -162,10 +162,10 @@ const permissionAPI = {
     api.get(`/permissions/files/${fileId}`),
   
   setFileUserPermission: (fileId, userId, permissions) =>
-    api.post(`/permissions/files/${fileId}/users/${userId}`, permissions),
+    api.post(`/permissions/files/${fileId}/user/${userId}`, permissions),
   
   setFileGroupPermission: (fileId, groupId, permissions) =>
-    api.post(`/permissions/files/${fileId}/groups/${groupId}`, permissions),
+    api.post(`/permissions/files/${fileId}/group/${groupId}`, permissions),
   
   deleteFilePermission: (fileId, permissionId) =>
     api.delete(`/permissions/files/${fileId}/permissions/${permissionId}`),
