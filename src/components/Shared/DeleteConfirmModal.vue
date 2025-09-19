@@ -1,129 +1,205 @@
+<!-- components/Shared/DeleteConfirmModal.vue -->
 <template>
-  <Modal
-    :visible="visible"
-    title="Confirm Deletion"
-    show-confirm
-    confirm-text="Delete"
-    confirm-class="btn-error"
-    @close="$emit('update:visible', false)"
-    @confirm="deleteItems"
-  >
-    <div class="space-y-4">
-      <div class="alert alert-warning">
+  <div class="modal modal-open">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg mb-4 text-error">
+        <i class="fas fa-exclamation-triangle mr-2"></i>
+        Confirmer la suppression
+      </h3>
+
+      <!-- Warning message -->
+      <div class="alert alert-warning mb-4">
         <i class="fas fa-exclamation-triangle"></i>
         <div>
-          <h3 class="font-bold">This action cannot be undone!</h3>
-          <div class="text-xs">The following items will be permanently deleted.</div>
+          <h4 class="font-bold">Attention !</h4>
+          <p>Cette action est irréversible. Les éléments seront définitivement supprimés du NAS.</p>
         </div>
       </div>
 
-      <div v-if="items && items.length > 0">
+      <!-- Items to delete -->
+      <div class="bg-base-200 p-4 rounded-lg mb-4">
         <h4 class="font-semibold mb-2">
-          Items to delete ({{ items.length }}):
+          {{ items.length === 1 ? 'Élément à supprimer :' : `${items.length} éléments à supprimer :` }}
         </h4>
-        <div class="max-h-48 overflow-y-auto space-y-2">
+        <div class="space-y-2 max-h-48 overflow-auto">
           <div 
             v-for="item in items" 
-            :key="item.id"
-            class="flex items-center p-2 bg-base-200 rounded"
+            :key="item.path"
+            class="flex items-center gap-3 p-2 bg-base-100 rounded"
           >
-            <i class="fas mr-3" :class="getItemIcon(item)"></i>
-            <span class="flex-1">{{ item.name }}</span>
-            <span class="text-xs text-base-content/70">{{ item.type }}</span>
+            <i :class="getItemIcon(item)" :style="{ color: getItemColor(item) }"></i>
+            <div class="flex-1">
+              <div class="font-medium">{{ item.name }}</div>
+              <div class="text-sm opacity-70">{{ item.path }}</div>
+              <div v-if="!item.is_directory" class="text-xs opacity-50">
+                {{ formatBytes(item.size) }}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="form-control">
-        <label class="label cursor-pointer">
-          <span class="label-text">I understand this action is permanent</span>
+      <!-- Confirmation checkbox for multiple items -->
+      <div v-if="items.length > 1" class="form-control mb-4">
+        <label class="label cursor-pointer justify-start gap-3">
           <input 
-            v-model="confirmUnderstood" 
+            v-model="confirmMultiple" 
             type="checkbox" 
             class="checkbox checkbox-error" 
           />
+          <span class="label-text">
+            Je confirme vouloir supprimer ces {{ items.length }} éléments
+          </span>
         </label>
       </div>
+
+      <!-- Actions -->
+      <div class="modal-action">
+        <button @click="$emit('close')" class="btn btn-outline">
+          Annuler
+        </button>
+        <button 
+          @click="deleteItems" 
+          :disabled="(items.length > 1 && !confirmMultiple) || loading"
+          class="btn btn-error"
+        >
+          <span v-if="loading" class="loading loading-spinner loading-sm mr-2"></span>
+          <i v-else class="fas fa-trash mr-2"></i>
+          Supprimer {{ items.length > 1 ? `${items.length} éléments` : '' }}
+        </button>
+      </div>
     </div>
-  </Modal>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { userAPI } from '@/services/api'
-import { useStore } from 'vuex'
-import Modal from './Modal.vue'
+import { ref } from 'vue'
 
 const props = defineProps({
-  visible: Boolean,
-  items: Array
+  items: {
+    type: Array,
+    required: true
+  }
 })
 
-const emit = defineEmits(['update:visible', 'deleted'])
+const emit = defineEmits(['close', 'confirmed'])
 
-const store = useStore()
-const confirmUnderstood = ref(false)
-const deleting = ref(false)
+// State
+const loading = ref(false)
+const confirmMultiple = ref(false)
 
-const canDelete = computed(() => {
-  return confirmUnderstood.value && props.items && props.items.length > 0
-})
-
+// Methods
 const deleteItems = async () => {
-  if (!canDelete.value || deleting.value) return
-
-  deleting.value = true
+  loading.value = true
 
   try {
-    const deletePromises = props.items.map(item => {
-      if (item.type === 'folder') {
-        return userAPI.deleteFolder(item.id)
-      } else {
-        return userAPI.deleteFile(item.id)
-      }
-    })
+    for (const item of props.items) {
+      await deleteItem(item)
+    }
 
-    await Promise.all(deletePromises)
-
-    emit('deleted')
-    emit('update:visible', false)
-    
-  } catch (error) {
-    console.error('Error deleting items:', error)
-    const message = error.response?.data?.message || error.message || 'Failed to delete items'
-    store.dispatch('showError', message)
+    emit('confirmed', props.items)
+    emit('close')
+  } catch (err) {
+    console.error('Error deleting items:', err)
+    // Handle error - could show toast notification
   } finally {
-    deleting.value = false
+    loading.value = false
   }
+}
+
+const deleteItem = async (item) => {
+  const response = await fetch('/nas/delete', {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      path: item.path
+    })
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+  }
+
+  const data = await response.json()
+
+  if (!data.success) {
+    throw new Error(data.error || 'Erreur lors de la suppression')
+  }
+}
+
+// Utility functions
+const formatBytes = (bytes) => {
+  if (!bytes || bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 const getItemIcon = (item) => {
-  if (item.type === 'folder') {
-    return 'fa-folder text-blue-500'
+  if (!item) return 'fas fa-file'
+  
+  if (item.is_directory) {
+    return 'fas fa-folder'
   }
   
-  const ext = item.name?.split('.').pop()?.toLowerCase()
+  const ext = item.name?.split('.').pop()?.toLowerCase() || ''
   const iconMap = {
-    'pdf': 'fa-file-pdf text-red-500',
-    'doc': 'fa-file-word text-blue-600',
-    'docx': 'fa-file-word text-blue-600',
-    'jpg': 'fa-file-image text-purple-500',
-    'jpeg': 'fa-file-image text-purple-500',
-    'png': 'fa-file-image text-purple-500',
-    'mp4': 'fa-file-video text-red-600',
-    'mp3': 'fa-file-audio text-green-500',
-    'zip': 'fa-file-archive text-yellow-600',
-    'txt': 'fa-file-alt text-gray-500',
-    'js': 'fa-file-code text-yellow-500'
+    'pdf': 'fas fa-file-pdf',
+    'doc': 'fas fa-file-word',
+    'docx': 'fas fa-file-word',
+    'xls': 'fas fa-file-excel',
+    'xlsx': 'fas fa-file-excel',
+    'jpg': 'fas fa-file-image',
+    'jpeg': 'fas fa-file-image',
+    'png': 'fas fa-file-image',
+    'gif': 'fas fa-file-image',
+    'mp4': 'fas fa-file-video',
+    'avi': 'fas fa-file-video',
+    'mp3': 'fas fa-file-audio',
+    'wav': 'fas fa-file-audio',
+    'zip': 'fas fa-file-archive',
+    'rar': 'fas fa-file-archive',
+    'txt': 'fas fa-file-alt',
+    'js': 'fas fa-file-code',
+    'html': 'fas fa-file-code',
+    'css': 'fas fa-file-code'
   }
-  
-  return iconMap[ext] || 'fa-file text-gray-400'
+  return iconMap[ext] || 'fas fa-file'
 }
 
-// Reset confirmation when modal opens/closes
-watch(() => props.visible, (newVal) => {
-  if (!newVal) {
-    confirmUnderstood.value = false
+const getItemColor = (item) => {
+  if (!item) return '#6b7280'
+  
+  if (item.is_directory) {
+    return '#3b82f6'
   }
-})
+  
+  const ext = item.name?.split('.').pop()?.toLowerCase() || ''
+  const colorMap = {
+    'pdf': '#dc2626',
+    'doc': '#2563eb',
+    'docx': '#2563eb',
+    'xls': '#059669',
+    'xlsx': '#059669',
+    'jpg': '#7c3aed',
+    'jpeg': '#7c3aed',
+    'png': '#7c3aed',
+    'gif': '#7c3aed',
+    'mp4': '#ea580c',
+    'avi': '#ea580c',
+    'mp3': '#10b981',
+    'wav': '#10b981',
+    'zip': '#6b7280',
+    'rar': '#6b7280',
+    'txt': '#374151',
+    'js': '#fbbf24',
+    'html': '#f97316',
+    'css': '#06b6d4'
+  }
+  return colorMap[ext] || '#6b7280'
+}
 </script>

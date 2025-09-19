@@ -2,24 +2,17 @@
 <template>
   <div class="flex h-screen bg-base-100">
     <!-- Sidebar -->
-    <Sidebar 
-      :activeTab="activeTab" 
-      @tab-changed="handleTabChange"
-      class="border-r border-base-300" 
-    />
+    <Sidebar :activeTab="activeTab" @tab-changed="handleTabChange" class="border-r border-base-300" />
 
     <!-- Main content -->
     <div class="flex-1 flex flex-col">
       <!-- Navbar -->
-      <Navbar 
-        :page-title="currentTabLabel"
-        class="border-b border-base-300" 
-      />
+      <Navbar :page-title="currentTabLabel" class="border-b border-base-300" />
 
       <!-- Page content -->
       <div class="flex-1 overflow-auto">
         <!-- Dynamic component -->
-        <component :is="currentComponent" />
+        <component :is="currentComponent" :user-role="'admin'" />
       </div>
     </div>
   </div>
@@ -35,7 +28,7 @@ import Sidebar from '../components/Shared/Sidebar.vue'
 import Dashboard from '@/components/Admin/Dashboard.vue'
 import UserManagement from '@/components/Admin/UserManagement.vue'
 import GroupManagement from '@/components/Admin/GroupManagement.vue'
-import FileExplorer from '@/components/Admin/FileExplorer.vue'
+import SimpleFileExplorer from '@/components/Shared/SimpleFileExplorer.vue'
 import PermissionManager from '@/components/Admin/PermissionManager.vue'
 import AccessLogs from '@/components/Admin/AccessLogs.vue'
 
@@ -44,8 +37,8 @@ const tabs = [
   { key: 'dash', label: 'Tableau de bord', comp: Dashboard },
   { key: 'users', label: 'Gestion des utilisateurs', comp: UserManagement },
   { key: 'groups', label: 'Gestion des groupes', comp: GroupManagement },
-  { key: 'explorer', label: 'Explorateur de fichiers', comp: FileExplorer },
-  { key: 'perms', label: 'Gestionnaire des droits des utilisateurs', comp: PermissionManager },
+  { key: 'explorer', label: 'Explorateur de fichiers', comp: SimpleFileExplorer },
+  { key: 'perms', label: 'Gestionnaire de permissions', comp: PermissionManager },
   { key: 'logs', label: 'Journaux d\'accès', comp: AccessLogs },
 ]
 

@@ -399,7 +399,6 @@ const showLogDetails = (log) => {
 // Lifecycle
 onMounted(async () => {
   await Promise.all([loadLogs(), loadUsers()])
-  console.log(permsRes.data)
 })
 </script>
 

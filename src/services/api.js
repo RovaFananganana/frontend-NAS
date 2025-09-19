@@ -140,7 +140,17 @@ export const adminAPI = {
   // Logs and Stats
   getLogs: (page = 1, perPage = 50) =>
     api.get("/admin/logs", { params: { page, per_page: perPage } }),
-  getStats: () => api.get("/admin/stats"),
+  getStats: (syncWithNas = false) => 
+    api.get("/admin/stats", { params: { sync: syncWithNas } }),
+  
+  // NAS Synchronization
+  syncWithNas: (options = {}) =>
+    api.post("/admin/sync-nas", {
+      dry_run: options.dryRun || false,
+      max_depth: options.maxDepth || 10
+    }),
+  
+  getNasStatus: () => api.get("/admin/nas-status"),
 };
 
 const permissionAPI = {
@@ -158,6 +168,17 @@ const permissionAPI = {
     api.delete(`/permissions/folders/${folderId}/permissions/${permissionId}`),
 
   // Gestion des permissions de fichiers
+  getFilePermissions: (fileId) => 
+    api.get(`/permissions/files/${fileId}`),
+  
+  setFileUserPermission: (fileId, userId, permissions) =>
+    api.post(`/permissions/files/${fileId}/user/${userId}`, permissions),
+  
+  setFileGroupPermission: (fileId, groupId, permissions) =>
+    api.post(`/permissions/files/${fileId}/group/${groupId}`, permissions),
+  
+  deleteFilePermission: (fileId, permissionId) =>
+    api.delete(`/permissions/files/${fileId}/permissions/${permissionId}`),
   getFilePermissions: (fileId) => 
     api.get(`/permissions/files/${fileId}`),
   

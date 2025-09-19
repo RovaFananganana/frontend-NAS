@@ -15,14 +15,42 @@
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <!-- <h1 class="text-3xl font-bold">Tableau de bord Admin</h1> -->
-      <button 
-        class="btn btn-primary btn-sm"
-        @click="refreshStats"
-        :disabled="loading"
-      >
-        <i class="fas fa-sync-alt mr-2"></i>
-        {{ loading ? 'Actualisation...' : 'Actualiser' }}
-      </button>
+      <div class="flex gap-2">
+        <button 
+          class="btn btn-secondary btn-sm"
+          @click="syncWithNas"
+          :disabled="syncing || (nasStatus && !nasStatus.connected)"
+          :title="nasStatus && !nasStatus.connected ? 'NAS not accessible - connect to work network' : ''"
+        >
+          <i class="fas fa-hdd mr-2" :class="{ 'animate-spin': syncing }"></i>
+          {{ syncing ? 'Synchronisation...' : 'Sync NAS' }}
+        </button>
+        <button 
+          class="btn btn-primary btn-sm"
+          @click="refreshStats"
+          :disabled="loading"
+        >
+          <i class="fas fa-sync-alt mr-2"></i>
+          {{ loading ? 'Actualisation...' : 'Actualiser' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- NAS Status -->
+    <div v-if="nasStatus" class="alert mb-6" :class="nasStatus.connected ? 'alert-success' : 'alert-warning'">
+      <i class="fas" :class="nasStatus.connected ? 'fa-check-circle' : 'fa-wifi-slash'"></i>
+      <div>
+        <h4 class="font-bold">NAS Status</h4>
+        <p>{{ nasStatus.message }}</p>
+        <div v-if="nasStatus.connected && nasStatus.server_info" class="text-sm mt-1">
+          Server: {{ nasStatus.server_info.ip }}:{{ nasStatus.server_info.port }} | 
+          Share: {{ nasStatus.server_info.share }} | 
+          Files: {{ nasStatus.root_files_count }}
+        </div>
+        <div v-else-if="!nasStatus.connected" class="text-sm mt-1">
+          💡 Tip: Connect to work network to enable NAS synchronization
+        </div>
+      </div>
     </div>
 
     <!-- Error Alert -->
@@ -47,6 +75,7 @@
         <div class="stat-value text-primary">{{ stats?.total_users || 0 }}</div>
         <div class="stat-desc">
           {{ stats?.admin_users || 0 }} admins, {{ stats?.simple_users || 0 }} utilisateurs
+          <span v-if="stats?.sync_performed" class="badge badge-success badge-xs ml-2">Sync NAS</span>
         </div>
       </div>
 
@@ -220,6 +249,8 @@ const recentLogs = ref([])
 const loading = ref(false)
 const error = ref('')
 const showPerformanceDashboard = ref(false)
+const syncing = ref(false)
+const nasStatus = ref(null)
 
 // Computed properties
 const performanceIssues = computed(() => {
@@ -295,12 +326,55 @@ const loadRecentLogs = async () => {
   }
 }
 
+const loadNasStatus = async () => {
+  try {
+    const response = await adminAPI.getNasStatus()
+    nasStatus.value = response.data
+  } catch (err) {
+    console.error('Error loading NAS status:', err)
+    nasStatus.value = {
+      connected: false,
+      message: 'Erreur lors de la vérification du statut NAS'
+    }
+  }
+}
+
+const syncWithNas = async () => {
+  syncing.value = true
+  
+  try {
+    const response = await adminAPI.syncWithNas({ dryRun: false, maxDepth: 10 })
+    
+    if (response.data.success) {
+      store.dispatch('showSuccess', `Synchronisation réussie: ${response.data.stats.folders_added} dossiers et ${response.data.stats.files_added} fichiers ajoutés, ${response.data.stats.folders_removed} dossiers et ${response.data.stats.files_removed} fichiers supprimés`)
+      
+      // Refresh stats and NAS status after sync
+      await Promise.all([loadStats(), loadNasStatus()])
+    } else {
+      if (response.data.nas_accessible === false) {
+        store.dispatch('showWarning', `NAS non accessible: ${response.data.message}`)
+      } else {
+        store.dispatch('showError', `Erreur de synchronisation: ${response.data.message}`)
+      }
+    }
+  } catch (err) {
+    console.error('Error syncing with NAS:', err)
+    if (err.response?.status === 400) {
+      store.dispatch('showWarning', 'NAS non accessible - vérifiez votre connexion au réseau de travail')
+    } else {
+      store.dispatch('showError', 'Erreur lors de la synchronisation avec le NAS')
+    }
+  } finally {
+    syncing.value = false
+  }
+}
+
 const refreshStats = async () => {
   loading.value = true
   error.value = ''
   
   try {
-    await Promise.all([loadStats(), loadRecentLogs()])
+    await Promise.all([loadStats(), loadRecentLogs(), loadNasStatus()])
     store.dispatch('showSuccess', 'Données actualisées')
   } catch (err) {
     error.value = 'Erreur lors de l\'actualisation des données'
