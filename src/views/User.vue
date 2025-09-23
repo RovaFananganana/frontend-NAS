@@ -19,7 +19,11 @@
       <!-- Page content -->
       <div class="flex-1 overflow-auto">
         <!-- Dynamic component -->
-        <component :is="currentComponent" :user-role="'user'" />
+        <component 
+          :is="currentComponent" 
+          :user-role="'user'" 
+          @navigate="handleTabChange"
+        />
       </div>
     </div>
   </div>
@@ -32,6 +36,7 @@ import Navbar from '../components/Shared/Navbar.vue'
 import Sidebar from '../components/Shared/Sidebar.vue'
 
 // Import User components
+import UserDashboard from '@/components/User/UserDashboard.vue'
 import ProfileEditor from '@/components/User/ProfileEditor.vue'
 import SimpleFileExplorer from '@/components/Shared/SimpleFileExplorer.vue'
 import StorageInfo from '@/components/User/StorageInfo.vue'
@@ -39,6 +44,7 @@ import ActivityLogs from '@/components/User/ActivityLogs.vue'
 
 // Tabs configuration
 const tabs = [
+  { key: 'dashboard', label: 'Dashboard', comp: UserDashboard },
   { key: 'files', label: 'Mes fichiers', comp: SimpleFileExplorer },
   { key: 'storage', label: 'Informations de stockage', comp: StorageInfo },
   { key: 'logs', label: 'Journal d\'activité', comp: ActivityLogs },
@@ -46,17 +52,17 @@ const tabs = [
 ]
 
 // Reactive data
-const activeTab = ref('files')
+const activeTab = ref('dashboard')
 
 // Computed properties
 const currentComponent = computed(() => {
   const tab = tabs.find(t => t.key === activeTab.value)
-  return tab ? tab.comp : SimpleFileExplorer
+  return tab ? tab.comp : UserDashboard
 })
 
 const currentTabLabel = computed(() => {
   const tab = tabs.find(t => t.key === activeTab.value)
-  return tab ? tab.label : 'Mes fichiers'
+  return tab ? tab.label : 'Dashboard'
 })
 
 // Methods

@@ -18,7 +18,7 @@
       Erreur de chargement de l'arbre
     </div>
     
-    <NASTreeNode
+    <NasTreeNode
       v-for="node in treeData"
       :key="node.path"
       :node="node"
@@ -33,7 +33,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import NASTreeNode from './NASTreeNode.vue'
+import NasTreeNode from './NasTreeNode.vue'
 
 // Utility function for path normalization
 const NasPathUtils = {
@@ -58,13 +58,11 @@ const treeData = ref([])
 const expandedPaths = ref(new Set())
 const loading = ref(false)
 const error = ref('')
-const {listDirectory} = useSynologyAPI()
 
 const buildTreeStructure = (items, basePath = '/') => {
   const tree = []
-  const directories = items.filter(item => item.type === 'directory')
   
-  for (const dir of directories) {
+  for (const dir of items) {
     const nodePath = NasPathUtils.join(basePath, dir.name)
     const node = {
       name: dir.name,
@@ -88,35 +86,27 @@ const loadTreeData = async (path = '/') => {
   error.value = ''
   
   try {
-    // Use the existing NAS API
-    const response = await fetch(`/nas/browse?path=${encodeURIComponent(path)}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-    
-    const data = await response.json()
+    // Use the nasAPI service for consistent error handling
+    const { nasAPI } = await import('@/services/nasAPI.js')
+    const data = await nasAPI.browse(path)
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to load directory')
     }
     
     if (path === '/') {
-      // Root level
-      treeData.value = buildTreeStructure(data.items, path)
+      // Root level - filter only directories for tree
+      const directories = data.items.filter(item => item.is_directory)
+      treeData.value = buildTreeStructure(directories, path)
     } else {
       // Update specific node
-      updateNodeChildren(treeData.value, path, data.items)
+      const directories = data.items.filter(item => item.is_directory)
+      updateNodeChildren(treeData.value, path, directories)
     }
     
   } catch (err) {
     console.error('Error loading tree data:', err)
-    error.value = err.message
+    error.value = err.message || 'Failed to load folder tree'
   } finally {
     loading.value = false
   }

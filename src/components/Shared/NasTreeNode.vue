@@ -1,6 +1,6 @@
 <!-- src/components/Shared/NASTreeNode.vue -->
 <template>
-  <div class="nas-tree-node">
+  <div class='NasTreeNode'>
     <div 
       class="flex items-center p-1 rounded hover:bg-base-200 cursor-pointer transition-colors text-sm"
       :class="{ 'bg-primary text-primary-content': currentPath === node.path }"

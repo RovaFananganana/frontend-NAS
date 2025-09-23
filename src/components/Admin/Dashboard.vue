@@ -151,6 +151,16 @@
       </div>
     </div>
 
+    <!-- Debug Panel (temporary) -->
+    <div class="mb-6">
+      <AuthDebug />
+    </div>
+
+    <!-- Synology Drive Integration -->
+    <div class="mb-6">
+      <SynologyDriveStatus />
+    </div>
+
     <!-- Quick Actions -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- Recent Activity -->
@@ -214,6 +224,16 @@
             </div>
             
             <div class="flex justify-between items-center">
+              <span>NAS Synology</span>
+              <div 
+                class="badge"
+                :class="nasStatus?.connected ? 'badge-success' : 'badge-warning'"
+              >
+                {{ nasStatus?.connected ? 'Connecté' : 'Déconnecté' }}
+              </div>
+            </div>
+            
+            <div class="flex justify-between items-center">
               <span>Dernière mise à jour</span>
               <span class="text-sm opacity-70">{{ formatDate(new Date()) }}</span>
             </div>
@@ -240,6 +260,8 @@ import { ref, computed, onMounted } from 'vue'
 import { adminAPI } from '@/services/api'
 import { useStore } from 'vuex'
 import PerformanceDashboard from './PerformanceDashboard.vue'
+import SynologyDriveStatus from '../Shared/SynologyDriveStatus.vue'
+import AuthDebug from '../Debug/AuthDebug.vue'
 
 const store = useStore()
 

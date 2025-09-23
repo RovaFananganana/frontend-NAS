@@ -376,37 +376,7 @@ import MoveModal from './MoveModal.vue'
 import DeleteConfirmModal from './DeleteConfirmModal.vue'
 import PropertiesModal from './PropertiesModal.vue'
 
-// API helper for NAS calls
-const nasAPI = {
-  async browse(path) {
-    const response = await fetch(`/nas/browse?path=${encodeURIComponent(path)}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-    
-    return response.json()
-  },
-  
-  async download(filePath) {
-    const response = await fetch(`/nas/download/${encodeURIComponent(filePath)}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-    
-    return response.blob()
-  }
-}
+import { nasAPI, NASAPIError } from '@/services/nasAPI.js'
 
 const store = useStore()
 
@@ -527,11 +497,20 @@ const loadDirectory = async (path = '/') => {
     if (data.success) {
       items.value = data.items || []
     } else {
-      throw new Error(data.error || 'Failed to load directory')
+      throw new NASAPIError(data.error || 'Failed to load directory')
     }
   } catch (err) {
     console.error('Error loading directory:', err)
-    error.value = err.message || 'Erreur lors du chargement du répertoire'
+    if (err instanceof NASAPIError) {
+      error.value = err.message
+      if (err.status === 403) {
+        store.dispatch('showError', 'Accès refusé à ce répertoire')
+      } else if (err.status === 404) {
+        store.dispatch('showError', 'Répertoire introuvable')
+      }
+    } else {
+      error.value = 'Erreur lors du chargement du répertoire'
+    }
     items.value = []
   } finally {
     loading.value = false
@@ -567,7 +546,9 @@ const openItem = (item) => {
 
 const downloadFile = async (item) => {
   try {
-    const blob = await nasAPI.download(item.path)
+    store.dispatch('showInfo', `Téléchargement de ${item.name} en cours...`)
+    
+    const blob = await nasAPI.downloadFile(item.path)
     
     // Create download link
     const url = window.URL.createObjectURL(blob)
@@ -579,10 +560,20 @@ const downloadFile = async (item) => {
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
     
-    store.dispatch('showSuccess', `Téléchargement de ${item.name} démarré`)
+    store.dispatch('showSuccess', `Téléchargement de ${item.name} terminé`)
   } catch (err) {
     console.error('Error downloading file:', err)
-    store.dispatch('showError', `Erreur lors du téléchargement: ${err.message}`)
+    if (err instanceof NASAPIError) {
+      if (err.status === 403) {
+        store.dispatch('showError', 'Permission refusée pour télécharger ce fichier')
+      } else if (err.status === 404) {
+        store.dispatch('showError', 'Fichier introuvable')
+      } else {
+        store.dispatch('showError', `Erreur de téléchargement: ${err.message}`)
+      }
+    } else {
+      store.dispatch('showError', `Erreur lors du téléchargement: ${err.message}`)
+    }
   }
 }
 
@@ -783,11 +774,7 @@ const clearSearch = () => {
 
 // Utility functions
 const formatBytes = (bytes) => {
-  if (!bytes || bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  return nasAPI.formatFileSize(bytes)
 }
 
 const formatDate = (date) => {
@@ -796,63 +783,11 @@ const formatDate = (date) => {
 }
 
 const getItemIcon = (item) => {
-  if (item.is_directory) {
-    return 'fas fa-folder'
-  }
-  
-  const ext = item.name?.split('.').pop()?.toLowerCase() || ''
-  const iconMap = {
-    'pdf': 'fas fa-file-pdf',
-    'doc': 'fas fa-file-word',
-    'docx': 'fas fa-file-word',
-    'xls': 'fas fa-file-excel',
-    'xlsx': 'fas fa-file-excel',
-    'jpg': 'fas fa-file-image',
-    'jpeg': 'fas fa-file-image',
-    'png': 'fas fa-file-image',
-    'gif': 'fas fa-file-image',
-    'mp4': 'fas fa-file-video',
-    'avi': 'fas fa-file-video',
-    'mp3': 'fas fa-file-audio',
-    'wav': 'fas fa-file-audio',
-    'zip': 'fas fa-file-archive',
-    'rar': 'fas fa-file-archive',
-    'txt': 'fas fa-file-alt',
-    'js': 'fas fa-file-code',
-    'html': 'fas fa-file-code',
-    'css': 'fas fa-file-code'
-  }
-  return iconMap[ext] || 'fas fa-file'
+  return nasAPI.getFileIcon(item.name, item.is_directory)
 }
 
 const getItemColor = (item) => {
-  if (item.is_directory) {
-    return '#3b82f6' // blue
-  }
-  
-  const ext = item.name?.split('.').pop()?.toLowerCase() || ''
-  const colorMap = {
-    'pdf': '#dc2626', // red
-    'doc': '#2563eb', // blue
-    'docx': '#2563eb',
-    'xls': '#059669', // green
-    'xlsx': '#059669',
-    'jpg': '#7c3aed', // purple
-    'jpeg': '#7c3aed',
-    'png': '#7c3aed',
-    'gif': '#7c3aed',
-    'mp4': '#ea580c', // orange
-    'avi': '#ea580c',
-    'mp3': '#10b981', // emerald
-    'wav': '#10b981',
-    'zip': '#6b7280', // gray
-    'rar': '#6b7280',
-    'txt': '#374151', // gray-700
-    'js': '#fbbf24', // amber
-    'html': '#f97316', // orange
-    'css': '#06b6d4' // cyan
-  }
-  return colorMap[ext] || '#6b7280'
+  return nasAPI.getFileColor(item.name, item.is_directory)
 }
 
 // Lifecycle
