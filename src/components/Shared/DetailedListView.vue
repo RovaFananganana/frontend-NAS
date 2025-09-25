@@ -17,7 +17,7 @@
   >
     <!-- Header avec gradient subtil -->
     <div class="list-header bg-gradient-to-r from-base-200 to-base-100 border-b border-base-300">
-      <table class="table w-full" :class="{ 'table-sm': !isTouch, 'table-md': isTouch }">
+      <table class="table w-full table-fixed" :class="{ 'table-sm': !isTouch, 'table-md': isTouch }">
         <thead>
           <tr class="border-none" role="row">
             <th 
@@ -42,15 +42,26 @@
                   'min-h-[44px]': isTouch // Minimum touch target
                 }
               ]"
-              :style="{ minHeight: isTouch ? '44px' : 'auto' }"
+              :style="{ 
+                height: isTouch ? '44px' : '40px',
+                width: column.width,
+                maxWidth: column.width
+              }"
               role="columnheader"
               :aria-sort="getSortAriaValue(column.key)"
               :aria-label="`Trier par ${column.label}${sortColumn === column.key ? (sortDirection === 'asc' ? ', tri croissant actuel' : ', tri décroissant actuel') : ''}`"
               tabindex="0"
             >
-              <div class="flex items-center justify-between">
+              <div :class="[
+                'flex items-center gap-2 h-full',
+                {
+                  'justify-start': column.align === 'left',
+                  'justify-center': column.align === 'center', 
+                  'justify-end': column.align === 'right'
+                }
+              ]">
                 <span class="truncate">{{ column.label }}</span>
-                <div class="sort-indicator-container ml-2 w-4 h-4 flex items-center justify-center flex-shrink-0">
+                <div class="sort-indicator-container w-4 h-4 flex items-center justify-center flex-shrink-0">
                   <i 
                     v-if="sortColumn === column.key" 
                     :class="[
@@ -100,7 +111,7 @@
         }
       ]"
     >
-      <table class="table w-full" :class="{ 'table-sm': !isTouch, 'table-md': isTouch }">
+      <table class="table w-full table-fixed" :class="{ 'table-sm': !isTouch, 'table-md': isTouch }">
         <tbody>
           <FileListItem
             v-for="(file, index) in sortedFiles"
@@ -258,10 +269,34 @@ const sortedFiles = computed(() => {
 // Computed pour les colonnes affichées selon l'écran
 const displayedColumns = computed(() => {
   const allColumns = [
-    { key: 'name', label: 'Nom', required: true },
-    { key: 'size', label: isMobile.value ? 'Taille' : 'Taille', required: false },
-    { key: 'type', label: 'Type', required: false },
-    { key: 'date', label: isMobile.value ? 'Modifié' : 'Date de modification', required: false }
+    { 
+      key: 'name', 
+      label: 'Nom', 
+      required: true, 
+      width: isMobile.value ? '50%' : '40%',
+      align: 'left'
+    },
+    { 
+      key: 'size', 
+      label: isMobile.value ? 'Taille' : 'Taille', 
+      required: false, 
+      width: isMobile.value ? '20%' : '15%',
+      align: 'right'
+    },
+    { 
+      key: 'type', 
+      label: 'Type', 
+      required: false, 
+      width: isMobile.value ? '15%' : '15%',
+      align: 'center'
+    },
+    { 
+      key: 'date', 
+      label: isMobile.value ? 'Modifié' : 'Date de modification', 
+      required: false, 
+      width: isMobile.value ? '15%' : '30%',
+      align: 'left'
+    }
   ]
   
   return allColumns.filter(column => {
@@ -618,5 +653,77 @@ watch([isMobile, isTouch], ([newIsMobile, newIsTouch]) => {
 
 .loading {
   animation: pulse-subtle 1.5s ease-in-out infinite;
+}
+
+/* Alignement des colonnes pour un affichage tabulaire parfait */
+.table-fixed {
+  table-layout: fixed;
+}
+
+.table-fixed th,
+.table-fixed td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Permettre le wrap pour la colonne nom qui peut être plus longue */
+.table-fixed td:first-child {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Alignement spécifique par colonne - seulement pour les cellules de données */
+.table td:nth-child(2) {
+  text-align: right; /* Taille */
+}
+
+.table td:nth-child(3) {
+  text-align: center; /* Type */
+}
+
+/* Amélioration de l'espacement vertical */
+.table th,
+.table td {
+  vertical-align: middle;
+  border-bottom: 1px solid hsl(var(--bc) / 0.1);
+}
+
+/* Assurer que tous les en-têtes ont la même hauteur */
+.table thead th {
+  height: 40px;
+  padding: 0.5rem 1rem;
+}
+
+.touch-optimized .table thead th {
+  height: 44px;
+  padding: 0.75rem 0.5rem;
+}
+
+/* Assurer que toutes les lignes de données ont la même hauteur */
+.table tbody tr {
+  height: 48px;
+}
+
+.touch-optimized .table tbody tr {
+  height: 56px;
+}
+
+/* Forcer l'alignement vertical au centre pour tous les éléments */
+.table th > div,
+.table td {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+/* Exception pour la première colonne qui a déjà un flex */
+.table td:first-child {
+  /* Déjà géré par le flex existant */
+}
+
+/* Hover effect pour les lignes */
+.table tbody tr:hover {
+  background-color: hsl(var(--b2) / 0.5);
 }
 </style>

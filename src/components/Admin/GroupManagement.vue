@@ -201,6 +201,44 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal de succès -->
+    <div v-if="successModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <div class="text-center">
+          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-success text-success-content mb-4">
+            <i class="fas fa-check text-xl"></i>
+          </div>
+          <h3 class="font-bold text-lg mb-2">{{ successModal.title }}</h3>
+          <p class="text-base-content/70 mb-6">
+            {{ successModal.message }}
+          </p>
+          <button class="btn btn-primary" @click="closeSuccessModal">
+            <i class="fas fa-thumbs-up mr-2"></i>
+            Parfait !
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal d'erreur -->
+    <div v-if="errorModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <div class="text-center">
+          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-error text-error-content mb-4">
+            <i class="fas fa-exclamation-triangle text-xl"></i>
+          </div>
+          <h3 class="font-bold text-lg mb-2">{{ errorModal.title }}</h3>
+          <p class="text-base-content/70 mb-6">
+            {{ errorModal.message }}
+          </p>
+          <button class="btn btn-primary" @click="closeErrorModal">
+            <i class="fas fa-times mr-2"></i>
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -229,6 +267,19 @@ const groupToDelete = ref(null)
 const groupForm = ref({ name: '' })
 const groupError = ref('')
 
+// Modals de succès et d'erreur
+const successModal = ref({
+  visible: false,
+  title: '',
+  message: ''
+})
+
+const errorModal = ref({
+  visible: false,
+  title: '',
+  message: ''
+})
+
 // Computed properties
 const groupMembers = computed(() => {
   if (!selectedGroup.value) return []
@@ -248,7 +299,10 @@ const loadGroups = async () => {
     groups.value = response.data || []
   } catch (error) {
     console.error('Error loading groups:', error)
-    store.dispatch('showError', 'Erreur lors du chargement des groupes')
+    showErrorModal(
+      'Erreur de chargement',
+      'Impossible de charger la liste des groupes. Veuillez réessayer.'
+    )
   } finally {
     loadingGroups.value = false
   }
@@ -260,7 +314,10 @@ const loadUsers = async () => {
     users.value = response.data || []
   } catch (error) {
     console.error('Error loading users:', error)
-    store.dispatch('showError', 'Erreur lors du chargement des utilisateurs')
+    showErrorModal(
+      'Erreur de chargement',
+      'Impossible de charger la liste des utilisateurs. Veuillez réessayer.'
+    )
   }
 }
 
@@ -299,14 +356,21 @@ const saveGroup = async () => {
   try {
     if (editingGroup.value) {
       await adminAPI.updateGroup(editingGroup.value.id, groupForm.value.name)
-      store.dispatch('showSuccess', 'Groupe modifié avec succès')
+      await loadGroups()
+      closeGroupModal()
+      showSuccessModal(
+        'Groupe modifié avec succès !',
+        `Le groupe "${groupForm.value.name}" a été modifié avec succès.`
+      )
     } else {
       await adminAPI.createGroup(groupForm.value.name)
-      store.dispatch('showSuccess', 'Groupe créé avec succès')
+      await loadGroups()
+      closeGroupModal()
+      showSuccessModal(
+        'Groupe créé avec succès !',
+        `Le groupe "${groupForm.value.name}" a été créé avec succès.`
+      )
     }
-
-    await loadGroups()
-    closeGroupModal()
   } catch (error) {
     console.error('Error saving group:', error)
     const message = error.response?.data?.msg || 'Erreur lors de la sauvegarde'
@@ -325,6 +389,7 @@ const deleteGroup = async () => {
 
   deletingGroup.value = true
   try {
+    const groupName = groupToDelete.value.name
     await adminAPI.deleteGroup(groupToDelete.value.id)
     await loadGroups()
     
@@ -334,11 +399,17 @@ const deleteGroup = async () => {
     }
     
     groupToDelete.value = null
-    store.dispatch('showSuccess', 'Groupe supprimé avec succès')
+    showSuccessModal(
+      'Groupe supprimé avec succès !',
+      `Le groupe "${groupName}" a été supprimé définitivement.`
+    )
   } catch (error) {
     console.error('Error deleting group:', error)
     const message = error.response?.data?.msg || 'Erreur lors de la suppression'
-    store.dispatch('showError', message)
+    showErrorModal(
+      'Erreur de suppression',
+      `Impossible de supprimer le groupe : ${message}`
+    )
   } finally {
     deletingGroup.value = false
   }
@@ -349,20 +420,26 @@ const addUserToGroup = async () => {
 
   addingUser.value = true
   try {
+    const user = users.value.find(u => u.id === selectedUserId.value)
     await adminAPI.addUserToGroup(selectedGroup.value.id, selectedUserId.value)
     
     // Add user to local group data
-    const user = users.value.find(u => u.id === selectedUserId.value)
     if (user && selectedGroup.value.users) {
       selectedGroup.value.users.push(user)
     }
     
     selectedUserId.value = ''
-    store.dispatch('showSuccess', 'Utilisateur ajouté au groupe')
+    showSuccessModal(
+      'Utilisateur ajouté avec succès !',
+      `${user?.username || 'L\'utilisateur'} a été ajouté au groupe "${selectedGroup.value.name}".`
+    )
   } catch (error) {
     console.error('Error adding user to group:', error)
     const message = error.response?.data?.msg || 'Erreur lors de l\'ajout'
-    store.dispatch('showError', message)
+    showErrorModal(
+      'Erreur d\'ajout',
+      `Impossible d'ajouter l'utilisateur au groupe : ${message}`
+    )
   } finally {
     addingUser.value = false
   }
@@ -380,14 +457,45 @@ const removeUserFromGroup = async (user) => {
       selectedGroup.value.users = selectedGroup.value.users.filter(u => u.id !== user.id)
     }
     
-    store.dispatch('showSuccess', 'Utilisateur retiré du groupe')
+    showSuccessModal(
+      'Utilisateur retiré avec succès !',
+      `${user.username} a été retiré du groupe "${selectedGroup.value.name}".`
+    )
   } catch (error) {
     console.error('Error removing user from group:', error)
     const message = error.response?.data?.msg || 'Erreur lors du retrait'
-    store.dispatch('showError', message)
+    showErrorModal(
+      'Erreur de retrait',
+      `Impossible de retirer l'utilisateur du groupe : ${message}`
+    )
   } finally {
     removingUser.value = false
   }
+}
+
+// Méthodes pour les modals de succès et d'erreur
+const showSuccessModal = (title, message) => {
+  successModal.value = {
+    visible: true,
+    title,
+    message
+  }
+}
+
+const closeSuccessModal = () => {
+  successModal.value.visible = false
+}
+
+const showErrorModal = (title, message) => {
+  errorModal.value = {
+    visible: true,
+    title,
+    message
+  }
+}
+
+const closeErrorModal = () => {
+  errorModal.value.visible = false
 }
 
 // Lifecycle

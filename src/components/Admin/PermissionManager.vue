@@ -142,7 +142,6 @@
                 </button>
                 <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-48">
                   <li><a @click="editPermission(folder, perm)"><i class="fas fa-edit mr-2"></i>Edit</a></li>
-                  <li><a @click="duplicatePermission(folder, perm)"><i class="fas fa-copy mr-2"></i>Duplicate</a></li>
                   <li>
                     <hr class="my-1">
                   </li>
@@ -823,20 +822,6 @@ const exportFolderPermissions = (folder) => {
   store.dispatch('showSuccess', `Permissions exported for ${folder.name}`)
 }
 
-const duplicatePermission = (folder, perm) => {
-  // Open modal with pre-filled permission data for duplication
-  modal.value.visible = true
-  modal.value.editing = false
-  modal.value.folder = folder
-  modal.value.targetType = perm.target_type
-  modal.value.targetId = '' // Clear ID for new target
-  modal.value.permissions = {
-    can_read: perm.can_read,
-    can_write: perm.can_write,
-    can_delete: perm.can_delete,
-    can_share: perm.can_share
-  }
-}
 
 // Bulk permissions methods
 const closeBulkModal = () => {

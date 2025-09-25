@@ -45,7 +45,11 @@
         'px-2': isMobile,
         'px-4': !isMobile
       }
-    ]">
+    ]"
+    :style="{ 
+      width: getColumnWidth('name'),
+      maxWidth: getColumnWidth('name')
+    }">
       <!-- Indicateur de sélection -->
       <div 
         v-if="selected" 
@@ -163,48 +167,66 @@
     </td>
     
     <!-- Colonne Taille -->
-    <td v-if="shouldShowColumn('size')" :class="[
-      'text-base-content/70 font-mono text-right',
-      {
-        'text-xs': isMobile,
-        'text-sm': !isMobile,
-        'px-1': isMobile,
-        'px-2': !isMobile
-      }
-    ]">
-      {{ formattedSize }}
+    <td v-if="shouldShowColumn('size')" 
+    :style="{ 
+      width: getColumnWidth('size'),
+      maxWidth: getColumnWidth('size')
+    }">
+      <div :class="[
+        'text-base-content/70 font-mono text-right w-full flex items-center justify-end',
+        {
+          'text-xs': isMobile,
+          'text-sm': !isMobile,
+          'px-1': isMobile,
+          'px-2': !isMobile
+        }
+      ]">
+        {{ formattedSize }}
+      </div>
     </td>
     
     <!-- Colonne Type -->
-    <td v-if="shouldShowColumn('type')" :class="[
-      'text-base-content/70',
-      {
-        'px-1': isMobile,
-        'px-2': !isMobile
-      }
-    ]">
-      <span :class="[
-        'inline-flex items-center rounded-full font-medium bg-base-200 text-base-content/80',
+    <td v-if="shouldShowColumn('type')" 
+    :style="{ 
+      width: getColumnWidth('type'),
+      maxWidth: getColumnWidth('type')
+    }">
+      <div :class="[
+        'text-base-content/70 w-full flex items-center justify-center',
         {
-          'px-1.5 py-0.5 text-xs': isMobile,
-          'px-2 py-1 text-xs': !isMobile
+          'px-1': isMobile,
+          'px-2': !isMobile
         }
       ]">
-        {{ fileType }}
-      </span>
+        <span :class="[
+          'inline-flex items-center rounded-full font-medium bg-base-200 text-base-content/80',
+          {
+            'px-1.5 py-0.5 text-xs': isMobile,
+            'px-2 py-1 text-xs': !isMobile
+          }
+        ]">
+          {{ fileType }}
+        </span>
+      </div>
     </td>
     
     <!-- Colonne Date de modification -->
-    <td v-if="shouldShowColumn('date')" :class="[
-      'text-base-content/60',
-      {
-        'text-xs': isMobile,
-        'text-sm': !isMobile,
-        'px-1': isMobile,
-        'px-2': !isMobile
-      }
-    ]">
-      {{ formattedDate }}
+    <td v-if="shouldShowColumn('date')" 
+    :style="{ 
+      width: getColumnWidth('date'),
+      maxWidth: getColumnWidth('date')
+    }">
+      <div :class="[
+        'text-base-content/60 text-left w-full flex items-center',
+        {
+          'text-xs': isMobile,
+          'text-sm': !isMobile,
+          'px-1': isMobile,
+          'px-2': !isMobile
+        }
+      ]">
+        {{ formattedDate }}
+      </div>
     </td>
     
     <!-- Description cachée pour les lecteurs d'écran -->
@@ -636,6 +658,12 @@ const handleKeydown = (event) => {
       // Autres touches sont gérées par le composable global
       break
   }
+}
+
+// Méthode pour obtenir la largeur de colonne
+const getColumnWidth = (columnKey) => {
+  const column = props.visibleColumns.find(col => col.key === columnKey)
+  return column ? column.width : 'auto'
 }
 </script>
 
