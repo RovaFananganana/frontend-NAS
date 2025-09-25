@@ -16,7 +16,7 @@ class NASAPIError extends Error {
 
 class NASAPIService {
   constructor() {
-    this.baseURL = '/nas'
+    this.baseURL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001') + '/nas'
     this.timeout = 30000 // 30 seconds for file operations
   }
 
@@ -257,7 +257,7 @@ class NASAPIService {
     return await this.request('/rename', {
       method: 'PUT',
       body: JSON.stringify({
-        path,
+        old_path: path,
         new_name: newName
       })
     })
@@ -295,6 +295,40 @@ class NASAPIService {
   async getProperties(path) {
     const encodedPath = encodeURIComponent(path)
     return await this.request(`/properties?path=${encodedPath}`)
+  }
+
+  /**
+   * Set file/folder permissions
+   */
+  async setPermissions(path, permissions) {
+    return await this.request('/permissions', {
+      method: 'POST',
+      body: JSON.stringify({
+        path,
+        permissions
+      })
+    })
+  }
+
+  /**
+   * Get folder by path from database
+   */
+  async getFolderByPath(path) {
+    const encodedPath = encodeURIComponent(path)
+    return await this.request(`/folder-by-path?path=${encodedPath}`)
+  }
+
+  /**
+   * Create folder in database
+   */
+  async createFolderInDB(name, path) {
+    return await this.request('/create-folder-db', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        path
+      })
+    })
   }
 
   // ==================== Utility Methods ====================
@@ -469,6 +503,14 @@ class NASAPIService {
    */
   joinPaths(...paths) {
     return this.normalizePath(paths.join('/'))
+  }
+
+  /**
+   * Check permissions for a specific path
+   */
+  async checkPermissions(path) {
+    const encodedPath = encodeURIComponent(path)
+    return await this.request(`/permissions/check?path=${encodedPath}`)
   }
 }
 

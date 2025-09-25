@@ -8,9 +8,23 @@ import Admin from '../views/Admin.vue'
 import User from '../views/User.vue'
 import NotFound from '../views/NotFound.vue'
 import TestModal from '../views/TestModal.vue'
+import TestViewModeSelector from '../views/TestViewModeSelector.vue'
+import TestTreeView from '../views/TestTreeView.vue'
+import TestDetailedListView from '../views/TestDetailedListView.vue'
+import TestFileExplorer from '../views/TestFileExplorer.vue'
+import TestMultipleSelection from '../views/TestMultipleSelection.vue'
+import FormattingUtilsDemo from '../components/Demo/FormattingUtilsDemo.vue'
+import FileOperationsExample from '../components/Examples/FileOperationsExample.vue'
 
 const routes = [
    { path: "/test-modal", component: TestModal },
+   { path: "/test-view-mode-selector", component: TestViewModeSelector },
+   { path: "/test-tree-view", component: TestTreeView },
+   { path: "/test-detailed-list-view", component: TestDetailedListView },
+   { path: "/test-file-explorer", component: TestFileExplorer },
+   { path: "/test-multiple-selection", component: TestMultipleSelection },
+   { path: "/test-formatting-utils", component: FormattingUtilsDemo },
+   { path: "/test-file-operations", component: FileOperationsExample },
   {
     path: '/',
     redirect: to => {

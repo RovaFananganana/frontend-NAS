@@ -28,12 +28,12 @@
           v-model="newName" 
           type="text" 
           class="input input-bordered"
-          :class="{ 'input-error': error }"
+          :class="{ 'input-error': error || !isValid }"
           @keyup.enter="rename"
           @keyup.escape="$emit('close')"
         />
-        <label v-if="error" class="label">
-          <span class="label-text-alt text-error">{{ error }}</span>
+        <label v-if="error || (!isValid && newName.trim())" class="label">
+          <span class="label-text-alt text-error">{{ error || validationError }}</span>
         </label>
       </div>
 
@@ -44,7 +44,7 @@
         </button>
         <button 
           @click="rename" 
-          :disabled="!newName.trim() || loading"
+          :disabled="!isValid || loading || newName.trim() === props.item.name"
           class="btn btn-primary"
         >
           <span v-if="loading" class="loading loading-spinner loading-sm mr-2"></span>
@@ -57,7 +57,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, computed } from 'vue'
+import { nasAPI } from '@/services/nasAPI'
 
 const props = defineProps({
   item: {
@@ -74,14 +75,28 @@ const loading = ref(false)
 const error = ref('')
 const nameInput = ref(null)
 
+// Computed validation
+const validationResult = computed(() => {
+  if (!newName.value.trim()) {
+    return { valid: false, error: 'Le nom ne peut pas être vide' }
+  }
+  return nasAPI.validateFileName(newName.value.trim())
+})
+
+const isValid = computed(() => validationResult.value.valid)
+const validationError = computed(() => validationResult.value.error)
+
 // Methods
 const rename = async () => {
-  if (!newName.value.trim()) {
-    error.value = 'Le nom ne peut pas être vide'
+  // Validate before proceeding
+  if (!isValid.value) {
+    error.value = validationError.value
     return
   }
 
-  if (newName.value === props.item.name) {
+  const trimmedName = newName.value.trim()
+  
+  if (trimmedName === props.item.name) {
     emit('close')
     return
   }
@@ -93,34 +108,54 @@ const rename = async () => {
     const response = await fetch('/nas/rename', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         old_path: props.item.path,
-        new_name: newName.value.trim()
+        new_name: trimmedName
       })
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Erreur HTTP ${response.status}: ${response.statusText}`)
     }
 
     const data = await response.json()
 
     if (data.success) {
+      // Emit success event with updated information
       emit('renamed', {
         oldPath: props.item.path,
         newPath: data.new_path,
-        newName: newName.value.trim()
+        newName: trimmedName
       })
+      
+      // Auto-close modal on success
       emit('close')
     } else {
       throw new Error(data.error || 'Erreur lors du renommage')
     }
   } catch (err) {
     console.error('Error renaming item:', err)
-    error.value = err.message || 'Erreur lors du renommage'
+    
+    // Provide user-friendly error messages
+    let userMessage = 'Erreur lors du renommage'
+    
+    if (err.message.includes('Permission')) {
+      userMessage = 'Vous n\'avez pas les permissions nécessaires pour renommer cet élément'
+    } else if (err.message.includes('404')) {
+      userMessage = 'L\'élément à renommer n\'existe plus'
+    } else if (err.message.includes('409') || err.message.includes('exists')) {
+      userMessage = 'Un élément avec ce nom existe déjà'
+    } else if (err.message.includes('network') || err.message.includes('fetch')) {
+      userMessage = 'Erreur de connexion au serveur'
+    } else if (err.message) {
+      userMessage = err.message
+    }
+    
+    error.value = userMessage
   } finally {
     loading.value = false
   }

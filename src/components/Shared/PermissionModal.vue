@@ -7,6 +7,15 @@
         Gestion des permissions - {{ item?.name }}
       </h3>
 
+      <!-- Admin restriction message -->
+      <div v-if="!isAdmin" class="alert alert-warning mb-6">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+          <h4 class="font-bold">Accès restreint</h4>
+          <p>La gestion des permissions est réservée aux administrateurs.</p>
+        </div>
+      </div>
+
       <!-- Item Info -->
       <div class="bg-base-200 p-4 rounded-lg mb-6">
         <div class="flex items-center gap-3">
@@ -23,7 +32,7 @@
       </div>
 
       <!-- Permissions Tabs -->
-      <div class="tabs tabs-bordered mb-4">
+      <div v-if="isAdmin" class="tabs tabs-bordered mb-4">
         <button 
           class="tab"
           :class="{ 'tab-active': activeTab === 'users' }"
@@ -43,7 +52,7 @@
       </div>
 
       <!-- Users Tab -->
-      <div v-if="activeTab === 'users'" class="space-y-4">
+      <div v-if="isAdmin && activeTab === 'users'" class="space-y-4">
         <!-- Add User Permission -->
         <div class="card bg-base-100 border border-base-300">
           <div class="card-body p-4">
@@ -144,7 +153,7 @@
       </div>
 
       <!-- Groups Tab -->
-      <div v-if="activeTab === 'groups'" class="space-y-4">
+      <div v-if="isAdmin && activeTab === 'groups'" class="space-y-4">
         <!-- Add Group Permission -->
         <div class="card bg-base-100 border border-base-300">
           <div class="card-body p-4">
@@ -245,7 +254,7 @@
       </div>
 
       <!-- Empty State -->
-      <div v-if="(activeTab === 'users' && userPermissions.length === 0) || (activeTab === 'groups' && groupPermissions.length === 0)" 
+      <div v-if="isAdmin && ((activeTab === 'users' && userPermissions.length === 0) || (activeTab === 'groups' && groupPermissions.length === 0))" 
            class="text-center py-8">
         <i class="fas fa-shield-alt text-4xl opacity-30 mb-4"></i>
         <p class="text-lg opacity-70">Aucune permission définie</p>
@@ -254,9 +263,41 @@
 
       <!-- Modal Actions -->
       <div class="modal-action">
-        <button @click="$emit('close')" class="btn btn-outline">
+        <button @click="closeModal" class="btn btn-outline">
           Fermer
         </button>
+      </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div v-if="confirmationModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <h3 class="font-bold text-lg mb-4 flex items-center">
+          <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
+          Confirmer l'action
+        </h3>
+        <div class="mb-6">
+          <p class="mb-4">{{ getConfirmationMessage() }}</p>
+          <div v-if="confirmationModal.permission" class="bg-base-200 p-4 rounded-lg">
+            <div class="font-semibold mb-2">
+              <i :class="['fas', 'mr-2', confirmationModal.permission.user_id ? 'fa-user' : 'fa-users']"></i>
+              {{ getPermissionTargetName(confirmationModal.permission) }}
+            </div>
+            <div v-if="confirmationModal.type !== 'remove'" class="flex gap-2 flex-wrap">
+              <span v-if="confirmationModal.permission.can_read" class="badge badge-success">Lecture</span>
+              <span v-if="confirmationModal.permission.can_write" class="badge badge-warning">Écriture</span>
+              <span v-if="confirmationModal.permission.can_delete" class="badge badge-error">Suppression</span>
+              <span v-if="confirmationModal.permission.can_share" class="badge badge-info">Partage</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-outline" @click="closeConfirmationModal">Annuler</button>
+          <button class="btn btn-primary" @click="executeConfirmedAction">
+            <i class="fas fa-check mr-2"></i>
+            Confirmer
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -265,6 +306,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { adminAPI, permissionAPI } from '@/services/api'
+import { useStore } from 'vuex'
 
 const props = defineProps({
   item: {
@@ -274,6 +316,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'updated'])
+
+const store = useStore()
 
 // State
 const activeTab = ref('users')
@@ -285,25 +329,40 @@ const selectedUserId = ref('')
 const selectedGroupId = ref('')
 const loading = ref(false)
 
+// Admin check
+const isAdmin = computed(() => store.getters.isAdmin)
+
+// Confirmation modal state
+const confirmationModal = ref({
+  visible: false,
+  type: '', // 'add', 'update', 'remove'
+  permission: null,
+  action: null
+})
+
 // Methods
 const loadPermissions = async () => {
-  if (!props.item) return
+  if (!props.item || !isAdmin.value) return
   
   loading.value = true
   try {
     const endpoint = props.item.is_directory ? 'folders' : 'files'
-    const response = await permissionAPI[`get${props.item.is_directory ? 'Folder' : 'File'}Permissions`](props.item.id)
+    const itemId = encodeURIComponent(props.item.path || props.item.id)
+    const response = await permissionAPI[`get${props.item.is_directory ? 'Folder' : 'File'}Permissions`](itemId)
     
     userPermissions.value = response.data.user_permissions || []
     groupPermissions.value = response.data.group_permissions || []
   } catch (error) {
     console.error('Error loading permissions:', error)
+    store.dispatch('showError', 'Erreur lors du chargement des permissions')
   } finally {
     loading.value = false
   }
 }
 
 const loadAvailableUsersAndGroups = async () => {
+  if (!isAdmin.value) return
+  
   try {
     const [usersResponse, groupsResponse] = await Promise.all([
       adminAPI.getUsers(),
@@ -314,86 +373,187 @@ const loadAvailableUsersAndGroups = async () => {
     availableGroups.value = groupsResponse.data || []
   } catch (error) {
     console.error('Error loading users and groups:', error)
+    store.dispatch('showError', 'Erreur lors du chargement des utilisateurs et groupes')
   }
 }
 
 const addUserPermission = async () => {
-  if (!selectedUserId.value) return
+  if (!selectedUserId.value || !isAdmin.value) return
   
-  try {
-    const permissions = {
-      can_read: true,
-      can_write: false,
-      can_delete: false,
-      can_share: false
+  const permissions = {
+    can_read: true,
+    can_write: false,
+    can_delete: false,
+    can_share: false
+  }
+  
+  const user = availableUsers.value.find(u => u.id === selectedUserId.value)
+  
+  confirmationModal.value = {
+    visible: true,
+    type: 'add',
+    permission: {
+      ...permissions,
+      user_id: selectedUserId.value,
+      target_name: user?.username || 'Utilisateur inconnu'
+    },
+    action: async () => {
+      try {
+        const endpoint = props.item.is_directory ? 'setFolderUserPermission' : 'setFileUserPermission'
+        const itemId = encodeURIComponent(props.item.path || props.item.id)
+        await permissionAPI[endpoint](itemId, selectedUserId.value, permissions)
+        
+        selectedUserId.value = ''
+        await loadPermissions()
+        emit('updated')
+        
+        store.dispatch('showSuccess', `Permission ajoutée avec succès pour ${user?.username}`)
+      } catch (error) {
+        console.error('Error adding user permission:', error)
+        store.dispatch('showError', 'Erreur lors de l\'ajout de la permission')
+      }
     }
-    
-    const endpoint = props.item.is_directory ? 'setFolderUserPermission' : 'setFileUserPermission'
-    await permissionAPI[endpoint](props.item.id, selectedUserId.value, permissions)
-    
-    selectedUserId.value = ''
-    await loadPermissions()
-    emit('updated')
-  } catch (error) {
-    console.error('Error adding user permission:', error)
   }
 }
 
 const addGroupPermission = async () => {
-  if (!selectedGroupId.value) return
+  if (!selectedGroupId.value || !isAdmin.value) return
   
-  try {
-    const permissions = {
-      can_read: true,
-      can_write: false,
-      can_delete: false,
-      can_share: false
+  const permissions = {
+    can_read: true,
+    can_write: false,
+    can_delete: false,
+    can_share: false
+  }
+  
+  const group = availableGroups.value.find(g => g.id === selectedGroupId.value)
+  
+  confirmationModal.value = {
+    visible: true,
+    type: 'add',
+    permission: {
+      ...permissions,
+      group_id: selectedGroupId.value,
+      target_name: group?.name || 'Groupe inconnu'
+    },
+    action: async () => {
+      try {
+        const endpoint = props.item.is_directory ? 'setFolderGroupPermission' : 'setFileGroupPermission'
+        const itemId = encodeURIComponent(props.item.path || props.item.id)
+        await permissionAPI[endpoint](itemId, selectedGroupId.value, permissions)
+        
+        selectedGroupId.value = ''
+        await loadPermissions()
+        emit('updated')
+        
+        store.dispatch('showSuccess', `Permission ajoutée avec succès pour le groupe ${group?.name}`)
+      } catch (error) {
+        console.error('Error adding group permission:', error)
+        store.dispatch('showError', 'Erreur lors de l\'ajout de la permission')
+      }
     }
-    
-    const endpoint = props.item.is_directory ? 'setFolderGroupPermission' : 'setFileGroupPermission'
-    await permissionAPI[endpoint](props.item.id, selectedGroupId.value, permissions)
-    
-    selectedGroupId.value = ''
-    await loadPermissions()
-    emit('updated')
-  } catch (error) {
-    console.error('Error adding group permission:', error)
   }
 }
 
 const updatePermission = async (permission) => {
-  try {
-    const permissions = {
-      can_read: permission.can_read,
-      can_write: permission.can_write,
-      can_delete: permission.can_delete,
-      can_share: permission.can_share
+  if (!isAdmin.value) return
+  
+  confirmationModal.value = {
+    visible: true,
+    type: 'update',
+    permission: { ...permission },
+    action: async () => {
+      try {
+        const permissions = {
+          can_read: permission.can_read,
+          can_write: permission.can_write,
+          can_delete: permission.can_delete,
+          can_share: permission.can_share
+        }
+        
+        if (permission.user_id) {
+          const endpoint = props.item.is_directory ? 'setFolderUserPermission' : 'setFileUserPermission'
+          const itemId = encodeURIComponent(props.item.path || props.item.id)
+          await permissionAPI[endpoint](itemId, permission.user_id, permissions)
+        } else if (permission.group_id) {
+          const endpoint = props.item.is_directory ? 'setFolderGroupPermission' : 'setFileGroupPermission'
+          const itemId = encodeURIComponent(props.item.path || props.item.id)
+          await permissionAPI[endpoint](itemId, permission.group_id, permissions)
+        }
+        
+        await loadPermissions()
+        emit('updated')
+        
+        const targetName = getPermissionTargetName(permission)
+        store.dispatch('showSuccess', `Permissions mises à jour pour ${targetName}`)
+      } catch (error) {
+        console.error('Error updating permission:', error)
+        store.dispatch('showError', 'Erreur lors de la mise à jour des permissions')
+      }
     }
-    
-    if (permission.user_id) {
-      const endpoint = props.item.is_directory ? 'setFolderUserPermission' : 'setFileUserPermission'
-      await permissionAPI[endpoint](props.item.id, permission.user_id, permissions)
-    } else if (permission.group_id) {
-      const endpoint = props.item.is_directory ? 'setFolderGroupPermission' : 'setFileGroupPermission'
-      await permissionAPI[endpoint](props.item.id, permission.group_id, permissions)
-    }
-    
-    emit('updated')
-  } catch (error) {
-    console.error('Error updating permission:', error)
   }
 }
 
 const removePermission = async (permission) => {
-  try {
-    const endpoint = props.item.is_directory ? 'deleteFolderPermission' : 'deleteFilePermission'
-    await permissionAPI[endpoint](props.item.id, permission.id)
-    
-    await loadPermissions()
-    emit('updated')
-  } catch (error) {
-    console.error('Error removing permission:', error)
+  if (!isAdmin.value) return
+  
+  confirmationModal.value = {
+    visible: true,
+    type: 'remove',
+    permission: { ...permission },
+    action: async () => {
+      try {
+        const endpoint = props.item.is_directory ? 'deleteFolderPermission' : 'deleteFilePermission'
+        const itemId = encodeURIComponent(props.item.path || props.item.id)
+        await permissionAPI[endpoint](itemId, permission.id)
+        
+        await loadPermissions()
+        emit('updated')
+        
+        const targetName = getPermissionTargetName(permission)
+        store.dispatch('showSuccess', `Permission supprimée pour ${targetName}`)
+      } catch (error) {
+        console.error('Error removing permission:', error)
+        store.dispatch('showError', 'Erreur lors de la suppression de la permission')
+      }
+    }
   }
+}
+
+// Modal management
+const closeModal = () => {
+  emit('close')
+}
+
+const closeConfirmationModal = () => {
+  confirmationModal.value.visible = false
+}
+
+const executeConfirmedAction = async () => {
+  if (confirmationModal.value.action) {
+    await confirmationModal.value.action()
+  }
+  closeConfirmationModal()
+}
+
+const getConfirmationMessage = () => {
+  switch (confirmationModal.value.type) {
+    case 'add':
+      return 'Voulez-vous ajouter cette permission ?'
+    case 'update':
+      return 'Voulez-vous modifier cette permission ?'
+    case 'remove':
+      return 'Voulez-vous supprimer cette permission ?'
+    default:
+      return 'Voulez-vous confirmer cette action ?'
+  }
+}
+
+const getPermissionTargetName = (permission) => {
+  if (permission.user) return permission.user.username
+  if (permission.group) return permission.group.name
+  if (permission.target_name) return permission.target_name
+  return permission.user_id ? 'Utilisateur' : 'Groupe'
 }
 
 // Utility functions
@@ -471,7 +631,9 @@ const getItemColor = (item) => {
 
 // Lifecycle
 onMounted(() => {
-  loadPermissions()
-  loadAvailableUsersAndGroups()
+  if (isAdmin.value) {
+    loadPermissions()
+    loadAvailableUsersAndGroups()
+  }
 })
 </script>

@@ -1,368 +1,322 @@
-// utils/performanceTest.js
-import { PerformanceMonitor } from '../services/performance'
-import { userAPI } from '../services/api'
+/**
+ * @fileoverview Utilitaires pour tester les performances avec de gros volumes de données
+ */
 
 /**
- * Comprehensive performance test suite for the frontend
+ * Génère des données de test pour simuler de gros dossiers
+ * @param {number} count - Nombre de fichiers à générer
+ * @param {Object} options - Options de génération
+ * @returns {Array} Tableau de fichiers simulés
  */
-export class PerformanceTestSuite {
-  constructor() {
-    this.results = []
-    this.isRunning = false
-  }
+export function generateTestFiles(count = 1000, options = {}) {
+  const {
+    includeDirectories = true,
+    directoryRatio = 0.2, // 20% de dossiers
+    fileTypes = ['txt', 'pdf', 'jpg', 'mp4', 'doc', 'zip', 'js', 'css', 'html', 'json'],
+    sizeRange = { min: 1024, max: 100 * 1024 * 1024 }, // 1KB à 100MB
+    nameLength = { min: 5, max: 30 }
+  } = options
 
-  async runAllTests() {
-    if (this.isRunning) {
-      console.warn('Performance tests already running')
-      return
+  const files = []
+  const now = new Date()
+
+  for (let i = 0; i < count; i++) {
+    const isDirectory = includeDirectories && Math.random() < directoryRatio
+    const nameLen = Math.floor(Math.random() * (nameLength.max - nameLength.min + 1)) + nameLength.min
+    const baseName = generateRandomString(nameLen)
+    
+    let name = baseName
+    let fileType = null
+    let size = 0
+
+    if (isDirectory) {
+      name = `${baseName}_folder`
+    } else {
+      const extension = fileTypes[Math.floor(Math.random() * fileTypes.length)]
+      name = `${baseName}.${extension}`
+      fileType = extension
+      size = Math.floor(Math.random() * (sizeRange.max - sizeRange.min + 1)) + sizeRange.min
     }
 
-    this.isRunning = true
-    this.results = []
-    
-    console.log('🚀 Starting comprehensive performance tests...')
-    
-    try {
-      // Test API performance
-      await this.testApiPerformance()
-      
-      // Test component rendering
-      await this.testComponentRendering()
-      
-      // Test virtual scrolling
-      await this.testVirtualScrolling()
-      
-      // Test bulk operations
-      await this.testBulkOperations()
-      
-      // Test caching
-      await this.testCaching()
-      
-      console.log('✅ Performance tests completed')
-      this.printResults()
-      
-    } catch (error) {
-      console.error('❌ Performance tests failed:', error)
-    } finally {
-      this.isRunning = false
-    }
-    
-    return this.results
-  }
+    // Générer des dates aléaoires dans les 2 dernières années
+    const randomDate = new Date(now.getTime() - Math.random() * 2 * 365 * 24 * 60 * 60 * 1000)
 
-  async testApiPerformance() {
-    console.log('📡 Testing API performance...')
-    
-    const tests = [
-      {
-        name: 'Get User Profile',
-        test: () => userAPI.getProfile()
-      },
-      {
-        name: 'Get Dashboard Data',
-        test: () => userAPI.getDashboard()
-      },
-      {
-        name: 'Get Folders',
-        test: () => userAPI.getFolders()
-      },
-      {
-        name: 'Get Files',
-        test: () => userAPI.getFiles()
-      },
-      {
-        name: 'Get Storage Info',
-        test: () => userAPI.getStorageInfo()
-      }
-    ]
-
-    for (const { name, test } of tests) {
-      const startTime = Date.now()
-      
-      try {
-        await test()
-        const duration = Date.now() - startTime
-        
-        this.results.push({
-          category: 'API',
-          test: name,
-          duration,
-          status: 'success',
-          rating: this.ratePerformance(duration, 'api')
-        })
-        
-        // Performance tracking for test
-        console.log(`Test ${name} completed in ${duration}ms`)
-          test: true,
-          category: 'performance_test'
-        })
-        
-      } catch (error) {
-        this.results.push({
-          category: 'API',
-          test: name,
-          duration: Date.now() - startTime,
-          status: 'error',
-          error: error.message,
-          rating: 'failed'
-        })
-      }
-    }
-  }
-
-  async testComponentRendering() {
-    console.log('🎨 Testing component rendering performance...')
-    
-    // Test large list rendering
-    const startTime = Date.now()
-    
-    // Simulate rendering 1000 items
-    const items = Array.from({ length: 1000 }, (_, i) => ({
-      id: i,
-      name: `Item ${i}`,
-      type: i % 2 === 0 ? 'file' : 'folder',
-      size: Math.random() * 1000000
-    }))
-    
-    // Simulate DOM operations
-    const fragment = document.createDocumentFragment()
-    items.forEach(item => {
-      const div = document.createElement('div')
-      div.textContent = item.name
-      div.className = 'test-item'
-      fragment.appendChild(div)
-    })
-    
-    const duration = Date.now() - startTime
-    
-    this.results.push({
-      category: 'Rendering',
-      test: 'Large List Rendering (1000 items)',
-      duration,
-      status: 'success',
-      rating: this.ratePerformance(duration, 'render')
-    })
-    
-    // Performance tracking for component render
-    console.log(`Large list render completed in ${duration}ms`)
-      itemCount: 1000,
-      test: true
+    files.push({
+      name,
+      path: `/test/${name}`,
+      is_directory: isDirectory,
+      size: isDirectory ? null : size,
+      file_type: fileType,
+      modified_time: randomDate.toISOString(),
+      created_time: randomDate.toISOString(),
+      permissions: 'rwxr-xr-x'
     })
   }
 
-  async testVirtualScrolling() {
-    console.log('📜 Testing virtual scrolling performance...')
-    
-    const startTime = Date.now()
-    
-    // Simulate virtual scrolling calculations
-    const totalItems = 10000
-    const itemHeight = 50
-    const containerHeight = 400
-    const scrollTop = 5000
-    
-    // Calculate visible range (simulating VirtualList logic)
-    const visibleCount = Math.ceil(containerHeight / itemHeight)
-    const startIndex = Math.floor(scrollTop / itemHeight)
-    const endIndex = Math.min(totalItems, startIndex + visibleCount)
-    
-    // Simulate rendering visible items
-    const visibleItems = []
-    for (let i = startIndex; i < endIndex; i++) {
-      visibleItems.push({
-        id: i,
-        name: `Item ${i}`,
-        index: i
-      })
-    }
-    
-    const duration = Date.now() - startTime
-    
-    this.results.push({
-      category: 'Virtual Scrolling',
-      test: `Virtual Scroll Calculation (${totalItems} items)`,
-      duration,
-      status: 'success',
-      rating: this.ratePerformance(duration, 'calculation'),
-      metadata: {
-        totalItems,
-        visibleItems: visibleItems.length,
-        startIndex,
-        endIndex
-      }
-    })
-  }
+  return files
+}
 
-  async testBulkOperations() {
-    console.log('📦 Testing bulk operations performance...')
+/**
+ * Génère une chaîne aléatoire
+ * @param {number} length - Longueur de la chaîne
+ * @returns {string} Chaîne aléatoire
+ */
+function generateRandomString(length) {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'
+  let result = ''
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
+/**
+ * Mesure les performances d'une fonction
+ * @param {Function} fn - Fonction à mesurer
+ * @param {string} name - Nom de la mesure
+ * @returns {Promise<any>} Résultat de la fonction avec métriques
+ */
+export async function measurePerformance(fn, name = 'operation') {
+  const startTime = performance.now()
+  const startMemory = performance.memory ? performance.memory.usedJSHeapSize : 0
+  
+  let result
+  try {
+    result = await fn()
+  } catch (error) {
+    console.error(`Erreur lors de l'exécution de ${name}:`, error)
+    throw error
+  }
+  
+  const endTime = performance.now()
+  const endMemory = performance.memory ? performance.memory.usedJSHeapSize : 0
+  
+  const metrics = {
+    name,
+    duration: endTime - startTime,
+    memoryDelta: endMemory - startMemory,
+    timestamp: new Date().toISOString()
+  }
+  
+  console.log(`Performance ${name}:`, {
+    duration: `${metrics.duration.toFixed(2)}ms`,
+    memory: `${(metrics.memoryDelta / 1024 / 1024).toFixed(2)}MB`,
+    result: result
+  })
+  
+  return { result, metrics }
+}
+
+/**
+ * Teste les performances de rendu avec différents volumes de données
+ * @param {Function} renderFn - Fonction de rendu à tester
+ * @param {Array} testSizes - Tailles à tester
+ * @returns {Promise<Array>} Résultats des tests
+ */
+export async function benchmarkRendering(renderFn, testSizes = [100, 500, 1000, 2000, 5000]) {
+  const results = []
+  
+  for (const size of testSizes) {
+    console.log(`Test de performance avec ${size} éléments...`)
     
-    // Test bulk selection
-    const startTime = Date.now()
+    const testData = generateTestFiles(size)
     
-    const items = Array.from({ length: 1000 }, (_, i) => ({ id: i }))
-    const selectedItems = new Set()
-    
-    // Simulate bulk selection
-    items.forEach(item => {
-      if (item.id % 2 === 0) {
-        selectedItems.add(item.id)
-      }
-    })
-    
-    const selectionDuration = Date.now() - startTime
-    
-    this.results.push({
-      category: 'Bulk Operations',
-      test: 'Bulk Selection (1000 items)',
-      duration: selectionDuration,
-      status: 'success',
-      rating: this.ratePerformance(selectionDuration, 'calculation'),
-      metadata: {
-        totalItems: items.length,
-        selectedItems: selectedItems.size
-      }
-    })
-    
-    // Test bulk filtering
-    const filterStartTime = Date.now()
-    
-    const filteredItems = items.filter(item => 
-      item.id.toString().includes('5')
+    const { metrics } = await measurePerformance(
+      () => renderFn(testData),
+      `render-${size}-items`
     )
     
-    const filterDuration = Date.now() - filterStartTime
-    
-    this.results.push({
-      category: 'Bulk Operations',
-      test: 'Bulk Filtering (1000 items)',
-      duration: filterDuration,
-      status: 'success',
-      rating: this.ratePerformance(filterDuration, 'calculation'),
-      metadata: {
-        totalItems: items.length,
-        filteredItems: filteredItems.length
-      }
+    results.push({
+      size,
+      ...metrics
     })
+    
+    // Petite pause pour laisser le navigateur respirer
+    await new Promise(resolve => setTimeout(resolve, 100))
   }
+  
+  return results
+}
 
-  async testCaching() {
-    console.log('💾 Testing caching performance...')
+/**
+ * Teste les performances de tri avec différents volumes
+ * @param {Function} sortFn - Fonction de tri à tester
+ * @param {Array} testSizes - Tailles à tester
+ * @returns {Promise<Array>} Résultats des tests
+ */
+export async function benchmarkSorting(sortFn, testSizes = [100, 500, 1000, 2000, 5000]) {
+  const results = []
+  
+  for (const size of testSizes) {
+    console.log(`Test de tri avec ${size} éléments...`)
     
-    // Test Map-based cache performance
-    const cache = new Map()
-    const startTime = Date.now()
+    const testData = generateTestFiles(size)
     
-    // Add 1000 items to cache
-    for (let i = 0; i < 1000; i++) {
-      cache.set(`key_${i}`, {
-        data: `value_${i}`,
-        timestamp: Date.now(),
-        ttl: 300000
-      })
-    }
+    // Tester différents types de tri
+    const sortTypes = ['name', 'size', 'type', 'modified']
+    const sortResults = {}
     
-    // Test cache lookups
-    let hits = 0
-    for (let i = 0; i < 1000; i++) {
-      if (cache.has(`key_${i}`)) {
-        hits++
-      }
-    }
-    
-    const duration = Date.now() - startTime
-    
-    this.results.push({
-      category: 'Caching',
-      test: 'Cache Operations (1000 items)',
-      duration,
-      status: 'success',
-      rating: this.ratePerformance(duration, 'calculation'),
-      metadata: {
-        cacheSize: cache.size,
-        hits,
-        hitRate: (hits / 1000) * 100
-      }
-    })
-  }
-
-  ratePerformance(duration, type) {
-    const thresholds = {
-      api: { excellent: 50, good: 100, acceptable: 200, poor: 500 },
-      render: { excellent: 10, good: 30, acceptable: 50, poor: 100 },
-      calculation: { excellent: 1, good: 5, acceptable: 10, poor: 50 }
-    }
-    
-    const threshold = thresholds[type] || thresholds.calculation
-    
-    if (duration <= threshold.excellent) return 'excellent'
-    if (duration <= threshold.good) return 'good'
-    if (duration <= threshold.acceptable) return 'acceptable'
-    if (duration <= threshold.poor) return 'poor'
-    return 'critical'
-  }
-
-  printResults() {
-    console.log('\n📊 Performance Test Results:')
-    console.log('=' .repeat(60))
-    
-    const categories = [...new Set(this.results.map(r => r.category))]
-    
-    categories.forEach(category => {
-      console.log(`\n${category}:`)
-      const categoryResults = this.results.filter(r => r.category === category)
+    for (const sortType of sortTypes) {
+      const { metrics } = await measurePerformance(
+        () => sortFn(testData, sortType),
+        `sort-${sortType}-${size}-items`
+      )
       
-      categoryResults.forEach(result => {
-        const emoji = {
-          excellent: '🟢',
-          good: '🟡',
-          acceptable: '🟠',
-          poor: '🔴',
-          critical: '💀',
-          failed: '❌'
-        }[result.rating] || '⚪'
-        
-        console.log(`  ${emoji} ${result.test}: ${result.duration}ms (${result.rating})`)
-        
-        if (result.metadata) {
-          Object.entries(result.metadata).forEach(([key, value]) => {
-            console.log(`    ${key}: ${value}`)
-          })
-        }
-        
-        if (result.error) {
-          console.log(`    Error: ${result.error}`)
-        }
-      })
-    })
-    
-    // Summary
-    const avgDuration = this.results.reduce((sum, r) => sum + r.duration, 0) / this.results.length
-    const successRate = (this.results.filter(r => r.status === 'success').length / this.results.length) * 100
-    
-    console.log('\n📈 Summary:')
-    console.log(`  Average Duration: ${avgDuration.toFixed(2)}ms`)
-    console.log(`  Success Rate: ${successRate.toFixed(1)}%`)
-    console.log(`  Total Tests: ${this.results.length}`)
-  }
-
-  exportResults() {
-    return {
-      timestamp: new Date().toISOString(),
-      results: this.results,
-      summary: {
-        totalTests: this.results.length,
-        successRate: (this.results.filter(r => r.status === 'success').length / this.results.length) * 100,
-        averageDuration: this.results.reduce((sum, r) => sum + r.duration, 0) / this.results.length,
-        categories: [...new Set(this.results.map(r => r.category))]
-      }
+      sortResults[sortType] = metrics
     }
+    
+    results.push({
+      size,
+      sorts: sortResults
+    })
+  }
+  
+  return results
+}
+
+/**
+ * Teste les performances de virtualisation
+ * @param {Function} virtualScrollFn - Fonction de scroll virtuel
+ * @param {number} totalItems - Nombre total d'éléments
+ * @param {number} visibleItems - Nombre d'éléments visibles
+ * @returns {Promise<Object>} Résultats du test
+ */
+export async function benchmarkVirtualization(virtualScrollFn, totalItems = 10000, visibleItems = 20) {
+  console.log(`Test de virtualisation avec ${totalItems} éléments (${visibleItems} visibles)...`)
+  
+  const testData = generateTestFiles(totalItems)
+  
+  // Simuler différentes positions de scroll
+  const scrollPositions = [0, 0.25, 0.5, 0.75, 1.0]
+  const results = []
+  
+  for (const position of scrollPositions) {
+    const scrollIndex = Math.floor(position * (totalItems - visibleItems))
+    
+    const { metrics } = await measurePerformance(
+      () => virtualScrollFn(testData, scrollIndex, visibleItems),
+      `virtual-scroll-${Math.round(position * 100)}%`
+    )
+    
+    results.push({
+      position: Math.round(position * 100),
+      scrollIndex,
+      ...metrics
+    })
+  }
+  
+  return {
+    totalItems,
+    visibleItems,
+    results
   }
 }
 
-// Global instance
-export const performanceTestSuite = new PerformanceTestSuite()
+/**
+ * Génère un rapport de performance complet
+ * @param {Object} testResults - Résultats des tests
+ * @returns {string} Rapport formaté
+ */
+export function generatePerformanceReport(testResults) {
+  let report = '# Rapport de Performance\n\n'
+  report += `Généré le: ${new Date().toLocaleString()}\n\n`
+  
+  if (testResults.rendering) {
+    report += '## Tests de Rendu\n\n'
+    report += '| Éléments | Durée (ms) | Mémoire (MB) |\n'
+    report += '|----------|------------|-------------|\n'
+    
+    testResults.rendering.forEach(result => {
+      report += `| ${result.size} | ${result.duration.toFixed(2)} | ${(result.memoryDelta / 1024 / 1024).toFixed(2)} |\n`
+    })
+    report += '\n'
+  }
+  
+  if (testResults.sorting) {
+    report += '## Tests de Tri\n\n'
+    testResults.sorting.forEach(sizeResult => {
+      report += `### ${sizeResult.size} éléments\n\n`
+      report += '| Type de tri | Durée (ms) | Mémoire (MB) |\n'
+      report += '|-------------|------------|-------------|\n'
+      
+      Object.entries(sizeResult.sorts).forEach(([sortType, metrics]) => {
+        report += `| ${sortType} | ${metrics.duration.toFixed(2)} | ${(metrics.memoryDelta / 1024 / 1024).toFixed(2)} |\n`
+      })
+      report += '\n'
+    })
+  }
+  
+  if (testResults.virtualization) {
+    report += '## Tests de Virtualisation\n\n'
+    report += `Total: ${testResults.virtualization.totalItems} éléments, Visibles: ${testResults.virtualization.visibleItems}\n\n`
+    report += '| Position | Index | Durée (ms) | Mémoire (MB) |\n'
+    report += '|----------|-------|------------|-------------|\n'
+    
+    testResults.virtualization.results.forEach(result => {
+      report += `| ${result.position}% | ${result.scrollIndex} | ${result.duration.toFixed(2)} | ${(result.memoryDelta / 1024 / 1024).toFixed(2)} |\n`
+    })
+    report += '\n'
+  }
+  
+  return report
+}
 
-// Utility function to run tests from console
-window.runPerformanceTests = () => performanceTestSuite.runAllTests()
+/**
+ * Exécute une suite complète de tests de performance
+ * @param {Object} components - Composants à tester
+ * @param {Object} options - Options de test
+ * @returns {Promise<Object>} Résultats complets
+ */
+export async function runPerformanceTestSuite(components, options = {}) {
+  const {
+    testSizes = [100, 500, 1000, 2000],
+    includeVirtualization = true,
+    includeSorting = true,
+    includeRendering = true
+  } = options
+  
+  console.log('🚀 Début de la suite de tests de performance...')
+  
+  const results = {}
+  
+  if (includeRendering && components.render) {
+    console.log('📊 Tests de rendu...')
+    results.rendering = await benchmarkRendering(components.render, testSizes)
+  }
+  
+  if (includeSorting && components.sort) {
+    console.log('🔄 Tests de tri...')
+    results.sorting = await benchmarkSorting(components.sort, testSizes)
+  }
+  
+  if (includeVirtualization && components.virtualScroll) {
+    console.log('📜 Tests de virtualisation...')
+    results.virtualization = await benchmarkVirtualization(
+      components.virtualScroll,
+      Math.max(...testSizes) * 5, // 5x le plus gros test
+      20
+    )
+  }
+  
+  console.log('✅ Suite de tests terminée!')
+  
+  // Générer et afficher le rapport
+  const report = generatePerformanceReport(results)
+  console.log('\n' + report)
+  
+  return {
+    results,
+    report,
+    timestamp: new Date().toISOString()
+  }
+}
 
-export default performanceTestSuite
+export default {
+  generateTestFiles,
+  measurePerformance,
+  benchmarkRendering,
+  benchmarkSorting,
+  benchmarkVirtualization,
+  generatePerformanceReport,
+  runPerformanceTestSuite
+}

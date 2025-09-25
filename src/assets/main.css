@@ -1,3 +1,6 @@
+/* Import accessibility and design system enhancements */
+@import './accessibility.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -65,3 +68,45 @@
   --noise: 1;
 }
 
+/* File Operations Visual Indicators */
+@layer components {
+  .file-operation-copy {
+    @apply relative;
+  }
+  
+  .file-operation-copy::after {
+    content: '';
+    @apply absolute inset-0 bg-blue-100 bg-opacity-50 border-2 border-blue-300 border-dashed rounded pointer-events-none;
+  }
+  
+  .file-operation-cut {
+    @apply relative opacity-60;
+  }
+  
+  .file-operation-cut::after {
+    content: '';
+    @apply absolute inset-0 bg-orange-100 bg-opacity-50 border-2 border-orange-300 border-dashed rounded pointer-events-none;
+  }
+  
+  /* File operation status indicators */
+  .file-operation-indicator {
+    @apply inline-flex items-center px-2 py-1 text-xs font-medium rounded-full;
+  }
+  
+  .file-operation-indicator.copy {
+    @apply bg-blue-100 text-blue-800;
+  }
+  
+  .file-operation-indicator.cut {
+    @apply bg-orange-100 text-orange-800;
+  }
+  
+  /* Animation for operation feedback */
+  .file-operation-feedback {
+    @apply transition-all duration-200 ease-in-out;
+  }
+  
+  .file-operation-feedback:hover {
+    @apply transform scale-105;
+  }
+}

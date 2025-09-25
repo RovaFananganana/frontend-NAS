@@ -48,6 +48,11 @@ export default createStore({
       language: localStorage.getItem('language') || 'fr',
       fileView: localStorage.getItem('fileView') || 'grid',
       itemsPerPage: parseInt(localStorage.getItem('itemsPerPage')) || 50
+    },
+    
+    // View Mode State (managed by useViewMode composable)
+    viewMode: {
+      initialized: false
     }
   },
 
@@ -71,7 +76,10 @@ export default createStore({
     currentTheme: (state) => state.preferences.theme,
     currentLanguage: (state) => state.preferences.language,
     preferredFileView: (state) => state.preferences.fileView,
-    preferredItemsPerPage: (state) => state.preferences.itemsPerPage
+    preferredItemsPerPage: (state) => state.preferences.itemsPerPage,
+    
+    // View Mode getters
+    isViewModeInitialized: (state) => state.viewMode.initialized
   },
 
   mutations: {
@@ -250,6 +258,11 @@ export default createStore({
     SET_LANGUAGE(state, language) {
       state.preferences.language = language
       localStorage.setItem('language', language)
+    },
+
+    // View Mode mutations
+    SET_VIEW_MODE_INITIALIZED(state, initialized) {
+      state.viewMode.initialized = initialized
     }
   },
 
@@ -422,6 +435,12 @@ export default createStore({
 
     setLanguage({ commit }, language) {
       commit('SET_LANGUAGE', language)
+    },
+
+    // View Mode actions
+    initializeViewMode({ commit }) {
+      commit('SET_VIEW_MODE_INITIALIZED', true)
+      console.log('View mode system initialized')
     },
 
     // Initialize app

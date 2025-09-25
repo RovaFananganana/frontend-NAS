@@ -16,6 +16,15 @@
         </div>
       </div>
 
+      <!-- Error message -->
+      <div v-if="errorMessage" class="alert alert-error mb-4">
+        <i class="fas fa-exclamation-circle"></i>
+        <div>
+          <h4 class="font-bold">Erreur</h4>
+          <p>{{ errorMessage }}</p>
+        </div>
+      </div>
+
       <!-- Items to delete -->
       <div class="bg-base-200 p-4 rounded-lg mb-4">
         <h4 class="font-semibold mb-2">
@@ -55,7 +64,7 @@
 
       <!-- Actions -->
       <div class="modal-action">
-        <button @click="$emit('close')" class="btn btn-outline">
+        <button @click="closeModal" class="btn btn-outline" :disabled="loading">
           Annuler
         </button>
         <button 
@@ -73,7 +82,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useStore } from 'vuex'
 
 const props = defineProps({
   items: {
@@ -84,24 +94,73 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'confirmed'])
 
+// Store
+const store = useStore()
+
 // State
 const loading = ref(false)
 const confirmMultiple = ref(false)
+const errorMessage = ref('')
+
+// Computed
+const isAdmin = computed(() => store.getters.isAdmin)
+const canDelete = computed(() => {
+  // Admin can delete everything
+  if (isAdmin.value) return true
+  
+  // For regular users, we'll let the backend handle permission validation
+  // This could be enhanced with more granular frontend permission checking
+  return true
+})
 
 // Methods
+const closeModal = () => {
+  errorMessage.value = ''
+  emit('close')
+}
+
 const deleteItems = async () => {
+  if (!canDelete.value) {
+    errorMessage.value = 'Vous n\'avez pas les permissions nécessaires pour supprimer ces éléments.'
+    return
+  }
+
   loading.value = true
+  errorMessage.value = ''
 
   try {
+    const results = []
+    
     for (const item of props.items) {
-      await deleteItem(item)
+      try {
+        const result = await deleteItem(item)
+        results.push({ item, success: true, result })
+      } catch (error) {
+        results.push({ item, success: false, error: error.message })
+      }
     }
 
-    emit('confirmed', props.items)
-    emit('close')
+    // Check if any deletions failed
+    const failedDeletions = results.filter(r => !r.success)
+    
+    if (failedDeletions.length > 0) {
+      // Show error for failed deletions
+      const failedNames = failedDeletions.map(f => f.item.name).join(', ')
+      errorMessage.value = `Échec de suppression pour: ${failedNames}. ${failedDeletions[0].error}`
+      
+      // If some succeeded, still emit the successful ones
+      const successfulItems = results.filter(r => r.success).map(r => r.item)
+      if (successfulItems.length > 0) {
+        emit('confirmed', successfulItems)
+      }
+    } else {
+      // All deletions successful
+      emit('confirmed', props.items)
+      closeModal()
+    }
   } catch (err) {
     console.error('Error deleting items:', err)
-    // Handle error - could show toast notification
+    errorMessage.value = `Erreur lors de la suppression: ${err.message}`
   } finally {
     loading.value = false
   }
@@ -120,7 +179,13 @@ const deleteItem = async (item) => {
   })
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    if (response.status === 403) {
+      throw new Error('Permission de suppression refusée')
+    } else if (response.status === 404) {
+      throw new Error('Élément introuvable')
+    } else {
+      throw new Error(`Erreur serveur (${response.status}): ${response.statusText}`)
+    }
   }
 
   const data = await response.json()
@@ -128,6 +193,8 @@ const deleteItem = async (item) => {
   if (!data.success) {
     throw new Error(data.error || 'Erreur lors de la suppression')
   }
+
+  return data
 }
 
 // Utility functions

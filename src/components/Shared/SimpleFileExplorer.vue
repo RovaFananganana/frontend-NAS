@@ -47,9 +47,9 @@
           <i class="fas fa-sitemap mr-2"></i>
           Arborescence
         </h3>
-        <NasFolderTree 
-          :current-path="currentPath"
-          @path-selected="navigateToPath"
+        <TreeView 
+          :selected-path="currentPath"
+          @folder-selected="navigateToPath"
         />
       </div>
     </div>
@@ -304,7 +304,7 @@
 
       <!-- Supprimer -->
       <button 
-        v-if="contextMenu.item && canModifyItem(contextMenu.item)"
+        v-if="contextMenu.item && canDeleteItem(contextMenu.item)"
         class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm text-error flex items-center gap-3"
         @click="confirmDelete(contextMenu.item)"
       >
@@ -369,7 +369,9 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useStore } from 'vuex'
-import NasFolderTree from './NasFolderTree.vue'
+import { usePermissions } from '@/composables/usePermissions.js'
+import TreeView from './TreeView.vue'
+import ContextMenu from './ContextMenu.vue'
 import PermissionModal from './PermissionModal.vue'
 import RenameModal from './RenameModal.vue'
 import MoveModal from './MoveModal.vue'
@@ -605,17 +607,70 @@ const onPermissionsUpdated = () => {
   loadDirectory(currentPath.value)
 }
 
-// Permission checks
-const canModifyItem = (item) => {
-  if (isAdmin.value) return true
-  // TODO: Check user permissions for this item
-  return true // Placeholder
+// Permission system
+const { 
+  isAdmin: isUserAdmin, 
+  canPerformAction, 
+  getPermissionErrorMessage, 
+  loadPermissions 
+} = usePermissions()
+
+// Permission state
+const contextMenuPermissions = ref({
+  can_read: false,
+  can_write: false,
+  can_delete: false,
+  can_share: false,
+  can_modify: false
+})
+
+// Load permissions for context menu item
+const loadContextMenuPermissions = async (item) => {
+  if (!item) {
+    contextMenuPermissions.value = {
+      can_read: false,
+      can_write: false,
+      can_delete: false,
+      can_share: false,
+      can_modify: false
+    }
+    return
+  }
+
+  try {
+    const permissions = await loadPermissions(item.path)
+    contextMenuPermissions.value = permissions || {
+      can_read: false,
+      can_write: false,
+      can_delete: false,
+      can_share: false,
+      can_modify: false
+    }
+  } catch (error) {
+    console.error('Error loading context menu permissions:', error)
+    contextMenuPermissions.value = {
+      can_read: false,
+      can_write: false,
+      can_delete: false,
+      can_share: false,
+      can_modify: false
+    }
+  }
 }
 
-const canModifyCurrentFolder = () => {
-  if (isAdmin.value) return true
-  // TODO: Check user permissions for current folder
-  return true // Placeholder
+// Legacy permission functions for backward compatibility
+const canModifyItem = async (item) => {
+  if (!item) return false
+  return await canPerformAction(item.path, 'write')
+}
+
+const canDeleteItem = async (item) => {
+  if (!item) return false
+  return await canPerformAction(item.path, 'delete')
+}
+
+const canModifyCurrentFolder = async () => {
+  return await canPerformAction(currentPath.value, 'write')
 }
 
 // Copy/Cut/Paste operations
@@ -664,13 +719,33 @@ const pasteItems = async () => {
 }
 
 const copyItemToPath = async (item, targetPath) => {
-  // TODO: Implement copy operation via API
-  console.log('Copy item:', item.path, 'to:', targetPath)
+  try {
+    const result = await nasAPI.copyItem(item.path, targetPath)
+    if (result.success) {
+      store.dispatch('showSuccess', `${item.name} copié avec succès`)
+    } else {
+      throw new Error(result.error || 'Copy failed')
+    }
+  } catch (error) {
+    console.error('Copy error:', error)
+    store.dispatch('showError', `Erreur lors de la copie: ${error.message}`)
+    throw error
+  }
 }
 
 const moveItemToPath = async (item, targetPath) => {
-  // TODO: Implement move operation via API
-  console.log('Move item:', item.path, 'to:', targetPath)
+  try {
+    const result = await nasAPI.moveItem(item.path, targetPath)
+    if (result.success) {
+      store.dispatch('showSuccess', `${item.name} déplacé avec succès`)
+    } else {
+      throw new Error(result.error || 'Move failed')
+    }
+  } catch (error) {
+    console.error('Move error:', error)
+    store.dispatch('showError', `Erreur lors du déplacement: ${error.message}`)
+    throw error
+  }
 }
 
 // Modal operations
@@ -699,9 +774,19 @@ const showProperties = (item) => {
 }
 
 // Modal event handlers
-const onItemRenamed = () => {
-  loadDirectory(currentPath.value)
-  store.dispatch('showSuccess', 'Élément renommé avec succès')
+const onItemRenamed = async (oldPath, newName) => {
+  try {
+    const result = await nasAPI.renameItem(oldPath, newName)
+    if (result.success) {
+      await loadDirectory(currentPath.value)
+      store.dispatch('showSuccess', 'Élément renommé avec succès')
+    } else {
+      throw new Error(result.error || 'Rename failed')
+    }
+  } catch (error) {
+    console.error('Rename error:', error)
+    store.dispatch('showError', `Erreur lors du renommage: ${error.message}`)
+  }
 }
 
 const onItemsMoved = () => {
@@ -709,9 +794,21 @@ const onItemsMoved = () => {
   store.dispatch('showSuccess', 'Éléments déplacés avec succès')
 }
 
-const onItemsDeleted = () => {
-  loadDirectory(currentPath.value)
-  store.dispatch('showSuccess', 'Éléments supprimés avec succès')
+const onItemsDeleted = async (items) => {
+  try {
+    for (const item of items) {
+      const result = await nasAPI.deleteItem(item.path)
+      if (!result.success) {
+        throw new Error(result.error || `Failed to delete ${item.name}`)
+      }
+    }
+    
+    await loadDirectory(currentPath.value)
+    store.dispatch('showSuccess', `${items.length} élément(s) supprimé(s) avec succès`)
+  } catch (error) {
+    console.error('Delete error:', error)
+    store.dispatch('showError', `Erreur lors de la suppression: ${error.message}`)
+  }
 }
 
 const toggleFavorite = () => {

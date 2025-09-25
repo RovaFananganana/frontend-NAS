@@ -1,10 +1,11 @@
 <!-- src/components/Shared/NASFolderTree.vue -->
 <template>
-  <div class="nas-folder-tree">
+  <div class='NasFolderTree'>
     <div 
       class="flex items-center p-1 rounded hover:bg-base-200 cursor-pointer transition-colors text-sm"
       :class="{ 'bg-primary text-primary-content': currentPath === '/' }"
       @click="$emit('path-selected', '/')"
+      @contextmenu="handleRootRightClick"
     >
       <i class="fas fa-hdd text-primary mr-2"></i>
       <span>NAS Root</span>
@@ -27,6 +28,7 @@
       :level="0"
       @path-selected="$emit('path-selected', $event)"
       @node-expanded="handleNodeExpanded"
+      @context-menu="(event, node) => $emit('context-menu', event, node)"
     />
   </div>
 </template>
@@ -52,7 +54,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['path-selected'])
+const emit = defineEmits(['path-selected', 'context-menu'])
 
 const treeData = ref([])
 const expandedPaths = ref(new Set())
@@ -67,7 +69,9 @@ const buildTreeStructure = (items, basePath = '/') => {
     const node = {
       name: dir.name,
       path: nodePath,
+      id: nodePath, // Use path as ID for permissions
       type: 'directory',
+      is_directory: true, // Add this property for compatibility
       children: [],
       loaded: false,
       loading: false,
@@ -96,11 +100,11 @@ const loadTreeData = async (path = '/') => {
     
     if (path === '/') {
       // Root level - filter only directories for tree
-      const directories = data.items.filter(item => item.is_directory)
+      const directories = (data.items || []).filter(item => item.is_directory)
       treeData.value = buildTreeStructure(directories, path)
     } else {
       // Update specific node
-      const directories = data.items.filter(item => item.is_directory)
+      const directories = (data.items || []).filter(item => item.is_directory)
       updateNodeChildren(treeData.value, path, directories)
     }
     
@@ -172,6 +176,18 @@ const expandPathToCurrentLocation = () => {
       loadTreeData(currentPath)
     }
   }
+}
+
+const handleRootRightClick = (event) => {
+  event.preventDefault()
+  const rootNode = {
+    name: 'NAS Root',
+    path: '/',
+    id: '/', // Add ID for permissions
+    is_directory: true,
+    type: 'directory'
+  }
+  emit('context-menu', event, rootNode)
 }
 
 // Watch for current path changes to expand tree

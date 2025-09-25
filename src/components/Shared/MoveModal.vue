@@ -28,9 +28,9 @@
         <div class="border border-base-300 rounded-lg p-4">
           <h4 class="font-semibold mb-3">Choisir le dossier de destination :</h4>
           <div class="max-h-96 overflow-auto">
-            <NasFolderTree 
-              :current-path="selectedDestination"
-              @path-selected="selectDestination"
+            <TreeView 
+              :selected-path="selectedDestination"
+              @folder-selected="selectDestination"
             />
           </div>
         </div>
@@ -130,7 +130,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import NasFolderTree from './NasFolderTree.vue'
+import TreeView from './TreeView.vue'
 
 const props = defineProps({
   items: {
@@ -192,27 +192,17 @@ const moveItems = async () => {
 }
 
 const moveItem = async (item, destinationPath) => {
-  const response = await fetch('/nas/move', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      source_path: item.path,
-      dest_path: destinationPath
-    })
-  })
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+  // Import nasAPI service
+  const { nasAPI } = await import('@/services/nasAPI.js')
+  
+  // Use the correct move method from nasAPI
+  const result = await nasAPI.moveItem(item.path, destinationPath)
+  
+  if (!result.success) {
+    throw new Error(result.error || 'Erreur lors du déplacement')
   }
-
-  const data = await response.json()
-
-  if (!data.success) {
-    throw new Error(data.error || 'Erreur lors du déplacement')
-  }
+  
+  return result
 }
 
 const addToRecentFolders = (path) => {

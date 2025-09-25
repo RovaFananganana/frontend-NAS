@@ -28,7 +28,7 @@ import Sidebar from '../components/Shared/Sidebar.vue'
 import Dashboard from '@/components/Admin/Dashboard.vue'
 import UserManagement from '@/components/Admin/UserManagement.vue'
 import GroupManagement from '@/components/Admin/GroupManagement.vue'
-import SimpleFileExplorer from '@/components/Shared/SimpleFileExplorer.vue'
+import FileExplorer from '@/components/Shared/FileExplorer.vue'
 import PermissionManager from '@/components/Admin/PermissionManager.vue'
 import AccessLogs from '@/components/Admin/AccessLogs.vue'
 
@@ -37,7 +37,7 @@ const tabs = [
   { key: 'dash', label: 'Tableau de bord', comp: Dashboard },
   { key: 'users', label: 'Gestion des utilisateurs', comp: UserManagement },
   { key: 'groups', label: 'Gestion des groupes', comp: GroupManagement },
-  { key: 'explorer', label: 'Explorateur de fichiers', comp: SimpleFileExplorer },
+  { key: 'explorer', label: 'Explorateur de fichiers', comp: FileExplorer },
   { key: 'perms', label: 'Gestionnaire de permissions', comp: PermissionManager },
   { key: 'logs', label: 'Journaux d\'accès', comp: AccessLogs },
 ]

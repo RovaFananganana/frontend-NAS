@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Manuel - useViewMode</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .test-result { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 3px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button { margin: 5px; padding: 8px 12px; cursor: pointer; }
+        .file-list { margin: 10px 0; }
+        .file-item { padding: 5px; margin: 2px 0; background: #f8f9fa; border-radius: 3px; }
+        .selected { background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Test Manuel - useViewMode Composable</h1>
+    
+    <div id="app">
+        <div class="test-section">
+            <h3>État Actuel</h3>
+            <div class="test-result">
+                <strong>Mode:</strong> {{ currentViewMode.label }} ({{ currentMode }})
+            </div>
+            <div class="test-result">
+                <strong>Tri:</strong> {{ sortColumn }} - {{ sortDirection }}
+            </div>
+            <div class="test-result">
+                <strong>Fichiers sélectionnés:</strong> {{ selectedFiles.length }} / {{ getSelectedCount() }}
+            </div>
+            <div class="test-result">
+                <strong>Colonnes visibles:</strong> {{ visibleColumns.map(c => c.label).join(', ') }}
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Changement de Mode</h3>
+            <button @click="setCurrentMode('tree')" :disabled="currentMode === 'tree'">
+                Mode Arbre
+            </button>
+            <button @click="setCurrentMode('detailed-list')" :disabled="currentMode === 'detailed-list'">
+                Mode Liste
+            </button>
+            <div class="test-result">
+                <strong>Mode Arbre:</strong> {{ isTreeMode ? 'Oui' : 'Non' }}
+            </div>
+            <div class="test-result">
+                <strong>Mode Liste:</strong> {{ isDetailedListMode ? 'Oui' : 'Non' }}
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Tri</h3>
+            <button @click="setSortColumn('name')">Trier par Nom</button>
+            <button @click="setSortColumn('size')">Trier par Taille</button>
+            <button @click="setSortColumn('type')">Trier par Type</button>
+            <button @click="setSortColumn('modified')">Trier par Date</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Sélection de Fichiers</h3>
+            <div class="file-list">
+                <div 
+                    v-for="file in testFiles" 
+                    :key="file.path"
+                    :class="['file-item', { selected: isSelected(file.path) }]"
+                    @click="toggleSelectedFile(file.path)"
+                    style="cursor: pointer;"
+                >
+                    {{ file.name }} ({{ file.size }} bytes)
+                </div>
+            </div>
+            <button @click="selectAll(testFiles)">Tout sélectionner</button>
+            <button @click="clearSelection()">Tout désélectionner</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Tri des Fichiers</h3>
+            <div class="file-list">
+                <div v-for="file in sortedFiles" :key="file.path" class="file-item">
+                    <strong>{{ file.name }}</strong> - 
+                    {{ file.size }} bytes - 
+                    {{ file.is_directory ? 'Dossier' : 'Fichier' }} - 
+                    {{ file.modified_time }}
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Visibilité des Colonnes</h3>
+            <div v-for="column in availableColumns" :key="column.key">
+                <label>
+                    <input 
+                        type="checkbox" 
+                        :checked="columnVisibility[column.key]"
+                        @change="setColumnVisibility(column.key, $event.target.checked)"
+                    >
+                    {{ column.label }}
+                </label>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Persistance</h3>
+            <button @click="saveToStorage()">Sauvegarder</button>
+            <button @click="loadFromStorage()">Charger</button>
+            <button @click="clearStorage()">Effacer</button>
+            <div class="test-result">
+                <strong>LocalStorage:</strong> {{ storageContent }}
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import du composable (simulé pour le test)
+        const { ref, computed, watch } = Vue;
+
+        // Simulation du composable useViewMode pour le test
+        function useViewMode() {
+            const state = ref({
+                currentMode: 'tree',
+                sortColumn: 'name',
+                sortDirection: 'asc',
+                selectedFiles: [],
+                columnVisibility: {
+                    name: true,
+                    size: true,
+                    type: true,
+                    modified: true
+                }
+            });
+
+            const AVAILABLE_MODES = [
+                { id: 'tree', label: 'Arbre', icon: 'fas fa-sitemap', component: 'TreeView' },
+                { id: 'detailed-list', label: 'Liste détaillée', icon: 'fas fa-list', component: 'DetailedListView' }
+            ];
+
+            const currentMode = computed(() => state.value.currentMode);
+            const sortColumn = computed(() => state.value.sortColumn);
+            const sortDirection = computed(() => state.value.sortDirection);
+            const selectedFiles = computed(() => state.value.selectedFiles);
+            const columnVisibility = computed(() => state.value.columnVisibility);
+
+            const currentViewMode = computed(() => {
+                return AVAILABLE_MODES.find(mode => mode.id === state.value.currentMode) || AVAILABLE_MODES[0];
+            });
+
+            const visibleColumns = computed(() => {
+                const allColumns = [
+                    { key: 'name', label: 'Nom', sortable: true },
+                    { key: 'size', label: 'Taille', sortable: true },
+                    { key: 'type', label: 'Type', sortable: true },
+                    { key: 'modified', label: 'Modifié', sortable: true }
+                ];
+                return allColumns.filter(col => state.value.columnVisibility[col.key]);
+            });
+
+            const isTreeMode = computed(() => state.value.currentMode === 'tree');
+            const isDetailedListMode = computed(() => state.value.currentMode === 'detailed-list');
+
+            const setCurrentMode = (modeId) => {
+                const mode = AVAILABLE_MODES.find(m => m.id === modeId);
+                if (mode) {
+                    state.value.currentMode = modeId;
+                }
+            };
+
+            const setSortColumn = (column) => {
+                if (state.value.sortColumn === column) {
+                    state.value.sortDirection = state.value.sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    state.value.sortColumn = column;
+                    state.value.sortDirection = 'asc';
+                }
+            };
+
+            const toggleSelectedFile = (filePath) => {
+                const index = state.value.selectedFiles.indexOf(filePath);
+                if (index > -1) {
+                    state.value.selectedFiles.splice(index, 1);
+                } else {
+                    state.value.selectedFiles.push(filePath);
+                }
+            };
+
+            const selectAll = (files) => {
+                state.value.selectedFiles = files.map(file => file.path);
+            };
+
+            const clearSelection = () => {
+                state.value.selectedFiles = [];
+            };
+
+            const isSelected = (filePath) => {
+                return state.value.selectedFiles.includes(filePath);
+            };
+
+            const getSelectedCount = () => {
+                return state.value.selectedFiles.length;
+            };
+
+            const setColumnVisibility = (column, visible) => {
+                state.value.columnVisibility[column] = visible;
+            };
+
+            const sortFiles = (files) => {
+                if (!Array.isArray(files)) return [];
+
+                const sorted = [...files].sort((a, b) => {
+                    let aValue, bValue;
+
+                    switch (state.value.sortColumn) {
+                        case 'name':
+                            aValue = (a.name || '').toLowerCase();
+                            bValue = (b.name || '').toLowerCase();
+                            break;
+                        case 'size':
+                            aValue = a.size || 0;
+                            bValue = b.size || 0;
+                            break;
+                        case 'type':
+                            aValue = a.is_directory ? 'dossier' : (a.file_type || 'fichier');
+                            bValue = b.is_directory ? 'dossier' : (b.file_type || 'fichier');
+                            break;
+                        case 'modified':
+                            aValue = new Date(a.modified_time || 0);
+                            bValue = new Date(b.modified_time || 0);
+                            break;
+                        default:
+                            return 0;
+                    }
+
+                    if (a.is_directory && !b.is_directory) return -1;
+                    if (!a.is_directory && b.is_directory) return 1;
+
+                    if (aValue < bValue) return state.value.sortDirection === 'asc' ? -1 : 1;
+                    if (aValue > bValue) return state.value.sortDirection === 'asc' ? 1 : -1;
+                    return 0;
+                });
+
+                return sorted;
+            };
+
+            // Watcher pour la persistance
+            watch(
+                () => state.value,
+                (newState) => {
+                    const toSave = {
+                        currentMode: newState.currentMode,
+                        sortColumn: newState.sortColumn,
+                        sortDirection: newState.sortDirection,
+                        columnVisibility: newState.columnVisibility
+                    };
+                    localStorage.setItem('nas-view-mode-preferences', JSON.stringify(toSave));
+                },
+                { deep: true }
+            );
+
+            return {
+                currentMode,
+                sortColumn,
+                sortDirection,
+                selectedFiles,
+                columnVisibility,
+                currentViewMode,
+                visibleColumns,
+                isTreeMode,
+                isDetailedListMode,
+                setCurrentMode,
+                setSortColumn,
+                toggleSelectedFile,
+                selectAll,
+                clearSelection,
+                isSelected,
+                getSelectedCount,
+                setColumnVisibility,
+                sortFiles
+            };
+        }
+
+        const { createApp } = Vue;
+
+        createApp({
+            setup() {
+                const viewMode = useViewMode();
+
+                const testFiles = ref([
+                    { name: 'Documents', path: '/documents', size: 0, is_directory: true, modified_time: '2023-12-01', file_type: 'folder' },
+                    { name: 'photo.jpg', path: '/photo.jpg', size: 2048000, is_directory: false, modified_time: '2023-12-02', file_type: 'image' },
+                    { name: 'document.pdf', path: '/document.pdf', size: 1024000, is_directory: false, modified_time: '2023-12-03', file_type: 'pdf' },
+                    { name: 'archive.zip', path: '/archive.zip', size: 5120000, is_directory: false, modified_time: '2023-11-30', file_type: 'archive' }
+                ]);
+
+                const availableColumns = [
+                    { key: 'name', label: 'Nom' },
+                    { key: 'size', label: 'Taille' },
+                    { key: 'type', label: 'Type' },
+                    { key: 'modified', label: 'Modifié' }
+                ];
+
+                const sortedFiles = computed(() => {
+                    return viewMode.sortFiles(testFiles.value);
+                });
+
+                const storageContent = ref('');
+
+                const saveToStorage = () => {
+                    // La sauvegarde se fait automatiquement via le watcher
+                    loadStorageContent();
+                };
+
+                const loadFromStorage = () => {
+                    const stored = localStorage.getItem('nas-view-mode-preferences');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        viewMode.setCurrentMode(parsed.currentMode);
+                        // Note: pour un vrai test, il faudrait recharger complètement l'état
+                    }
+                    loadStorageContent();
+                };
+
+                const clearStorage = () => {
+                    localStorage.removeItem('nas-view-mode-preferences');
+                    loadStorageContent();
+                };
+
+                const loadStorageContent = () => {
+                    const stored = localStorage.getItem('nas-view-mode-preferences');
+                    storageContent.value = stored ? JSON.stringify(JSON.parse(stored), null, 2) : 'Aucune donnée';
+                };
+
+                // Charger le contenu initial
+                loadStorageContent();
+
+                return {
+                    ...viewMode,
+                    testFiles,
+                    availableColumns,
+                    sortedFiles,
+                    storageContent,
+                    saveToStorage,
+                    loadFromStorage,
+                    clearStorage
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
