@@ -9,6 +9,21 @@
           {{ loading ? 'Refreshing...' : 'Refresh' }}
         </button>
 
+        <button class="btn btn-sm btn-info" @click="testNasConnection" :disabled="loading || testing">
+          <i class="fas fa-network-wired mr-2" :class="{ 'animate-spin': testing }"></i>
+          {{ testing ? 'Test...' : 'Test NAS' }}
+        </button>
+
+        <button class="btn btn-sm btn-warning" @click="syncWithNas" :disabled="loading || syncing">
+          <i class="fas fa-server mr-2" :class="{ 'animate-spin': syncing }"></i>
+          {{ syncing ? 'Synchronisation...' : 'Sync NAS' }}
+        </button>
+
+        <button class="btn btn-sm btn-secondary" @click="showOrphanedFolders" :disabled="loading">
+          <i class="fas fa-search mr-2"></i>
+          Find Orphaned
+        </button>
+
         <button class="btn btn-sm btn-primary" @click="openBulkPermissionModal">
           <i class="fas fa-users-cog mr-2"></i>
           Bulk Permissions
@@ -87,6 +102,11 @@
                 <li><a @click="openAddPermissionModal(folder)"><i class="fas fa-plus mr-2"></i>Add Permission</a></li>
                 <li><a @click="viewFolderDetails(folder)"><i class="fas fa-eye mr-2"></i>View Details</a></li>
                 <li><a @click="exportFolderPermissions(folder)"><i class="fas fa-download mr-2"></i>Export</a></li>
+                <li>
+                  <hr class="my-1">
+                </li>
+                <li><a @click="confirmDeleteFolder(folder)" class="text-error"><i class="fas fa-trash mr-2"></i>Delete
+                    Folder</a></li>
               </ul>
             </div>
           </div>
@@ -305,6 +325,75 @@
       </div>
     </div>
 
+    <!-- Modal de confirmation de synchronisation -->
+    <div v-if="syncModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <h3 class="font-bold text-lg mb-4 flex items-center">
+          <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
+          Synchroniser avec le NAS
+        </h3>
+        <div class="mb-6">
+          <p class="mb-4">Cette opération va :</p>
+          <ul class="list-disc list-inside space-y-2 text-sm">
+            <li class="text-error">Supprimer les dossiers fictifs de la base de données</li>
+            <li class="text-success">Ajouter les nouveaux dossiers du NAS</li>
+            <li class="text-info">Synchroniser la structure avec le NAS réel</li>
+          </ul>
+          <div class="alert alert-warning mt-4">
+            <i class="fas fa-info-circle"></i>
+            <span class="text-sm">Les permissions des dossiers supprimés seront perdues.</span>
+          </div>
+          <div class="alert alert-info mt-2">
+            <i class="fas fa-lightbulb"></i>
+            <div class="text-sm">
+              <strong>Alternative :</strong> Vous pouvez aussi supprimer les dossiers fictifs un par un via le menu "⋮"
+              de chaque dossier.
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-outline" @click="closeSyncModal">Annuler</button>
+          <button class="btn btn-warning" @click="confirmSyncWithNas" :disabled="syncing">
+            <i class="fas fa-server mr-2"></i>
+            Synchroniser
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de confirmation de suppression de dossier -->
+    <div v-if="deleteModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <h3 class="font-bold text-lg mb-4 flex items-center">
+          <i class="fas fa-exclamation-triangle text-error mr-2"></i>
+          Supprimer le dossier
+        </h3>
+        <div class="mb-6">
+          <p class="mb-4">Êtes-vous sûr de vouloir supprimer le dossier :</p>
+          <div class="bg-base-200 p-3 rounded-lg mb-4">
+            <div class="flex items-center">
+              <i class="fas fa-folder text-primary mr-2"></i>
+              <span class="font-semibold">{{ deleteModal.folder?.name }}</span>
+            </div>
+            <div class="text-sm text-base-content/70 mt-1">
+              {{ deleteModal.folder?.permissions?.length || 0 }} permission(s)
+            </div>
+          </div>
+          <div class="alert alert-error">
+            <i class="fas fa-warning"></i>
+            <span class="text-sm">Cette action est irréversible. Toutes les permissions associées seront perdues.</span>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-outline" @click="closeDeleteModal">Annuler</button>
+          <button class="btn btn-error" @click="deleteFolderDirect" :disabled="loading">
+            <i class="fas fa-trash mr-2"></i>
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal pour permissions en masse -->
     <div v-if="bulkModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white p-6 rounded-lg shadow-xl w-[600px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
@@ -496,6 +585,8 @@ const folders = ref([])
 const users = ref([])
 const groups = ref([])
 const loading = ref(false)
+const syncing = ref(false)
+const testing = ref(false)
 const error = ref('')
 
 // Filters and search
@@ -539,6 +630,15 @@ const successModal = ref({
   visible: false,
   targetName: '',
   folderName: ''
+})
+
+const syncModal = ref({
+  visible: false
+})
+
+const deleteModal = ref({
+  visible: false,
+  folder: null
 })
 
 const bulkModal = ref({
@@ -655,6 +755,290 @@ const refreshPermissions = async () => {
     store.dispatch('showError', 'Failed to refresh permissions')
   } finally {
     // Stop spinner no matter what
+    loading.value = false
+  }
+}
+
+const testNasConnection = async () => {
+  testing.value = true
+  try {
+    const { adminAPI } = await import('@/services/api')
+
+    // Test with dry run first
+    const result = await adminAPI.syncWithNas({ dryRun: true, maxDepth: 2 })
+
+    console.log('Test NAS result:', result)
+    console.log('Test NAS result.data:', result.data)
+
+    if (result.data && result.data.success) {
+      const stats = result.data.stats || {}
+      const message = `Test NAS réussi ! 
+        Trouvé : ${stats.folders_scanned || 0} dossiers, ${stats.files_scanned || 0} fichiers
+        À supprimer : ${stats.folders_removed || 0} dossiers fictifs
+        À ajouter : ${stats.folders_added || 0} nouveaux dossiers`
+
+      store.dispatch('showSuccess', message)
+    } else {
+      const errorMsg = result.data?.message || result.data?.error || result.message || 'Test NAS échoué'
+      throw new Error(errorMsg)
+    }
+  } catch (error) {
+    console.error('Error testing NAS:', error)
+    let message = 'Erreur lors du test NAS'
+
+    if (error.message) {
+      if (error.message.includes('404')) {
+        message = 'Endpoint non trouvé. Backend pas à jour ?'
+      } else if (error.message.includes('connection')) {
+        message = 'Impossible de se connecter au NAS. Vérifiez le réseau de travail.'
+      } else {
+        message = `Test NAS échoué : ${error.message}`
+      }
+    }
+
+    store.dispatch('showError', message)
+  } finally {
+    testing.value = false
+  }
+}
+
+const syncWithNas = () => {
+  syncModal.value.visible = true
+}
+
+const confirmSyncWithNas = async () => {
+  syncModal.value.visible = false
+  syncing.value = true
+
+  try {
+    console.log('🔄 Démarrage synchronisation NAS-DB...')
+
+    // Import nasAPI for sync (using the new /nas/sync endpoint)
+    const { nasAPI } = await import('@/services/nasAPI.js')
+
+    // Perform synchronization using the new endpoint
+    const result = await nasAPI.syncDatabase({
+      dry_run: false,
+      max_depth: 10
+    })
+
+    // Debug logging
+    console.log('Sync result:', result)
+    console.log('Sync result.data:', result.data)
+
+    // Check if result has success property directly or in data
+    const syncData = result.data || result
+
+    if (syncData && syncData.success) {
+      // Clear cache and reload data
+      permissionCache.clear()
+      await loadFolders()
+
+      // Show success with detailed stats
+      const stats = syncData.stats || {}
+      console.log('Sync stats:', stats)
+
+      const message = `✅ Synchronisation réussie !
+📊 Statistiques:
+• ${stats.folders_removed || 0} dossier(s) supprimé(s)
+• ${stats.folders_added || 0} dossier(s) ajouté(s)
+• ${stats.files_removed || 0} fichier(s) supprimé(s)
+• ${stats.files_added || 0} fichier(s) ajouté(s)
+• ${stats.folders_scanned || 0} dossier(s) analysé(s)
+• ${stats.files_scanned || 0} fichier(s) analysé(s)`
+
+      store.dispatch('showSuccess', message)
+
+      // Log additional info
+      if (syncData.nas_structure) {
+        console.log(`�  NAS: ${syncData.nas_structure.folders_count} dossiers, ${syncData.nas_structure.files_count} fichiers`)
+      }
+      if (syncData.db_structure) {
+        console.log(`🗄️ DB: ${syncData.db_structure.folders_count} dossiers, ${syncData.db_structure.files_count} fichiers`)
+      }
+
+    } else {
+      // Log the full result for debugging
+      console.error('Sync failed with result:', result)
+      const errorMsg = syncData?.message || syncData?.error || result.message || 'Synchronisation échouée'
+      throw new Error(errorMsg)
+    }
+  } catch (error) {
+    console.error('❌ Error syncing with NAS:', error)
+    let message = 'Erreur lors de la synchronisation avec le NAS'
+
+    if (error.message) {
+      if (error.message.includes('404')) {
+        message = 'Endpoint de synchronisation non trouvé. Vérifiez que le backend est à jour.'
+      } else if (error.message.includes('Network')) {
+        message = 'Erreur réseau. Vérifiez votre connexion au réseau de travail.'
+      } else if (error.message.includes('NAS')) {
+        message = 'Impossible de se connecter au NAS. Vérifiez que vous êtes sur le réseau de travail.'
+      } else {
+        message = `Erreur de synchronisation : ${error.message}`
+      }
+    }
+
+    // Show more detailed error message if available
+    if (error.response?.data?.stats?.errors?.length > 0) {
+      message += '\n\nErreurs détaillées:\n' + error.response.data.stats.errors.join('\n')
+    }
+
+    store.dispatch('showError', message)
+  } finally {
+    syncing.value = false
+  }
+}
+
+const closeSyncModal = () => {
+  syncModal.value.visible = false
+}
+
+const confirmDeleteFolder = (folder) => {
+  deleteModal.value = {
+    visible: true,
+    folder: folder
+  }
+}
+
+const deleteFolder = async () => {
+  if (!deleteModal.value.folder) return
+
+  loading.value = true
+  try {
+    // Use the correct backend URL for folder deletion
+    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001'
+    const response = await fetch(`${baseURL}/folders/${deleteModal.value.folder.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const result = await response.json()
+
+    // Remove folder from local data
+    folders.value = folders.value.filter(f => f.id !== deleteModal.value.folder.id)
+
+    // Close modal
+    deleteModal.value.visible = false
+
+    // Show success message
+    store.dispatch('showSuccess', `Dossier "${deleteModal.value.folder.name}" supprimé avec succès`)
+
+  } catch (error) {
+    console.error('Error deleting folder:', error)
+    store.dispatch('showError', `Erreur lors de la suppression : ${error.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+const closeDeleteModal = () => {
+  deleteModal.value.visible = false
+}
+
+const deleteFolderDirect = async () => {
+  if (!deleteModal.value.folder) return
+
+  loading.value = true
+  try {
+    // Try different API endpoints
+    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001'
+    const folderId = deleteModal.value.folder.id
+
+    // Try the admin API first
+    let response = await fetch(`${baseURL}/admin/folders/${folderId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    // If admin endpoint doesn't work, try the regular folders endpoint
+    if (!response.ok) {
+      response = await fetch(`${baseURL}/folders/${folderId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      })
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const result = await response.json()
+
+    // Remove folder from local data
+    folders.value = folders.value.filter(f => f.id !== deleteModal.value.folder.id)
+
+    // Close modal
+    deleteModal.value.visible = false
+
+    // Show success message
+    store.dispatch('showSuccess', `Dossier "${deleteModal.value.folder.name}" supprimé avec succès`)
+
+  } catch (error) {
+    console.error('Error deleting folder:', error)
+
+    // If API deletion fails, try to remove from local data anyway
+    if (error.message.includes('404')) {
+      folders.value = folders.value.filter(f => f.id !== deleteModal.value.folder.id)
+      deleteModal.value.visible = false
+      store.dispatch('showSuccess', `Dossier "${deleteModal.value.folder.name}" retiré de la liste (n'existait plus sur le serveur)`)
+    } else {
+      store.dispatch('showError', `Erreur lors de la suppression : ${error.message}`)
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+const showOrphanedFolders = async () => {
+  loading.value = true
+  try {
+    // Test each folder by trying to browse it via NAS API
+    const { nasAPI } = await import('@/services/nasAPI.js')
+    const orphanedFolders = []
+
+    for (const folder of folders.value) {
+      try {
+        // Try to browse the folder path on NAS - use path instead of name
+        const folderPath = folder.path || `/${folder.name}` || '/'
+        console.log(`Testing folder: ${folder.name} at path: ${folderPath}`)
+
+        const result = await nasAPI.browse(folderPath)
+        if (!result.success) {
+          console.log(`Folder ${folder.name} not found on NAS`)
+          orphanedFolders.push(folder)
+        }
+      } catch (error) {
+        // If browsing fails, it's likely an orphaned folder
+        console.log(`Error browsing folder ${folder.name}:`, error)
+        orphanedFolders.push(folder)
+      }
+    }
+
+    if (orphanedFolders.length > 0) {
+      const folderNames = orphanedFolders.map(f => f.name).join(', ')
+      store.dispatch('showWarning', `${orphanedFolders.length} dossier(s) fictif(s) trouvé(s) : ${folderNames}`)
+    } else {
+      store.dispatch('showSuccess', 'Aucun dossier fictif trouvé ! Tous les dossiers existent sur le NAS.')
+    }
+
+  } catch (error) {
+    console.error('Error checking orphaned folders:', error)
+    store.dispatch('showError', 'Erreur lors de la vérification des dossiers fictifs')
+  } finally {
     loading.value = false
   }
 }

@@ -143,6 +143,20 @@ class NASAPIService {
     })
   }
 
+  /**
+   * Synchronize database with NAS structure (Admin only)
+   */
+  async syncDatabase(options = {}) {
+    const { dry_run = false, max_depth = 10 } = options
+    return await this.request('/sync', {
+      method: 'POST',
+      body: JSON.stringify({
+        dry_run,
+        max_depth
+      })
+    })
+  }
+
   // ==================== File Operations ====================
 
   /**
