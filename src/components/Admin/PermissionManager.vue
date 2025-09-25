@@ -2,23 +2,14 @@
   <div class="p-6 space-y-6">
     <!-- Header with actions -->
     <div class="flex items-center justify-between">
-      <h2 class="text-2xl font-bold flex items-center">
-        <i class="fas fa-shield-alt mr-3 text-primary"></i>
-        Permission Management
-      </h2>
+
       <div class="flex gap-2">
-        <button 
-          class="btn btn-sm btn-outline"
-          @click="refreshPermissions"
-          :disabled="loading"
-        >
-          <i class="fas fa-sync-alt mr-2" :class="{ 'animate-spin': loading }"></i>
-          Refresh
+        <button class="btn btn-sm btn-outline" @click="refreshPermissions" :disabled="loading">
+          <i class="fas fa-sync-alt mr-2"></i>
+          {{ loading ? 'Refreshing...' : 'Refresh' }}
         </button>
-        <button 
-          class="btn btn-sm btn-primary"
-          @click="openBulkPermissionModal"
-        >
+
+        <button class="btn btn-sm btn-primary" @click="openBulkPermissionModal">
           <i class="fas fa-users-cog mr-2"></i>
           Bulk Permissions
         </button>
@@ -29,15 +20,12 @@
     <div class="flex items-center gap-4 flex-wrap">
       <div class="flex-1 min-w-64">
         <div class="relative">
-          <input 
-            v-model="searchQuery" 
-            placeholder="Search folders, users, or groups..." 
-            class="input input-bordered w-full pl-10"
-          />
+          <input v-model="searchQuery" placeholder="Search folders, users, or groups..."
+            class="input input-bordered w-full pl-10" />
           <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
         </div>
       </div>
-      
+
       <select v-model="filterType" class="select select-bordered">
         <option value="all">All Resources</option>
         <option value="folders">Folders Only</option>
@@ -79,11 +67,8 @@
 
     <!-- Permission cards view -->
     <div v-else class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-      <div 
-        v-for="folder in paginatedFolders" 
-        :key="folder.id"
-        class="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow"
-      >
+      <div v-for="folder in paginatedFolders" :key="folder.id"
+        class="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow">
         <div class="card-body">
           <!-- Folder header -->
           <div class="flex items-center justify-between mb-4">
@@ -108,11 +93,8 @@
 
           <!-- Permissions list -->
           <div class="space-y-3 max-h-64 overflow-y-auto">
-            <div 
-              v-for="perm in folder.permissions" 
-              :key="perm.id"
-              class="flex items-center justify-between p-3 bg-base-200 rounded-lg"
-            >
+            <div v-for="perm in folder.permissions" :key="perm.id"
+              class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
               <div class="flex items-center flex-1">
                 <div class="avatar placeholder mr-3">
                   <div class="bg-neutral-focus text-neutral-content rounded-full w-8">
@@ -127,36 +109,28 @@
 
               <!-- Permission badges -->
               <div class="flex gap-1 mr-3">
-                <button
-                  :class="['badge badge-xs cursor-pointer transition-colors', 
-                          perm.can_read ? 'badge-success' : 'badge-outline hover:badge-success']"
+                <button :class="['badge badge-xs cursor-pointer transition-colors',
+                  perm.can_read ? 'badge-success' : 'badge-outline hover:badge-success']"
                   @click="toggleRight(folder, perm, 'can_read')"
-                  :title="perm.can_read ? 'Remove read access' : 'Grant read access'"
-                >
+                  :title="perm.can_read ? 'Remove read access' : 'Grant read access'">
                   R
                 </button>
-                <button
-                  :class="['badge badge-xs cursor-pointer transition-colors', 
-                          perm.can_write ? 'badge-warning' : 'badge-outline hover:badge-warning']"
+                <button :class="['badge badge-xs cursor-pointer transition-colors',
+                  perm.can_write ? 'badge-warning' : 'badge-outline hover:badge-warning']"
                   @click="toggleRight(folder, perm, 'can_write')"
-                  :title="perm.can_write ? 'Remove write access' : 'Grant write access'"
-                >
+                  :title="perm.can_write ? 'Remove write access' : 'Grant write access'">
                   W
                 </button>
-                <button
-                  :class="['badge badge-xs cursor-pointer transition-colors', 
-                          perm.can_delete ? 'badge-error' : 'badge-outline hover:badge-error']"
+                <button :class="['badge badge-xs cursor-pointer transition-colors',
+                  perm.can_delete ? 'badge-error' : 'badge-outline hover:badge-error']"
                   @click="toggleRight(folder, perm, 'can_delete')"
-                  :title="perm.can_delete ? 'Remove delete access' : 'Grant delete access'"
-                >
+                  :title="perm.can_delete ? 'Remove delete access' : 'Grant delete access'">
                   D
                 </button>
-                <button
-                  :class="['badge badge-xs cursor-pointer transition-colors', 
-                          perm.can_share ? 'badge-info' : 'badge-outline hover:badge-info']"
+                <button :class="['badge badge-xs cursor-pointer transition-colors',
+                  perm.can_share ? 'badge-info' : 'badge-outline hover:badge-info']"
                   @click="toggleRight(folder, perm, 'can_share')"
-                  :title="perm.can_share ? 'Remove share access' : 'Grant share access'"
-                >
+                  :title="perm.can_share ? 'Remove share access' : 'Grant share access'">
                   S
                 </button>
               </div>
@@ -169,8 +143,11 @@
                 <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-48">
                   <li><a @click="editPermission(folder, perm)"><i class="fas fa-edit mr-2"></i>Edit</a></li>
                   <li><a @click="duplicatePermission(folder, perm)"><i class="fas fa-copy mr-2"></i>Duplicate</a></li>
-                  <li><hr class="my-1"></li>
-                  <li><a @click="removePermission(folder, perm)" class="text-error"><i class="fas fa-trash mr-2"></i>Remove</a></li>
+                  <li>
+                    <hr class="my-1">
+                  </li>
+                  <li><a @click="removePermission(folder, perm)" class="text-error"><i
+                        class="fas fa-trash mr-2"></i>Remove</a></li>
                 </ul>
               </div>
             </div>
@@ -179,10 +156,7 @@
             <div v-if="folder.permissions.length === 0" class="text-center py-6 text-base-content/50">
               <i class="fas fa-lock text-2xl mb-2"></i>
               <p class="text-sm">No permissions set</p>
-              <button 
-                class="btn btn-xs btn-primary mt-2"
-                @click="openAddPermissionModal(folder)"
-              >
+              <button class="btn btn-xs btn-primary mt-2" @click="openAddPermissionModal(folder)">
                 Add Permission
               </button>
             </div>
@@ -194,35 +168,19 @@
     <!-- Pagination -->
     <div v-if="totalPages > 1" class="flex justify-center">
       <div class="btn-group">
-        <button 
-          class="btn btn-sm"
-          :disabled="currentPage === 1"
-          @click="currentPage = 1"
-        >
+        <button class="btn btn-sm" :disabled="currentPage === 1" @click="currentPage = 1">
           <i class="fas fa-angle-double-left"></i>
         </button>
-        <button 
-          class="btn btn-sm"
-          :disabled="currentPage === 1"
-          @click="currentPage--"
-        >
+        <button class="btn btn-sm" :disabled="currentPage === 1" @click="currentPage--">
           <i class="fas fa-angle-left"></i>
         </button>
         <span class="btn btn-sm btn-disabled">
           {{ currentPage }} / {{ totalPages }}
         </span>
-        <button 
-          class="btn btn-sm"
-          :disabled="currentPage === totalPages"
-          @click="currentPage++"
-        >
+        <button class="btn btn-sm" :disabled="currentPage === totalPages" @click="currentPage++">
           <i class="fas fa-angle-right"></i>
         </button>
-        <button 
-          class="btn btn-sm"
-          :disabled="currentPage === totalPages"
-          @click="currentPage = totalPages"
-        >
+        <button class="btn btn-sm" :disabled="currentPage === totalPages" @click="currentPage = totalPages">
           <i class="fas fa-angle-double-right"></i>
         </button>
       </div>
@@ -239,28 +197,25 @@
             <div class="label">
               <span class="label-text">Type:</span>
             </div>
-            <select v-model="modal.targetType" class="select select-bordered w-full" :disabled="modal.editing" @change="onTargetTypeChange">
+            <select v-model="modal.targetType" class="select select-bordered w-full" :disabled="modal.editing"
+              @change="onTargetTypeChange">
               <option value="user">Utilisateur</option>
               <option value="group">Groupe</option>
             </select>
           </label>
-          
+
           <label class="form-control">
             <div class="label">
               <span class="label-text">{{ modal.targetType === 'user' ? 'Utilisateur' : 'Groupe' }}:</span>
             </div>
             <select v-model="modal.targetId" class="select select-bordered w-full" :disabled="modal.editing">
               <option value="">-- Sélectionner --</option>
-              <option 
-                v-for="item in availableTargets" 
-                :key="item.id" 
-                :value="item.id"
-              >
+              <option v-for="item in availableTargets" :key="item.id" :value="item.id">
                 {{ item.name }}
               </option>
             </select>
           </label>
-          
+
           <div class="form-control">
             <div class="label">
               <span class="label-text">Permissions:</span>
@@ -295,7 +250,8 @@
     </div>
 
     <!-- Modal de confirmation -->
-    <div v-if="confirmationModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div v-if="confirmationModal.visible"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
         <h3 class="font-bold text-lg mb-4 flex items-center">
           <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
@@ -334,7 +290,8 @@
     <div v-if="successModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
         <div class="text-center">
-          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-success text-success-content mb-4">
+          <div
+            class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-success text-success-content mb-4">
             <i class="fas fa-check text-xl"></i>
           </div>
           <h3 class="font-bold text-lg mb-2">Permission ajoutée avec succès !</h3>
@@ -344,6 +301,182 @@
           <button class="btn btn-primary" @click="closeSuccessModal">
             <i class="fas fa-thumbs-up mr-2"></i>
             Parfait !
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal pour permissions en masse -->
+    <div v-if="bulkModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-[600px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+        <h3 class="font-bold text-lg mb-4 flex items-center">
+          <i class="fas fa-users-cog text-primary mr-2"></i>
+          Permissions en masse
+        </h3>
+
+        <!-- Sélection des dossiers -->
+        <div class="mb-6">
+          <label class="form-control">
+            <div class="label">
+              <span class="label-text font-semibold">Sélectionner les dossiers :</span>
+            </div>
+            <div class="max-h-48 overflow-y-auto border border-base-300 rounded-lg p-3 space-y-2">
+              <label v-for="folder in folders" :key="folder.id" class="cursor-pointer label justify-start gap-3">
+                <input type="checkbox" :value="folder.id" v-model="bulkModal.selectedFolders"
+                  class="checkbox checkbox-primary" />
+                <div class="flex items-center">
+                  <i class="fas fa-folder text-primary mr-2"></i>
+                  <span class="label-text">{{ folder.name }}</span>
+                </div>
+              </label>
+            </div>
+          </label>
+        </div>
+
+        <!-- Sélection des utilisateurs -->
+        <div class="mb-6">
+          <label class="form-control">
+            <div class="label">
+              <span class="label-text font-semibold">Sélectionner les utilisateurs :</span>
+            </div>
+            <div class="max-h-48 overflow-y-auto border border-base-300 rounded-lg p-3 space-y-2">
+              <div v-if="users.length === 0" class="text-center text-base-content/50 py-4">
+                <i class="fas fa-user-slash text-2xl mb-2"></i>
+                <p class="text-sm">Aucun utilisateur disponible</p>
+              </div>
+              <label v-for="user in users" :key="user.id" class="cursor-pointer label justify-start gap-3">
+                <input type="checkbox" :value="user.id" v-model="bulkModal.selectedUsers"
+                  class="checkbox checkbox-primary" />
+                <div class="flex items-center">
+                  <i class="fas fa-user text-primary mr-2"></i>
+                  <span class="label-text">{{ user.username }}</span>
+                  <span class="badge badge-outline badge-xs ml-2">{{ user.role }}</span>
+                </div>
+              </label>
+            </div>
+          </label>
+        </div>
+
+        <!-- Sélection des groupes -->
+        <div class="mb-6">
+          <label class="form-control">
+            <div class="label">
+              <span class="label-text font-semibold">Sélectionner les groupes :</span>
+            </div>
+            <div class="max-h-48 overflow-y-auto border border-base-300 rounded-lg p-3 space-y-2">
+              <div v-if="groups.length === 0" class="text-center text-base-content/50 py-4">
+                <i class="fas fa-users-slash text-2xl mb-2"></i>
+                <p class="text-sm">Aucun groupe disponible</p>
+              </div>
+              <label v-for="group in groups" :key="group.id" class="cursor-pointer label justify-start gap-3">
+                <input type="checkbox" :value="group.id" v-model="bulkModal.selectedGroups"
+                  class="checkbox checkbox-secondary" />
+                <div class="flex items-center">
+                  <i class="fas fa-users text-secondary mr-2"></i>
+                  <span class="label-text">{{ group.name }}</span>
+                  <span class="badge badge-outline badge-xs ml-2">{{ group.members?.length || 0 }} membre(s)</span>
+                </div>
+              </label>
+            </div>
+          </label>
+        </div>
+
+        <!-- Permissions -->
+        <div class="form-control mb-6">
+          <div class="label">
+            <span class="label-text font-semibold">Permissions à appliquer :</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="cursor-pointer label justify-start gap-3">
+              <input type="checkbox" v-model="bulkModal.permissions.can_read" class="checkbox checkbox-success" />
+              <span class="label-text">Lecture</span>
+            </label>
+            <label class="cursor-pointer label justify-start gap-3">
+              <input type="checkbox" v-model="bulkModal.permissions.can_write" class="checkbox checkbox-warning" />
+              <span class="label-text">Écriture</span>
+            </label>
+            <label class="cursor-pointer label justify-start gap-3">
+              <input type="checkbox" v-model="bulkModal.permissions.can_delete" class="checkbox checkbox-error" />
+              <span class="label-text">Suppression</span>
+            </label>
+            <label class="cursor-pointer label justify-start gap-3">
+              <input type="checkbox" v-model="bulkModal.permissions.can_share" class="checkbox checkbox-info" />
+              <span class="label-text">Partage</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Résumé -->
+        <div
+          v-if="bulkModal.selectedFolders.length > 0 && (bulkModal.selectedUsers.length > 0 || bulkModal.selectedGroups.length > 0)"
+          class="bg-base-200 p-4 rounded-lg mb-6">
+          <h4 class="font-semibold mb-3">Résumé :</h4>
+
+          <!-- Dossiers sélectionnés -->
+          <div class="mb-3">
+            <p class="text-sm font-medium mb-1">
+              <i class="fas fa-folder text-primary mr-1"></i>
+              <strong>{{ bulkModal.selectedFolders.length }}</strong> dossier(s) sélectionné(s)
+            </p>
+          </div>
+
+          <!-- Utilisateurs sélectionnés -->
+          <div v-if="bulkModal.selectedUsers.length > 0" class="mb-3">
+            <p class="text-sm font-medium mb-1">
+              <i class="fas fa-users text-primary mr-1"></i>
+              <strong>{{ bulkModal.selectedUsers.length }}</strong> utilisateur(s) :
+            </p>
+            <div class="flex gap-1 flex-wrap ml-4">
+              <span v-for="userId in bulkModal.selectedUsers" :key="userId" class="badge badge-primary badge-sm">
+                {{ getUserName(userId) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Groupes sélectionnés -->
+          <div v-if="bulkModal.selectedGroups.length > 0" class="mb-3">
+            <p class="text-sm font-medium mb-1">
+              <i class="fas fa-users text-secondary mr-1"></i>
+              <strong>{{ bulkModal.selectedGroups.length }}</strong> groupe(s) :
+            </p>
+            <div class="flex gap-1 flex-wrap ml-4">
+              <span v-for="groupId in bulkModal.selectedGroups" :key="groupId" class="badge badge-secondary badge-sm">
+                {{ getGroupName(groupId) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Permissions -->
+          <div>
+            <p class="text-sm font-medium mb-1">
+              <i class="fas fa-shield-alt text-info mr-1"></i>
+              Permissions à appliquer :
+            </p>
+            <div class="flex gap-2 flex-wrap ml-4">
+              <span v-if="bulkModal.permissions.can_read" class="badge badge-success">Lecture</span>
+              <span v-if="bulkModal.permissions.can_write" class="badge badge-warning">Écriture</span>
+              <span v-if="bulkModal.permissions.can_delete" class="badge badge-error">Suppression</span>
+              <span v-if="bulkModal.permissions.can_share" class="badge badge-info">Partage</span>
+              <span v-if="!hasBulkPermissions" class="badge badge-outline">Aucune permission</span>
+            </div>
+          </div>
+
+          <!-- Total des opérations -->
+          <div class="mt-3 pt-3 border-t border-base-300">
+            <p class="text-sm font-semibold text-info">
+              <i class="fas fa-calculator mr-1"></i>
+              Total : {{ getTotalOperations() }} opération(s) de permission
+            </p>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-outline" @click="closeBulkModal">Annuler</button>
+          <button class="btn btn-primary" @click="applyBulkPermissions"
+            :disabled="bulkModal.selectedFolders.length === 0 || (bulkModal.selectedUsers.length === 0 && bulkModal.selectedGroups.length === 0)">
+            <i class="fas fa-check mr-2"></i>
+            Appliquer les permissions
           </button>
         </div>
       </div>
@@ -395,7 +528,8 @@ const modal = ref({
   folder: null,
   targetType: 'user',
   targetId: '',
-  permissions: { can_read: false, can_write: false, can_delete: false, can_share: false }
+  permissions: { can_read: false, can_write: false, can_delete: false, can_share: false },
+  editingId: null
 })
 
 const confirmationModal = ref({
@@ -411,8 +545,8 @@ const successModal = ref({
 const bulkModal = ref({
   visible: false,
   selectedFolders: [],
-  targetType: 'user',
-  targetId: '',
+  selectedUsers: [],
+  selectedGroups: [],
   permissions: { can_read: false, can_write: false, can_delete: false, can_share: false }
 })
 
@@ -425,22 +559,17 @@ const filteredFolders = computed(() => {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(folder => {
       const folderMatch = folder.name.toLowerCase().includes(query)
-      const permissionMatch = folder.permissions.some(p => 
+      const permissionMatch = folder.permissions.some(p =>
         p.target_name.toLowerCase().includes(query)
       )
       return folderMatch || permissionMatch
     })
   }
 
-  // Apply type filter
-  if (filterType.value !== 'all') {
-    // This would be extended for files when file permissions are added
-    filtered = filtered.filter(folder => folder.type === filterType.value || filterType.value === 'folders')
-  }
 
   // Apply permission filter
   if (filterPermission.value !== 'all') {
-    filtered = filtered.filter(folder => 
+    filtered = filtered.filter(folder =>
       folder.permissions.some(p => p[`can_${filterPermission.value}`])
     )
   }
@@ -467,22 +596,22 @@ const availableTargets = computed(() => {
 })
 
 const hasAnyPermission = computed(() => {
-  return modal.value.permissions.can_read || 
-         modal.value.permissions.can_write || 
-         modal.value.permissions.can_delete || 
-         modal.value.permissions.can_share
+  return modal.value.permissions.can_read ||
+    modal.value.permissions.can_write ||
+    modal.value.permissions.can_delete ||
+    modal.value.permissions.can_share
 })
 
 // Methods
 const loadFolders = async () => {
   const monitor = PerformanceMonitor.start('PermissionManager.loadFolders')
-  
+
   loading.value = true
   error.value = ''
-  
+
   try {
     const res = await cachedGetAllResources()
-    
+
     folders.value = res.data.folders.map(f => ({
       id: f.id,
       name: f.name,
@@ -497,10 +626,10 @@ const loadFolders = async () => {
         can_share: p.can_share
       }))
     }))
-    
+
     users.value = res.data.users || []
     groups.value = res.data.groups || []
-    
+
   } catch (err) {
     console.error('Error loading folders:', err)
     error.value = 'Failed to load folders and permissions'
@@ -512,10 +641,23 @@ const loadFolders = async () => {
 }
 
 const refreshPermissions = async () => {
-  // Clear cache and reload
-  permissionCache.clear()
-  await loadFolders()
-  store.dispatch('showSuccess', 'Permissions refreshed')
+  loading.value = true
+  try {
+    // Clear cache
+    permissionCache.clear()
+
+    // Reload folders
+    await loadFolders()
+
+    // Success notification
+    store.dispatch('showSuccess', 'Permissions refreshed')
+  } catch (error) {
+    console.error('Error refreshing permissions:', error)
+    store.dispatch('showError', 'Failed to refresh permissions')
+  } finally {
+    // Stop spinner no matter what
+    loading.value = false
+  }
 }
 
 // Toggle droit
@@ -563,7 +705,7 @@ const editPermission = (folder, perm) => {
   modal.value.folder = folder
   modal.value.targetType = perm.target_type
   modal.value.targetId = perm.target_id
-  modal.value.permissions = { 
+  modal.value.permissions = {
     can_read: perm.can_read,
     can_write: perm.can_write,
     can_delete: perm.can_delete,
@@ -627,7 +769,7 @@ const confirmSavePermission = async () => {
       } else {
         await permissionAPI.setFolderGroupPermission(modal.value.folder.id, targetId, modal.value.permissions)
       }
-      
+
       // Show success modal
       successModal.value.visible = true
       successModal.value.targetName = getTargetName()
@@ -645,8 +787,8 @@ const confirmSavePermission = async () => {
 const openBulkPermissionModal = () => {
   bulkModal.value.visible = true
   bulkModal.value.selectedFolders = []
-  bulkModal.value.targetType = 'user'
-  bulkModal.value.targetId = ''
+  bulkModal.value.selectedUsers = []
+  bulkModal.value.selectedGroups = []
   bulkModal.value.permissions = { can_read: false, can_write: false, can_delete: false, can_share: false }
 }
 
@@ -667,16 +809,16 @@ const exportFolderPermissions = (folder) => {
     delete: p.can_delete,
     share: p.can_share
   }))
-  
+
   const dataStr = JSON.stringify(permissions, null, 2)
   const dataBlob = new Blob([dataStr], { type: 'application/json' })
   const url = URL.createObjectURL(dataBlob)
-  
+
   const link = document.createElement('a')
   link.href = url
   link.download = `${folder.name}_permissions.json`
   link.click()
-  
+
   URL.revokeObjectURL(url)
   store.dispatch('showSuccess', `Permissions exported for ${folder.name}`)
 }
@@ -688,12 +830,111 @@ const duplicatePermission = (folder, perm) => {
   modal.value.folder = folder
   modal.value.targetType = perm.target_type
   modal.value.targetId = '' // Clear ID for new target
-  modal.value.permissions = { 
+  modal.value.permissions = {
     can_read: perm.can_read,
     can_write: perm.can_write,
     can_delete: perm.can_delete,
     can_share: perm.can_share
   }
+}
+
+// Bulk permissions methods
+const closeBulkModal = () => {
+  bulkModal.value.visible = false
+}
+
+const getUserName = (userId) => {
+  const user = users.value.find(u => u.id === userId)
+  return user ? user.username : `User ${userId}`
+}
+
+const getGroupName = (groupId) => {
+  const group = groups.value.find(g => g.id === groupId)
+  return group ? group.name : `Group ${groupId}`
+}
+
+const getTotalOperations = () => {
+  const totalTargets = bulkModal.value.selectedUsers.length + bulkModal.value.selectedGroups.length
+  return bulkModal.value.selectedFolders.length * totalTargets
+}
+
+const hasBulkPermissions = computed(() => {
+  return bulkModal.value.permissions.can_read ||
+    bulkModal.value.permissions.can_write ||
+    bulkModal.value.permissions.can_delete ||
+    bulkModal.value.permissions.can_share
+})
+
+const applyBulkPermissions = async () => {
+  if (bulkModal.value.selectedFolders.length === 0 ||
+    (bulkModal.value.selectedUsers.length === 0 && bulkModal.value.selectedGroups.length === 0)) {
+    return
+  }
+
+  loading.value = true
+  let successCount = 0
+  let errorCount = 0
+  const errors = []
+
+  try {
+    // Apply permissions for each folder
+    for (const folderId of bulkModal.value.selectedFolders) {
+      // Apply permissions for selected users
+      for (const userId of bulkModal.value.selectedUsers) {
+        try {
+          await permissionAPI.setFolderUserPermission(folderId, userId, bulkModal.value.permissions)
+          successCount++
+        } catch (err) {
+          console.error(`Error setting user permission for folder ${folderId}, user ${userId}:`, err)
+          errorCount++
+          errors.push(`Utilisateur ${getUserName(userId)} sur dossier ${getFolderName(folderId)}`)
+        }
+      }
+
+      // Apply permissions for selected groups
+      for (const groupId of bulkModal.value.selectedGroups) {
+        try {
+          await permissionAPI.setFolderGroupPermission(folderId, groupId, bulkModal.value.permissions)
+          successCount++
+        } catch (err) {
+          console.error(`Error setting group permission for folder ${folderId}, group ${groupId}:`, err)
+          errorCount++
+          errors.push(`Groupe ${getGroupName(groupId)} sur dossier ${getFolderName(folderId)}`)
+        }
+      }
+    }
+
+    // Show results
+    if (successCount > 0) {
+      const totalUsers = bulkModal.value.selectedUsers.length
+      const totalGroups = bulkModal.value.selectedGroups.length
+      const totalFolders = bulkModal.value.selectedFolders.length
+
+      store.dispatch('showSuccess',
+        `Permissions appliquées avec succès ! ${successCount} opération(s) réussie(s) sur ${totalFolders} dossier(s), ${totalUsers} utilisateur(s) et ${totalGroups} groupe(s).`
+      )
+    }
+
+    if (errorCount > 0) {
+      const errorMessage = `Erreur lors de ${errorCount} opération(s). Échecs: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`
+      store.dispatch('showError', errorMessage)
+    }
+
+    // Refresh data and close modal
+    closeBulkModal()
+    await loadFolders()
+
+  } catch (err) {
+    console.error('Error applying bulk permissions:', err)
+    store.dispatch('showError', 'Erreur lors de l\'application des permissions en masse')
+  } finally {
+    loading.value = false
+  }
+}
+
+const getFolderName = (folderId) => {
+  const folder = folders.value.find(f => f.id === folderId)
+  return folder ? folder.name : `Folder ${folderId}`
 }
 
 // Watchers
