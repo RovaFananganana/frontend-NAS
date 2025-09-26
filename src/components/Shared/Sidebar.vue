@@ -247,12 +247,7 @@ const username = computed(() => store.getters.username)
 const userRoleLabel = computed(() => isAdmin.value ? 'Administrateur' : 'Utilisateur')
 
 // Themes
-const availableThemes = [
-  { name: 'Clair', value: 'light', icon: 'fas fa-sun' },
-  { name: 'Sombre', value: 'dark', icon: 'fas fa-moon' },
-  { name: 'Cupcake', value: 'cupcake', icon: 'fas fa-heart' },
-  { name: 'Corporate', value: 'corporate', icon: 'fas fa-building' }
-]
+import { availableThemes, applyTheme, getCurrentTheme } from '@/utils/themeUtils.js'
 
 // Tabs
 const adminTabs = [
@@ -279,8 +274,7 @@ const openProfileModal = () => {
 
 const changeTheme = (theme) => {
   currentTheme.value = theme
-  document.documentElement.setAttribute('data-theme', theme)
-  localStorage.setItem('theme', theme)
+  applyTheme(theme)
   store.dispatch('showSuccess', `Thème "${theme}" appliqué`)
 }
 
@@ -309,9 +303,9 @@ const handleLogout = () => {
 
 // Lifecycle
 onMounted(async () => {
-  const savedTheme = localStorage.getItem('theme') || 'light'
+  const savedTheme = getCurrentTheme()
   currentTheme.value = savedTheme
-  document.documentElement.setAttribute('data-theme', savedTheme)
+  applyTheme(savedTheme)
 
   if (!isAdmin.value) {
     try {

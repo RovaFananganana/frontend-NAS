@@ -65,8 +65,39 @@ onMounted(load)
 </script>
 
 <style scoped>
-.input { @apply border rounded px-3 py-2; }
-.btn { @apply px-3 py-2 rounded border bg-white hover:bg-gray-50; }
-.btn.primary { @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700; }
-.alert-error { @apply bg-red-50 border border-red-200 text-red-700 p-2 rounded; }
+/* Boutons */
+.btn {
+  @apply px-3 py-2 rounded border transition-all duration-200;
+}
+
+.btn.primary {
+  @apply btn-primary; /* DaisyUI gère automatiquement la couleur selon le thème */
+}
+
+.btn.secondary {
+  @apply btn-secondary; /* Même principe que btn-primary */
+}
+
+.btn.accent {
+  @apply btn-accent;
+}
+
+/* Inputs */
+.input {
+  @apply border rounded px-3 py-2 transition-colors duration-200;
+}
+
+/* Alerts */
+
+/* Hover et focus enhancements (sans couleur fixe) */
+.btn:hover,
+.input:focus {
+  @apply shadow-md transform -translate-y-0.5;
+}
+
+/* Pour les boutons désactivés */
+.btn:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
 </style>
+

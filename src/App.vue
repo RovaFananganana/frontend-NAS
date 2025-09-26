@@ -14,6 +14,8 @@
 </template>
 
 <script>
+import { initializeTheme } from './utils/themeUtils'
+initializeTheme()
 import { ref, onMounted, provide } from 'vue'
 import { useStore } from 'vuex'
 import Notification from './components/Shared/Notification.vue'

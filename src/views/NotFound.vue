@@ -1,9 +1,9 @@
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-700 p-6">
+  <div class="min-h-screen flex flex-col items-center justify-center bg-base-200 text-base-content p-6">
     <!-- Illustration ou icône -->
     <div class="mb-6">
       <svg
-        class="w-32 h-32 text-gray-400"
+        class="w-32 h-32 text-base-content opacity-40"
         fill="none"
         stroke="currentColor"
         stroke-width="1.5"
@@ -23,7 +23,7 @@
 
     <!-- Texte -->
     <h1 class="text-4xl font-bold mb-2">404</h1>
-    <p class="text-lg text-gray-500 mb-6">
+    <p class="text-lg text-base-content opacity-60 mb-6">
       Oups 😢 La page que vous recherchez est introuvable.
     </p>
 

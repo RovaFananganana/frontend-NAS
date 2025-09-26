@@ -48,6 +48,7 @@ const props = defineProps({
     default: 'Tableau de bord'
   }
 })
+
 </script>
 
 <style scoped>

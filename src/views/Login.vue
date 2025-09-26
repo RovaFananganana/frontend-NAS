@@ -1,43 +1,43 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50">
-    <div class="max-w-md w-full bg-white rounded-lg shadow-md p-8">
+  <div class="min-h-screen flex items-center justify-center bg-base-200">
+    <div class="max-w-md w-full bg-base-100 rounded-lg shadow-md p-8">
       
       <!-- Logo et Nom de l'application -->
       <div class="text-center mb-6">
         <img src="@/assets/logo.png" alt="Logo" class="mx-auto w-24 h-24 mb-2">
-        <h1 class="text-2xl font-bold text-gray-700">{{ appName }}</h1>
+        <h1 class="text-2xl font-bold text-base-content">{{ appName }}</h1>
       </div>
 
       <!-- Formulaire de connexion -->
       <form @submit.prevent="handleLogin" class="space-y-4">
         <div>
-          <label class="block text-gray-600 font-medium mb-1" for="username">Nom d'utilisateur</label>
+          <label class="block text-base-content font-medium mb-1" for="username">Nom d'utilisateur</label>
           <input
             type="text"
             id="username"
             v-model="username"
             placeholder="Entrez votre nom d'utilisateur"
-            class="w-full px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring focus:ring-indigo-200"
+            class="input input-bordered w-full"
             required
           >
         </div>
 
         <div>
-          <label class="block text-gray-600 font-medium mb-1" for="password">Mot de passe</label>
+          <label class="block text-base-content font-medium mb-1" for="password">Mot de passe</label>
           <div class="relative">
             <input
               :type="showPassword ? 'text' : 'password'"
               id="password"
               v-model="password"
               placeholder="Entrez votre mot de passe"
-              class="w-full px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring focus:ring-indigo-200 pr-10"
+              class="input input-bordered w-full pr-10"
               required
             >
             <!-- Bouton œil -->
             <button 
               type="button"
               @click="togglePassword"
-              class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700"
+              class="absolute inset-y-0 right-0 flex items-center px-3 text-base-content opacity-60 hover:opacity-100"
             >
               <span v-if="showPassword">👁️‍🗨️</span>
               <span v-else>👁️</span>
@@ -47,7 +47,7 @@
 
         <!-- Se souvenir de moi -->
         <div class="flex items-center justify-between">
-          <label class="flex items-center text-gray-600">
+          <label class="flex items-center text-base-content">
             <input type="checkbox" v-model="rememberMe" class="mr-2">
             Se souvenir de moi
           </label>
@@ -57,7 +57,7 @@
           <button
             type="submit"
             :disabled="loading"
-            class="w-full py-2 px-4 bg-indigo-200 hover:bg-indigo-300 text-gray-800 font-semibold rounded-md transition-colors"
+            class="btn btn-primary w-full"
           >
             {{ loading ? "Connexion..." : "Se connecter" }}
           </button>
@@ -125,7 +125,7 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-body {
+/* body {
   font-family: 'Inter', sans-serif;
-}
+} */
 </style>

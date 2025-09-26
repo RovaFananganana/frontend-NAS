@@ -2,13 +2,18 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import store from './store'
-import './assets/main.css'
 
 // Import Tailwind
 import './assets/main.css'
 //Import fontawesome
 import '@fortawesome/fontawesome-free/css/all.css'
 import '@fortawesome/fontawesome-free/js/all.js'
+
+// Initialize theme
+import { initializeTheme } from './utils/themeUtils.js'
+initializeTheme()
+console.log("Theme appliqué:", document.documentElement.getAttribute("data-theme"));
+
 
 const app = createApp(App)
 

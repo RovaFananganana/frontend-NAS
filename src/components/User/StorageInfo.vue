@@ -1,14 +1,14 @@
 <template>
-  <section class="p-4 bg-white rounded-lg border">
+  <section class="p-4 bg-base-100 rounded-lg border border-base-300">
       <div v-if="error" class="alert alert-error">{{ error }}</div>
 
     <div v-else>
       <div class="flex items-center gap-4">
         <div class="flex-1">
-          <div class="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
+          <div class="w-full bg-base-200 rounded-full h-4 overflow-hidden">
             <div :style="{ width: percent + '%' }" class="h-4 bg-primary rounded-full"></div>
           </div>
-          <div class="text-sm text-gray-600 mt-2">{{ human(used) }} utilisés sur {{ human(total) }} ({{ percent }}%)</div>
+          <div class="text-sm text-base-content opacity-70 mt-2">{{ human(used) }} utilisés sur {{ human(total) }} ({{ percent }}%)</div>
         </div>
         <div class="text-right">
           <div class="text-sm">Fichiers</div>

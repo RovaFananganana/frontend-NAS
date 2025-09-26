@@ -12,7 +12,10 @@
         </button>
       </div>
     </div>
-    <!-- Header -->
+    <!-- Theme Test (temporary)>
+ <ThemeTest />
+
+<!--Header -->
     <div class="flex items-center justify-between mb-6">
       <!-- <h1 class="text-3xl font-bold">Tableau de bord Admin</h1> -->
       <div class="flex gap-2">
@@ -262,6 +265,7 @@ import { useStore } from 'vuex'
 import PerformanceDashboard from './PerformanceDashboard.vue'
 import SynologyDriveStatus from '../Shared/SynologyDriveStatus.vue'
 import AuthDebug from '../Debug/AuthDebug.vue'
+import ThemeTest from '../Debug/ThemeTest.vue'
 
 const store = useStore()
 

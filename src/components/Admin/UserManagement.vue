@@ -1,35 +1,36 @@
 <!-- components/Admin/UserManagement.vue -->
 <template>
   <div class="p-6">
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
-      <!-- <h1 class="text-3xl font-bold mb-4 md:mb-0">Gestion des utilisateurs</h1> -->
-      <button class="btn btn-primary" @click="openCreateModal">
-        <i class="fas fa-plus mr-2"></i>
-        Nouvel utilisateur
-      </button>
-    </div>
-
-    <!-- Search Bar -->
-    <div class="flex flex-col md:flex-row gap-4 mb-6">
-      <div class="form-control flex-1">
-        <div class="input-group">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Rechercher par nom ou email..."
-            class="input input-bordered w-full"
-          >
-          <button class="btn btn-square">
-            <i class="fas fa-search"></i>
-          </button>
+    <!-- Top bar : Search + Role Filter + New User Button -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+      <div class="flex flex-1 gap-2">
+        <div class="form-control flex-1">
+          <div class="input-group">
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Rechercher par nom ou email..."
+              class="input input-bordered w-full"
+            >
+          </div>
         </div>
+
+        <select v-model="roleFilter" class="select select-bordered w-40">
+          <option value="">Tous les rôles</option>
+          <option value="ADMIN">Administrateurs</option>
+          <option value="SIMPLE_USER">Utilisateurs simples</option>
+        </select>
       </div>
-      <select v-model="roleFilter" class="select select-bordered">
-        <option value="">Tous les rôles</option>
-        <option value="ADMIN">Administrateurs</option>
-        <option value="SIMPLE_USER">Utilisateurs simples</option>
-      </select>
+
+      <div>
+        <button
+          class="btn btn-primary btn-circle"
+          @click="openCreateModal"
+          title="Nouvel utilisateur"
+        >
+          <i class="fas fa-plus"></i>
+        </button>
+      </div>
     </div>
 
     <!-- Loading State -->
@@ -56,16 +57,9 @@
             <tbody>
               <tr v-for="user in filteredUsers" :key="user.id">
                 <td>
-                  <div class="flex items-center space-x-3">
-                    <div class="avatar">
-                      <div class="mask mask-squircle w-12 h-12 bg-primary text-primary-content flex items-center justify-center">
-                        {{ user.username.charAt(0).toUpperCase() }}
-                      </div>
-                    </div>
-                    <div>
-                      <div class="font-bold">{{ user.username }}</div>
-                      <div class="text-sm opacity-50">#{{ user.id }}</div>
-                    </div>
+                  <div>
+                    <div class="font-bold text-primary">{{ user.username }}</div>
+                    <div class="text-sm opacity-50">#{{ user.id }}</div>
                   </div>
                 </td>
                 <td>{{ user.email || 'Non défini' }}</td>
@@ -256,17 +250,30 @@
         </div>
       </div>
     </div>
+
+    <!-- === Notification Modal === -->
+    <div v-if="notificationModal.show" class="modal modal-open">
+      <div class="modal-box text-center">
+        <h3
+          class="font-bold text-lg mb-4"
+          :class="notificationModal.type === 'success' ? 'text-green-600' : 'text-red-600'"
+        >
+          {{ notificationModal.type === 'success' ? 'Succès' : 'Erreur' }}
+        </h3>
+        <p class="mb-4">{{ notificationModal.message }}</p>
+        <div class="modal-action justify-center">
+          <button class="btn btn-primary" @click="closeNotificationModal">OK</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { adminAPI } from '@/services/api'
-import { useStore } from 'vuex'
 
-const store = useStore()
-
-// Reactive data
+// === Reactive State ===
 const users = ref([])
 const loading = ref(false)
 const saving = ref(false)
@@ -278,7 +285,6 @@ const userToDelete = ref(null)
 const searchQuery = ref('')
 const roleFilter = ref('')
 
-// Form data
 const userForm = ref({
   username: '',
   email: '',
@@ -289,11 +295,24 @@ const userForm = ref({
 
 const errors = ref({})
 
-// Computed properties
+// === Notification Modal ===
+const notificationModal = ref({
+  show: false,
+  message: '',
+  type: 'success'
+})
+
+const showNotificationModal = (message, type = 'success') => {
+  notificationModal.value = { show: true, message, type }
+}
+
+const closeNotificationModal = () => {
+  notificationModal.value.show = false
+}
+
+// === Computed ===
 const filteredUsers = computed(() => {
   let filtered = users.value
-
-  // Filter by search query
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(user =>
@@ -301,24 +320,18 @@ const filteredUsers = computed(() => {
       (user.email && user.email.toLowerCase().includes(query))
     )
   }
-
-  // Filter by role
   if (roleFilter.value) {
     filtered = filtered.filter(user => user.role === roleFilter.value)
   }
-
   return filtered
 })
 
-// Methods
 const formatDate = (dateString) => {
-  return new Intl.DateTimeFormat('fr-FR', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  }).format(new Date(dateString))
+  return new Intl.DateTimeFormat('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' })
+    .format(new Date(dateString))
 }
 
+// === Load Users ===
 const loadUsers = async () => {
   loading.value = true
   try {
@@ -326,21 +339,16 @@ const loadUsers = async () => {
     users.value = response.data || []
   } catch (error) {
     console.error('Error loading users:', error)
-    store.dispatch('showError', 'Erreur lors du chargement des utilisateurs')
+    showNotificationModal('Erreur lors du chargement des utilisateurs', 'error')
   } finally {
     loading.value = false
   }
 }
 
+// === Modals ===
 const openCreateModal = () => {
   editingUser.value = null
-  userForm.value = {
-    username: '',
-    email: '',
-    password: '',
-    role: 'SIMPLE_USER',
-    quota_mb: 2048
-  }
+  userForm.value = { username: '', email: '', password: '', role: 'SIMPLE_USER', quota_mb: 2048 }
   errors.value = {}
   showModal.value = true
 }
@@ -365,98 +373,66 @@ const closeModal = () => {
   errors.value = {}
 }
 
+// === Validation ===
 const validateForm = () => {
   errors.value = {}
-
-  if (!userForm.value.username.trim()) {
-    errors.value.username = 'Le nom d\'utilisateur est requis'
-  }
-
-  if (!editingUser.value && !userForm.value.password) {
-    errors.value.password = 'Le mot de passe est requis'
-  }
-
-  if (userForm.value.email && !isValidEmail(userForm.value.email)) {
+  if (!userForm.value.username.trim()) errors.value.username = 'Le nom d\'utilisateur est requis'
+  if (!editingUser.value && !userForm.value.password) errors.value.password = 'Le mot de passe est requis'
+  if (userForm.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.value.email)) {
     errors.value.email = 'Format d\'email invalide'
   }
-
   return Object.keys(errors.value).length === 0
 }
 
-const isValidEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
-
+// === Save User ===
 const saveUser = async () => {
   if (!validateForm()) return
-
   saving.value = true
   try {
-    // Construire l'objet à envoyer au backend
-    const userData = {
-      username: userForm.value.username,
-      role: userForm.value.role,
-      quota_mb: userForm.value.quota_mb
-    }
-
-    if (userForm.value.email) {
-      userData.email = userForm.value.email
-    }
-
-    // Mot de passe obligatoire seulement à la création ou si modifié
-    if (!editingUser.value || userForm.value.password) {
-      userData.password = userForm.value.password
-    }
+    const userData = { username: userForm.value.username, role: userForm.value.role, quota_mb: userForm.value.quota_mb }
+    if (userForm.value.email) userData.email = userForm.value.email
+    if (!editingUser.value || userForm.value.password) userData.password = userForm.value.password
 
     if (editingUser.value) {
       await adminAPI.updateUser(editingUser.value.id, userData)
-      store.dispatch('showSuccess', 'Utilisateur modifié avec succès')
+      showNotificationModal('Utilisateur modifié avec succès', 'success')
     } else {
       await adminAPI.createUser(userData)
-      store.dispatch('showSuccess', 'Utilisateur créé avec succès')
+      showNotificationModal('Utilisateur créé avec succès', 'success')
     }
 
     await loadUsers()
     closeModal()
   } catch (error) {
     console.error('Error saving user:', error)
-    const message = error.response?.data?.msg || error.response?.data?.error || 'Erreur lors de la sauvegarde'
-    store.dispatch('showError', message)
+    const message = error.response?.data?.msg || 'Erreur lors de la sauvegarde'
+    showNotificationModal(message, 'error')
   } finally {
     saving.value = false
   }
 }
 
-
-
-
-const confirmDeleteUser = (user) => {
-  userToDelete.value = user
-}
-
+// === Delete User ===
+const confirmDeleteUser = (user) => { userToDelete.value = user }
 const deleteUser = async () => {
   if (!userToDelete.value) return
-
   deleting.value = true
   try {
     await adminAPI.deleteUser(userToDelete.value.id)
     await loadUsers()
     userToDelete.value = null
-    store.dispatch('showSuccess', 'Utilisateur supprimé avec succès')
+    showNotificationModal('Utilisateur supprimé avec succès', 'success')
   } catch (error) {
     console.error('Error deleting user:', error)
     const message = error.response?.data?.msg || 'Erreur lors de la suppression'
-    store.dispatch('showError', message)
+    showNotificationModal(message, 'error')
   } finally {
     deleting.value = false
   }
 }
 
-// Lifecycle
-onMounted(() => {
-  loadUsers()
-})
+// === Lifecycle ===
+onMounted(() => { loadUsers() })
 </script>
 
 <style scoped>
