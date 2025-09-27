@@ -774,15 +774,14 @@ const showProperties = (item) => {
 }
 
 // Modal event handlers
-const onItemRenamed = async (oldPath, newName) => {
+const onItemRenamed = async (renameData) => {
   try {
-    const result = await nasAPI.renameItem(oldPath, newName)
-    if (result.success) {
-      await loadDirectory(currentPath.value)
-      store.dispatch('showSuccess', 'Élément renommé avec succès')
-    } else {
-      throw new Error(result.error || 'Rename failed')
-    }
+    // renameData is an object: {oldPath, newPath, newName}
+    console.log('Rename data received:', renameData)
+    
+    // The rename has already been completed by the modal, just refresh the view
+    await loadDirectory(currentPath.value)
+    store.dispatch('showSuccess', `Élément renommé avec succès: ${renameData.newName}`)
   } catch (error) {
     console.error('Rename error:', error)
     store.dispatch('showError', `Erreur lors du renommage: ${error.message}`)

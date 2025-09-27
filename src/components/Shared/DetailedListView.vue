@@ -1,23 +1,14 @@
 <template>
   <div 
     ref="listContainer"
-    :class="[
-      'detailed-list-view file-list-enhanced bg-base-100 shadow-sm border border-base-300 overflow-hidden',
-      'transition-all duration-200',
-      {
-        'rounded-lg': !isMobile,
-        'rounded-none border-x-0': isMobile,
-        'mobile-optimized': isMobile,
-        'touch-optimized': isTouch
-      }
-    ]"
+    class="detailed-list-view bg-base-100 shadow-sm border border-base-300 rounded-lg overflow-hidden"
     role="grid"
     :aria-label="`Liste des fichiers, ${files?.length || 0} éléments`"
     :aria-busy="loading"
   >
-    <!-- Header avec gradient subtil -->
-    <div class="list-header bg-gradient-to-r from-base-200 to-base-100 border-b border-base-300">
-      <table class="table w-full table-fixed" :class="{ 'table-sm': !isTouch, 'table-md': isTouch }">
+    <!-- Header -->
+    <div class="list-header bg-base-200 border-b border-base-300">
+      <table class="table w-full table-fixed">
         <thead>
           <tr class="border-none" role="row">
             <th 
@@ -27,54 +18,31 @@
               @keydown.enter="handleSort(column.key)"
               @keydown.space.prevent="handleSort(column.key)"
               :class="[
-                'column-header cursor-pointer hover:bg-base-300/50 transition-all duration-200',
-                'font-semibold text-base-content/80 tracking-tight',
-                'first:rounded-tl-lg last:rounded-tr-lg',
-                'group relative select-none focus-visible-only',
+                'column-header cursor-pointer hover:bg-base-300/50 transition-colors duration-200',
+                'font-semibold text-base-content/80 px-3 py-2',
                 {
-                  'hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]': !isMobile,
-                  'active:bg-base-300/70': isMobile,
-                  'bg-primary/10 text-primary border-b-2 border-primary active-sort': sortColumn === column.key,
-                  'hover:bg-primary/5': sortColumn !== column.key,
-                  'sorting': sortingColumn === column.key,
-                  'px-2 py-3': isMobile,
-                  'px-4 py-2': !isMobile,
-                  'min-h-[44px]': isTouch // Minimum touch target
+                  'bg-primary/10 text-primary': sortColumn === column.key,
+                  'hover:bg-primary/5': sortColumn !== column.key
                 }
               ]"
-              :style="{ 
-                height: isTouch ? '44px' : '40px',
-                width: column.width,
-                maxWidth: column.width
-              }"
               role="columnheader"
               :aria-sort="getSortAriaValue(column.key)"
               :aria-label="`Trier par ${column.label}${sortColumn === column.key ? (sortDirection === 'asc' ? ', tri croissant actuel' : ', tri décroissant actuel') : ''}`"
               tabindex="0"
             >
-              <div :class="[
-                'flex items-center gap-2 h-full',
-                {
-                  'justify-start': column.align === 'left',
-                  'justify-center': column.align === 'center', 
-                  'justify-end': column.align === 'right'
-                }
-              ]">
+              <div class="flex items-center gap-2">
                 <span class="truncate">{{ column.label }}</span>
-                <div class="sort-indicator-container w-4 h-4 flex items-center justify-center flex-shrink-0">
-                  <i 
-                    v-if="sortColumn === column.key" 
-                    :class="[
-                      sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
-                      'text-primary transition-all duration-300 transform',
-                      'animate-sort-change'
-                    ]"
-                  ></i>
-                  <i 
-                    v-else 
-                    class="fas fa-sort text-base-content/30 opacity-0 group-hover:opacity-60 transition-all duration-200 transform group-hover:scale-110"
-                  ></i>
-                </div>
+                <i 
+                  v-if="sortColumn === column.key" 
+                  :class="[
+                    sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
+                    'text-primary text-xs'
+                  ]"
+                ></i>
+                <i 
+                  v-else 
+                  class="fas fa-sort text-base-content/30 text-xs opacity-0 group-hover:opacity-60 transition-opacity"
+                ></i>
               </div>
             </th>
           </tr>
@@ -99,31 +67,17 @@
       <p>Aucun fichier dans ce dossier</p>
     </div>
     
-    <!-- Body avec hover effects et support tactile -->
-    <div 
-      v-else 
-      :class="[
-        'overflow-y-auto custom-scrollbar',
-        {
-          'max-h-96': !isMobile,
-          'max-h-[70vh]': isMobile,
-          'touch-scroll': isTouch
-        }
-      ]"
-    >
-      <table class="table w-full table-fixed" :class="{ 'table-sm': !isTouch, 'table-md': isTouch }">
+    <!-- Body -->
+    <div v-else class="overflow-y-auto max-h-96">
+      <table class="table w-full table-fixed">
         <tbody>
           <FileListItem
             v-for="(file, index) in sortedFiles"
             :key="file.path || file.name"
             :file="file"
-            :index="index"
             :selected="isSelected(file.path || file.name)"
             :focused="focusedIndex === index"
-            :is-mobile="isMobile"
-            :is-touch="isTouch"
             :visible-columns="displayedColumns"
-            :file-operation-indicator="getFileOperationIndicator(file)"
             @click="handleFileClick"
             @double-click="handleFileDoubleClick"
             @context-menu="handleContextMenu"
@@ -157,8 +111,7 @@
 <script setup>
 import { computed, watch, ref } from 'vue'
 import { useViewMode } from '@/composables/useViewMode.js'
-import { useResponsive } from '@/composables/useResponsive.js'
-import { useTouchGestures } from '@/composables/useTouchGestures.js'
+
 import FileListItem from './FileListItem.vue'
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp.vue'
 
@@ -225,28 +178,13 @@ const {
   addShortcut
 } = useViewMode()
 
-const {
-  isMobile,
-  isTablet,
-  isDesktop,
-  isTouch,
-  shouldShowColumn,
-  touchSizes,
-  responsiveClasses
-} = useResponsive()
-
 // Référence pour le conteneur
 const listContainer = ref(null)
 
-// Gestion des gestes tactiles
-const {
-  isGesturing,
-  swipeDirection
-} = useTouchGestures(listContainer, {
-  enableSwipe: true,
-  enablePinch: false,
-  swipeThreshold: 50
-})
+// Fonction simple pour déterminer si une colonne doit être affichée
+const shouldShowColumn = (columnKey) => {
+  return visibleColumns.value.some(col => col.key === columnKey)
+}
 
 // Ajouter le raccourci pour l'aide
 addShortcut('F1', () => {
@@ -266,36 +204,32 @@ const sortedFiles = computed(() => {
   return sortFiles(props.files)
 })
 
-// Computed pour les colonnes affichées selon l'écran
+// Computed pour les colonnes affichées
 const displayedColumns = computed(() => {
   const allColumns = [
     { 
       key: 'name', 
       label: 'Nom', 
       required: true, 
-      width: isMobile.value ? '50%' : '40%',
-      align: 'left'
+      width: '40%'
     },
     { 
       key: 'size', 
-      label: isMobile.value ? 'Taille' : 'Taille', 
+      label: 'Taille', 
       required: false, 
-      width: isMobile.value ? '20%' : '15%',
-      align: 'right'
+      width: '15%'
     },
     { 
       key: 'type', 
       label: 'Type', 
       required: false, 
-      width: isMobile.value ? '15%' : '15%',
-      align: 'center'
+      width: '15%'
     },
     { 
       key: 'date', 
-      label: isMobile.value ? 'Modifié' : 'Date de modification', 
+      label: 'Date de modification', 
       required: false, 
-      width: isMobile.value ? '15%' : '30%',
-      align: 'left'
+      width: '30%'
     }
   ]
   
@@ -305,8 +239,7 @@ const displayedColumns = computed(() => {
   })
 })
 
-// État pour les animations et l'aide
-const sortingColumn = ref(null)
+// État pour l'aide
 const showShortcutsHelp = ref(false)
 
 // Obtient la valeur ARIA pour le tri
@@ -315,13 +248,10 @@ const getSortAriaValue = (columnKey) => {
   return sortDirection.value === 'asc' ? 'ascending' : 'descending'
 }
 
-// Gestion du tri avec animations
+// Gestion du tri
 const handleSort = (column) => {
   const oldColumn = sortColumn.value
   const oldDirection = sortDirection.value
-  
-  // Marquer la colonne comme en cours de tri pour l'animation
-  sortingColumn.value = column
   
   setSortColumn(column)
   
@@ -337,41 +267,20 @@ const handleSort = (column) => {
     oldDirection,
     announcement: `Tri par ${columnLabel} en ordre ${directionText}`
   })
-  
-  // Retirer l'animation après un délai
-  setTimeout(() => {
-    sortingColumn.value = null
-  }, 300)
 }
 
-// Gestion des clics sur les fichiers avec support tactile
+// Gestion des clics sur les fichiers
 const handleFileClick = (file, event) => {
   const fileIndex = sortedFiles.value.findIndex(f => (f.path || f.name) === (file.path || f.name))
   
-  // Sur mobile/tactile, gérer différemment les interactions
-  if (isTouch.value && isMobile.value) {
-    // Sur mobile tactile, un simple tap sélectionne, double tap ouvre
-    emit('file-selected', {
-      file,
-      event,
-      multiSelect: false, // Pas de multi-sélection par défaut sur mobile
-      rangeSelect: false,
-      currentIndex: fileIndex,
-      files: sortedFiles.value,
-      isTouchInteraction: true
-    })
-  } else {
-    // Comportement desktop standard
-    emit('file-selected', {
-      file,
-      event,
-      multiSelect: event.ctrlKey || event.metaKey,
-      rangeSelect: event.shiftKey,
-      currentIndex: fileIndex,
-      files: sortedFiles.value,
-      isTouchInteraction: false
-    })
-  }
+  emit('file-selected', {
+    file,
+    event,
+    multiSelect: event.ctrlKey || event.metaKey,
+    rangeSelect: event.shiftKey,
+    currentIndex: fileIndex,
+    files: sortedFiles.value
+  })
 }
 
 const handleFileDoubleClick = (file, event) => {
@@ -391,271 +300,28 @@ const handleContextMenu = (file, event) => {
   emit('context-menu', event, file)
 }
 
-// Gestion des gestes de swipe pour la navigation
-const handleSwipeGesture = () => {
-  if (!isGesturing.value) return
-  
-  if (swipeDirection.value === 'left') {
-    // Swipe vers la gauche - aller au dossier suivant ou action
-    emit('swipe-left')
-  } else if (swipeDirection.value === 'right') {
-    // Swipe vers la droite - retour ou action
-    emit('swipe-right')
-  }
-}
 
-// Écouter les événements de swipe
-if (listContainer.value) {
-  listContainer.value.addEventListener('swipe', (event) => {
-    const { direction } = event.detail
-    if (direction === 'right') {
-      // Swipe vers la droite - navigation retour
-      emit('navigate-back')
-    } else if (direction === 'left') {
-      // Swipe vers la gauche - action contextuelle
-      emit('show-actions')
-    }
-  })
-}
 
-// Get file operation indicator for visual feedback
-const getFileOperationIndicator = (file) => {
-  if (!props.fileOperationsState.hasOperation) {
-    return null
-  }
-  
-  const isInOperation = props.fileOperationsState.isItemInOperation(file)
-  if (!isInOperation) {
-    return null
-  }
-  
-  return {
-    type: props.fileOperationsState.isCopyOperation ? 'copy' : 'cut',
-    cssClass: props.fileOperationsState.getItemIndicatorClass(file),
-    label: props.fileOperationsState.isCopyOperation ? 'Copié' : 'Coupé'
-  }
-}
 
-// Watcher pour les changements de fichiers
-watch(() => props.files, (newFiles) => {
-  console.log('DetailedListView: Files updated', newFiles?.length || 0, 'items')
-}, { immediate: true })
 
-// Watcher pour les changements de taille d'écran
-watch([isMobile, isTouch], ([newIsMobile, newIsTouch]) => {
-  console.log('DetailedListView: Screen changed', { mobile: newIsMobile, touch: newIsTouch })
-}, { immediate: true })
+
 </script>
 
 <style scoped>
 .detailed-list-view {
   min-height: 200px;
-  position: relative;
 }
 
-/* Custom scrollbar pour une meilleure apparence */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--bc) / 0.2) transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--bc) / 0.2);
-  border-radius: 4px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--bc) / 0.3);
-}
-
-/* Animations pour les changements de tri */
+/* En-têtes de colonnes */
 .table th {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  transition: background-color 0.2s ease;
 }
 
 .table th:hover {
   background-color: hsl(var(--b3) / 0.5);
-  transform: translateY(-1px);
 }
 
-.table th:active {
-  transform: translateY(0);
-}
-
-/* Animation pour les indicateurs de tri */
-@keyframes sort-change {
-  0% {
-    transform: scale(0.8) rotate(-10deg);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scale(1.2) rotate(5deg);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
-  }
-}
-
-.animate-sort-change {
-  animation: sort-change 0.3s ease-out;
-}
-
-/* Indicateur de colonne active */
-.table th.active-sort {
-  background: linear-gradient(135deg, hsl(var(--p) / 0.1), hsl(var(--p) / 0.05));
-  border-bottom: 2px solid hsl(var(--p));
-}
-
-.table th.active-sort::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, hsl(var(--p)), transparent);
-  opacity: 0.6;
-}
-
-/* Container pour l'indicateur de tri */
-.sort-indicator-container {
-  min-width: 16px;
-  min-height: 16px;
-}
-
-/* Animation de pulsation pour les changements */
-@keyframes pulse-sort {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.1);
-  }
-}
-
-.table th.sorting {
-  animation: pulse-sort 0.6s ease-in-out;
-}
-
-/* Adaptations mobiles et tactiles */
-.mobile-optimized {
-  border-radius: 0;
-  border-left: none;
-  border-right: none;
-}
-
-.touch-optimized .table th,
-.touch-optimized .table td {
-  padding: 0.75rem 0.5rem;
-  min-height: 44px; /* Minimum touch target */
-}
-
-.mobile-optimized .table th,
-.mobile-optimized .table td {
-  padding: 0.5rem 0.25rem;
-}
-
-.mobile-optimized .table th:first-child,
-.mobile-optimized .table td:first-child {
-  padding-left: 0.5rem;
-}
-
-.mobile-optimized .table th:last-child,
-.mobile-optimized .table td:last-child {
-  padding-right: 0.5rem;
-}
-
-/* Scroll tactile amélioré */
-.touch-scroll {
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-}
-
-.touch-scroll::-webkit-scrollbar {
-  width: 12px; /* Plus large pour le tactile */
-}
-
-.touch-scroll::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--bc) / 0.3);
-  border-radius: 6px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-/* Responsive breakpoints */
-@media (max-width: 640px) {
-  .detailed-list-view {
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-  }
-  
-  /* Masquer les colonnes moins importantes */
-  .table th:nth-child(4),
-  .table td:nth-child(4) {
-    display: none; /* Masquer la date sur très petit écran */
-  }
-}
-
-@media (max-width: 480px) {
-  /* Masquer aussi le type sur très petit écran */
-  .table th:nth-child(3),
-  .table td:nth-child(3) {
-    display: none;
-  }
-  
-  /* Ajuster les tailles */
-  .table th,
-  .table td {
-    padding: 0.5rem 0.25rem;
-    font-size: 0.875rem;
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1024px) {
-  /* Tablette - optimisations spécifiques */
-  .table th,
-  .table td {
-    padding: 0.625rem 0.5rem;
-  }
-}
-
-/* Amélioration de l'accessibilité */
-.table th[role="columnheader"] {
-  position: relative;
-}
-
-.table th[role="columnheader"]:focus {
-  outline: 2px solid hsl(var(--p));
-  outline-offset: -2px;
-}
-
-/* Animation pour le loading */
-@keyframes pulse-subtle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.loading {
-  animation: pulse-subtle 1.5s ease-in-out infinite;
-}
-
-/* Alignement des colonnes pour un affichage tabulaire parfait */
+/* Alignement des colonnes */
 .table-fixed {
   table-layout: fixed;
 }
@@ -667,13 +333,13 @@ watch([isMobile, isTouch], ([newIsMobile, newIsTouch]) => {
   white-space: nowrap;
 }
 
-/* Permettre le wrap pour la colonne nom qui peut être plus longue */
+/* Permettre le wrap pour la colonne nom */
 .table-fixed td:first-child {
   white-space: normal;
   word-break: break-word;
 }
 
-/* Alignement spécifique par colonne - seulement pour les cellules de données */
+/* Alignement spécifique par colonne */
 .table td:nth-child(2) {
   text-align: right; /* Taille */
 }
@@ -682,48 +348,9 @@ watch([isMobile, isTouch], ([newIsMobile, newIsTouch]) => {
   text-align: center; /* Type */
 }
 
-/* Amélioration de l'espacement vertical */
-.table th,
-.table td {
-  vertical-align: middle;
-  border-bottom: 1px solid hsl(var(--bc) / 0.1);
-}
-
-/* Assurer que tous les en-têtes ont la même hauteur */
-.table thead th {
-  height: 40px;
-  padding: 0.5rem 1rem;
-}
-
-.touch-optimized .table thead th {
-  height: 44px;
-  padding: 0.75rem 0.5rem;
-}
-
-/* Assurer que toutes les lignes de données ont la même hauteur */
-.table tbody tr {
-  height: 48px;
-}
-
-.touch-optimized .table tbody tr {
-  height: 56px;
-}
-
-/* Forcer l'alignement vertical au centre pour tous les éléments */
-.table th > div,
-.table td {
-  display: flex;
-  align-items: center;
-  height: 100%;
-}
-
-/* Exception pour la première colonne qui a déjà un flex */
-.table td:first-child {
-  /* Déjà géré par le flex existant */
-}
-
-/* Hover effect pour les lignes */
-.table tbody tr:hover {
-  background-color: hsl(var(--b2) / 0.5);
+/* Amélioration de l'accessibilité */
+.table th[role="columnheader"]:focus {
+  outline: 2px solid hsl(var(--p));
+  outline-offset: -2px;
 }
 </style>

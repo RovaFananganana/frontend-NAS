@@ -1,0 +1,478 @@
+<template>
+  <div :class="[
+    'favorites-panel flex flex-col',
+    compact ? 'bg-transparent' : 'bg-base-100 border-r border-base-300 h-full'
+  ]">
+    <!-- En-tête du panneau -->
+    <div v-if="!compact" class="favorites-header p-4 border-b border-base-300">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
+          <i class="fas fa-star text-warning" aria-hidden="true"></i>
+          Favoris
+        </h3>
+        <div class="flex items-center gap-1">
+          <button
+            @click="showImportExport = !showImportExport"
+            class="btn btn-xs btn-ghost tooltip tooltip-bottom"
+            data-tip="Import/Export"
+            :aria-label="showImportExport ? 'Masquer import/export' : 'Afficher import/export'"
+          >
+            <i class="fas fa-cog" aria-hidden="true"></i>
+          </button>
+          <button
+            @click="refresh"
+            class="btn btn-xs btn-ghost tooltip tooltip-bottom"
+            data-tip="Actualiser"
+            aria-label="Actualiser les favoris"
+          >
+            <i class="fas fa-redo" :class="{ 'animate-spin': refreshing }" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Panneau d'import/export -->
+      <div v-if="showImportExport" class="mt-3 p-3 bg-base-200 rounded-lg">
+        <div class="flex gap-2 mb-2">
+          <button
+            @click="exportFavorites"
+            class="btn btn-xs btn-outline flex-1"
+            :disabled="favorites.length === 0"
+          >
+            <i class="fas fa-download mr-1" aria-hidden="true"></i>
+            Exporter
+          </button>
+          <label class="btn btn-xs btn-outline flex-1 cursor-pointer">
+            <i class="fas fa-upload mr-1" aria-hidden="true"></i>
+            Importer
+            <input
+              ref="importInput"
+              type="file"
+              accept=".json"
+              class="hidden"
+              @change="importFavorites"
+            />
+          </label>
+        </div>
+        <button
+          v-if="favorites.length > 0"
+          @click="confirmClearAll"
+          class="btn btn-xs btn-error btn-outline w-full"
+        >
+          <i class="fas fa-trash mr-1" aria-hidden="true"></i>
+          Tout supprimer
+        </button>
+      </div>
+    </div>
+
+    <!-- Liste des favoris -->
+    <div :class="[
+      'favorites-content flex-1 overflow-y-auto',
+      compact ? 'max-h-48' : ''
+    ]">
+      <!-- État vide -->
+      <div v-if="favorites.length === 0" :class="[
+        'empty-state text-center text-base-content/60',
+        compact ? 'p-2' : 'p-4'
+      ]">
+        <i :class="[
+          'fas fa-star mb-3 opacity-30',
+          compact ? 'text-2xl' : 'text-4xl'
+        ]" aria-hidden="true"></i>
+        <p :class="compact ? 'text-xs mb-1' : 'text-sm mb-2'">Aucun favori</p>
+        <p class="text-xs" v-if="!compact">
+          Clic droit sur un dossier pour l'ajouter aux favoris
+        </p>
+      </div>
+
+      <!-- Liste des favoris -->
+      <ul v-else :class="[
+        'favorites-list space-y-1',
+        compact ? 'p-0' : 'p-2'
+      ]" role="list">
+        <li
+          v-for="favorite in favorites"
+          :key="favorite.path"
+          class="favorite-item group"
+          role="listitem"
+        >
+          <div :class="[
+            'flex items-center rounded-lg transition-colors duration-150',
+            compact ? 'hover:bg-base-300' : 'bg-base-100 hover:bg-base-200'
+          ]">
+            <!-- Bouton de navigation -->
+            <button
+              @click="navigateToFavorite(favorite)"
+              :class="[
+                'favorite-button flex-1 flex items-center text-left rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset',
+                compact ? 'gap-2 p-2' : 'gap-3 p-3'
+              ]"
+              :title="`Naviguer vers ${favorite.path}`"
+              :aria-label="`Naviguer vers le dossier favori ${favorite.name}`"
+            >
+              <i class="fas fa-folder text-primary flex-shrink-0" aria-hidden="true"></i>
+              <div class="flex-1 min-w-0">
+                <div :class="[
+                  'font-medium text-base-content truncate',
+                  compact ? 'text-xs' : 'text-sm'
+                ]">
+                  {{ favorite.name }}
+                </div>
+                <div v-if="!compact" class="text-xs text-base-content/60 truncate">
+                  {{ favorite.path }}
+                </div>
+              </div>
+            </button>
+
+            <!-- Bouton de suppression -->
+            <button
+              @click="removeFavorite(favorite)"
+              :class="[
+                'remove-favorite text-base-content/40 hover:text-error hover:bg-error/10 rounded-r-lg opacity-0 group-hover:opacity-100 transition-all duration-150 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-error focus:ring-inset',
+                compact ? 'p-1' : 'p-2'
+              ]"
+              :title="`Retirer ${favorite.name} des favoris`"
+              :aria-label="`Retirer ${favorite.name} des favoris`"
+            >
+              <i class="fas fa-times text-xs" aria-hidden="true"></i>
+            </button>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Pied du panneau avec statistiques -->
+    <div v-if="favorites.length > 0 && !compact" class="favorites-footer p-3 border-t border-base-300 text-xs text-base-content/60">
+      {{ favorites.length }} favori{{ favorites.length > 1 ? 's' : '' }}
+      <span v-if="maxFavorites > 0">
+        / {{ maxFavorites }} max
+      </span>
+    </div>
+  </div>
+
+  <!-- Modal de confirmation pour supprimer tous les favoris -->
+  <div v-if="showClearConfirm" class="modal modal-open">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg mb-4">Confirmer la suppression</h3>
+      <p class="mb-6">
+        Êtes-vous sûr de vouloir supprimer tous les favoris ? Cette action est irréversible.
+      </p>
+      <div class="modal-action">
+        <button @click="showClearConfirm = false" class="btn btn-ghost">
+          Annuler
+        </button>
+        <button @click="clearAllFavorites" class="btn btn-error">
+          Supprimer tout
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div v-if="notification.show" class="toast toast-top toast-end">
+    <div :class="[
+      'alert',
+      notification.type === 'success' ? 'alert-success' : 
+      notification.type === 'error' ? 'alert-error' : 
+      'alert-info'
+    ]">
+      <span>{{ notification.message }}</span>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { favoritesService } from '@/services/favoritesService.js'
+
+// Props
+const props = defineProps({
+  currentPath: {
+    type: String,
+    default: '/'
+  },
+  compact: {
+    type: Boolean,
+    default: false
+  }
+})
+
+// Émissions
+const emit = defineEmits([
+  'navigate',
+  'favorite-added',
+  'favorite-removed',
+  'error'
+])
+
+// État réactif
+const favorites = ref([])
+const refreshing = ref(false)
+const showImportExport = ref(false)
+const showClearConfirm = ref(false)
+const importInput = ref(null)
+
+// Notification système
+const notification = ref({
+  show: false,
+  message: '',
+  type: 'info'
+})
+
+// Computed
+const maxFavorites = computed(() => favoritesService.maxFavorites)
+
+// Méthodes
+const loadFavorites = () => {
+  try {
+    favorites.value = favoritesService.getFavorites()
+  } catch (error) {
+    console.error('Erreur lors du chargement des favoris:', error)
+    showNotification('Erreur lors du chargement des favoris', 'error')
+  }
+}
+
+const refresh = async () => {
+  refreshing.value = true
+  try {
+    await new Promise(resolve => setTimeout(resolve, 300)) // Animation
+    loadFavorites()
+    showNotification('Favoris actualisés', 'success')
+  } finally {
+    refreshing.value = false
+  }
+}
+
+const navigateToFavorite = (favorite) => {
+  try {
+    emit('navigate', {
+      path: favorite.path,
+      source: 'favorite',
+      favorite: favorite
+    })
+    showNotification(`Navigation vers ${favorite.name}`, 'info')
+  } catch (error) {
+    console.error('Erreur lors de la navigation:', error)
+    showNotification('Erreur lors de la navigation', 'error')
+  }
+}
+
+const removeFavorite = (favorite) => {
+  try {
+    const success = favoritesService.removeFavorite(favorite.path)
+    if (success) {
+      loadFavorites()
+      emit('favorite-removed', favorite)
+      showNotification(`${favorite.name} retiré des favoris`, 'success')
+    } else {
+      showNotification('Erreur lors de la suppression du favori', 'error')
+    }
+  } catch (error) {
+    console.error('Erreur lors de la suppression du favori:', error)
+    showNotification('Erreur lors de la suppression du favori', 'error')
+  }
+}
+
+const exportFavorites = () => {
+  try {
+    const jsonData = favoritesService.exportFavorites()
+    const blob = new Blob([jsonData], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `favoris-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    URL.revokeObjectURL(url)
+    showNotification('Favoris exportés avec succès', 'success')
+  } catch (error) {
+    console.error('Erreur lors de l\'export:', error)
+    showNotification('Erreur lors de l\'export des favoris', 'error')
+  }
+}
+
+const importFavorites = (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const success = favoritesService.importFavorites(e.target.result, true)
+      if (success) {
+        loadFavorites()
+        showNotification('Favoris importés avec succès', 'success')
+      } else {
+        showNotification('Erreur lors de l\'import des favoris', 'error')
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'import:', error)
+      showNotification('Format de fichier invalide', 'error')
+    }
+  }
+  reader.readAsText(file)
+  
+  // Reset input
+  if (importInput.value) {
+    importInput.value.value = ''
+  }
+}
+
+const confirmClearAll = () => {
+  showClearConfirm.value = true
+}
+
+const clearAllFavorites = () => {
+  try {
+    const success = favoritesService.clearAllFavorites()
+    if (success) {
+      loadFavorites()
+      showNotification('Tous les favoris ont été supprimés', 'success')
+    } else {
+      showNotification('Erreur lors de la suppression', 'error')
+    }
+  } catch (error) {
+    console.error('Erreur lors de la suppression:', error)
+    showNotification('Erreur lors de la suppression', 'error')
+  } finally {
+    showClearConfirm.value = false
+  }
+}
+
+const showNotification = (message, type = 'info') => {
+  notification.value = {
+    show: true,
+    message,
+    type
+  }
+  
+  // Auto-hide après 3 secondes
+  setTimeout(() => {
+    notification.value.show = false
+  }, 3000)
+}
+
+// Écouteur d'événements pour les changements de favoris
+let unsubscribeFavoritesChanged = null
+
+// Méthodes publiques exposées
+const addCurrentPathToFavorites = (name = null) => {
+  try {
+    const folderName = name || props.currentPath.split('/').pop() || 'Racine'
+    const success = favoritesService.addFavorite(props.currentPath, folderName)
+    
+    if (success) {
+      loadFavorites()
+      emit('favorite-added', {
+        path: props.currentPath,
+        name: folderName
+      })
+      showNotification(`${folderName} ajouté aux favoris`, 'success')
+      return true
+    } else {
+      showNotification('Ce dossier est déjà dans les favoris', 'info')
+      return false
+    }
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout aux favoris:', error)
+    showNotification('Erreur lors de l\'ajout aux favoris', 'error')
+    return false
+  }
+}
+
+const isCurrentPathFavorite = () => {
+  return favoritesService.isFavorite(props.currentPath)
+}
+
+// Exposer les méthodes pour utilisation par le parent
+defineExpose({
+  addCurrentPathToFavorites,
+  isCurrentPathFavorite,
+  refresh: loadFavorites
+})
+
+// Lifecycle hooks
+onMounted(() => {
+  loadFavorites()
+  
+  // Écouter les changements de favoris depuis d'autres composants
+  unsubscribeFavoritesChanged = favoritesService.onFavoritesChanged((detail) => {
+    loadFavorites()
+    
+    // Émettre des événements selon l'action
+    if (detail.action === 'added') {
+      emit('favorite-added', detail.data)
+    } else if (detail.action === 'removed') {
+      emit('favorite-removed', detail.data)
+    }
+  })
+})
+
+onUnmounted(() => {
+  // Nettoyer l'écouteur d'événements
+  if (unsubscribeFavoritesChanged) {
+    unsubscribeFavoritesChanged()
+  }
+})
+</script>
+
+<style scoped>
+.favorites-panel:not(.compact) {
+  min-width: 250px;
+  max-width: 350px;
+}
+
+.favorites-panel.compact {
+  width: 100%;
+}
+
+.favorite-item:hover .remove-favorite {
+  opacity: 1;
+}
+
+.favorite-button:focus,
+.remove-favorite:focus {
+  z-index: 10;
+}
+
+/* Animation pour les notifications */
+.toast {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Amélioration de l'accessibilité */
+.favorite-button:focus-visible,
+.remove-favorite:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .favorites-panel {
+    min-width: 200px;
+    max-width: 280px;
+  }
+  
+  .favorite-button {
+    padding: 0.5rem;
+  }
+  
+  .favorites-header h3 {
+    font-size: 1rem;
+  }
+}
+</style>

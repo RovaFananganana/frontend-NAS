@@ -2,7 +2,13 @@
 <template>
   <div class="flex h-screen bg-base-100">
     <!-- Sidebar -->
-    <Sidebar :activeTab="activeTab" @tab-changed="handleTabChange" class="border-r border-base-300" />
+    <Sidebar 
+      :activeTab="activeTab" 
+      :currentPath="currentPath"
+      @tab-changed="handleTabChange" 
+      @navigate-to-favorite="handleFavoriteNavigation"
+      class="border-r border-base-300" 
+    />
 
     <!-- Main content -->
     <div class="flex-1 flex flex-col">
@@ -12,7 +18,12 @@
       <!-- Page content -->
       <div class="flex-1 overflow-auto">
         <!-- Dynamic component -->
-        <component :is="currentComponent" :user-role="'admin'" />
+        <component 
+          :is="currentComponent" 
+          :user-role="'admin'" 
+          :external-path="activeTab === 'explorer' ? currentPath : null"
+          @path-changed="handlePathChanged"
+        />
       </div>
     </div>
   </div>
@@ -44,6 +55,7 @@ const tabs = [
 
 // Reactive data
 const activeTab = ref('dash')
+const currentPath = ref('/')
 
 // Computed properties
 const currentComponent = computed(() => {
@@ -59,6 +71,16 @@ const currentTabLabel = computed(() => {
 // Methods
 const handleTabChange = (tabKey) => {
   activeTab.value = tabKey
+}
+
+const handlePathChanged = (event) => {
+  currentPath.value = event.newPath
+}
+
+const handleFavoriteNavigation = (event) => {
+  // Switch to explorer tab and navigate to the favorite path
+  activeTab.value = 'explorer'
+  currentPath.value = event.path
 }
 </script>
 

@@ -81,6 +81,16 @@
       Permissions
     </button>
 
+    <!-- Ajouter/Retirer des favoris (dossiers seulement) -->
+    <button 
+      v-if="item && item.is_directory"
+      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
+      @click="$emit('toggle-favorite', item)"
+    >
+      <i class="fas w-4" :class="isFavorite ? 'fa-star text-warning' : 'fa-star-o'"></i>
+      {{ isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris' }}
+    </button>
+
     <!-- Envoyer vers / Déplacer -->
     <button 
       v-if="item && permissions.can_write"
@@ -172,6 +182,10 @@ const props = defineProps({
   showPermissionErrors: {
     type: Boolean,
     default: false
+  },
+  isFavorite: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -186,7 +200,8 @@ const emit = defineEmits([
   'move',
   'create-folder',
   'delete',
-  'properties'
+  'properties',
+  'toggle-favorite'
 ])
 
 const store = useStore()

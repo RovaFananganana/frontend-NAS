@@ -53,6 +53,24 @@
             </a>
           </li>
         </ul>
+
+        <!-- Section Favoris -->
+        <div class="mt-6 pt-4 border-t border-base-300">
+          <div class="text-xs font-semibold text-base-content/60 uppercase tracking-wider mb-3">
+            Favoris
+          </div>
+          <div class="favorites-container">
+            <FavoritesPanel
+              ref="favoritesPanel"
+              :current-path="currentPath"
+              :compact="true"
+              @navigate="handleFavoriteNavigation"
+              @favorite-added="onFavoriteAdded"
+              @favorite-removed="onFavoriteRemoved"
+              @error="onFavoritesError"
+            />
+          </div>
+        </div>
       </div>
 
       <!-- Section utilisateur -->
@@ -220,16 +238,21 @@
 import { ref, computed, defineEmits, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
+import FavoritesPanel from './FavoritesPanel.vue'
 
 const store = useStore()
 const router = useRouter()
-const emit = defineEmits(['tab-changed'])
+const emit = defineEmits(['tab-changed', 'navigate-to-favorite'])
 
 // Props
 const props = defineProps({
   activeTab: {
     type: String,
     required: true
+  },
+  currentPath: {
+    type: String,
+    default: '/'
   }
 })
 
@@ -301,6 +324,23 @@ const handleLogout = () => {
   router.push('/login')
 }
 
+// Favorites methods
+const handleFavoriteNavigation = (event) => {
+  emit('navigate-to-favorite', event)
+}
+
+const onFavoriteAdded = (favorite) => {
+  store.dispatch('showSuccess', `${favorite.name} ajouté aux favoris`)
+}
+
+const onFavoriteRemoved = (favorite) => {
+  store.dispatch('showSuccess', `${favorite.name} retiré des favoris`)
+}
+
+const onFavoritesError = (error) => {
+  store.dispatch('showError', error.message || 'Erreur dans le système de favoris')
+}
+
 // Lifecycle
 onMounted(async () => {
   const savedTheme = getCurrentTheme()
@@ -317,3 +357,28 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.favorites-container {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Scrollbar styling for favorites */
+.favorites-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.favorites-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.favorites-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+}
+
+.favorites-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+</style>

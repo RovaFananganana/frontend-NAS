@@ -1,11 +1,19 @@
 <!-- components/Shared/RenameModal.vue -->
 <template>
   <div class="modal modal-open">
-    <div class="modal-box">
+    <div class="modal-box relative" :class="{ 'pointer-events-none opacity-75': loading }">
       <h3 class="font-bold text-lg mb-4">
         <i class="fas fa-edit mr-2"></i>
         Renommer {{ item?.is_directory ? 'le dossier' : 'le fichier' }}
       </h3>
+      
+      <!-- Loading overlay -->
+      <div v-if="loading" class="absolute inset-0 bg-base-100 bg-opacity-75 flex items-center justify-center z-50 rounded-lg">
+        <div class="flex flex-col items-center gap-2">
+          <span class="loading loading-spinner loading-lg"></span>
+          <span class="text-sm font-medium">Renommage en cours...</span>
+        </div>
+      </div>
 
       <!-- Current item info -->
       <div class="bg-base-200 p-4 rounded-lg mb-4">
@@ -39,7 +47,7 @@
 
       <!-- Actions -->
       <div class="modal-action">
-        <button @click="$emit('close')" class="btn btn-outline">
+        <button @click="$emit('close')" class="btn btn-outline" :disabled="loading">
           Annuler
         </button>
         <button 
@@ -49,7 +57,7 @@
         >
           <span v-if="loading" class="loading loading-spinner loading-sm mr-2"></span>
           <i v-else class="fas fa-check mr-2"></i>
-          Renommer
+          {{ loading ? 'Renommage en cours...' : 'Renommer' }}
         </button>
       </div>
     </div>
@@ -105,10 +113,16 @@ const rename = async () => {
   error.value = ''
 
   try {
+    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
+    
+    if (!token) {
+      throw new Error('Token d\'authentification manquant')
+    }
+
     const response = await fetch('/nas/rename', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -117,9 +131,31 @@ const rename = async () => {
       })
     })
 
+    // Gérer les différents codes de statut
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Erreur HTTP ${response.status}: ${response.statusText}`)
+      let errorMessage = 'Erreur lors du renommage'
+      
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error || errorData.msg || errorMessage
+      } catch (parseError) {
+        // Si on ne peut pas parser la réponse JSON
+        if (response.status === 401) {
+          errorMessage = 'Session expirée, veuillez vous reconnecter'
+        } else if (response.status === 403) {
+          errorMessage = 'Permissions insuffisantes pour cette opération'
+        } else if (response.status === 404) {
+          errorMessage = 'L\'élément à renommer n\'existe plus'
+        } else if (response.status === 409) {
+          errorMessage = 'Un élément avec ce nom existe déjà'
+        } else if (response.status === 500) {
+          errorMessage = 'Erreur interne du serveur'
+        } else {
+          errorMessage = `Erreur HTTP ${response.status}: ${response.statusText}`
+        }
+      }
+      
+      throw new Error(errorMessage)
     }
 
     const data = await response.json()
@@ -143,14 +179,20 @@ const rename = async () => {
     // Provide user-friendly error messages
     let userMessage = 'Erreur lors du renommage'
     
-    if (err.message.includes('Permission')) {
+    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+      userMessage = 'Erreur de connexion au serveur. Vérifiez votre connexion réseau.'
+    } else if (err.message.includes('Token') || err.message.includes('Session')) {
+      userMessage = 'Session expirée, veuillez vous reconnecter'
+    } else if (err.message.includes('Permission') || err.message.includes('permissions')) {
       userMessage = 'Vous n\'avez pas les permissions nécessaires pour renommer cet élément'
-    } else if (err.message.includes('404')) {
+    } else if (err.message.includes('404') || err.message.includes('existe plus')) {
       userMessage = 'L\'élément à renommer n\'existe plus'
-    } else if (err.message.includes('409') || err.message.includes('exists')) {
+    } else if (err.message.includes('409') || err.message.includes('existe déjà')) {
       userMessage = 'Un élément avec ce nom existe déjà'
-    } else if (err.message.includes('network') || err.message.includes('fetch')) {
-      userMessage = 'Erreur de connexion au serveur'
+    } else if (err.message.includes('500') || err.message.includes('serveur')) {
+      userMessage = 'Erreur interne du serveur. Veuillez réessayer plus tard.'
+    } else if (err.message.includes('CORS')) {
+      userMessage = 'Erreur de configuration du serveur (CORS)'
     } else if (err.message) {
       userMessage = err.message
     }

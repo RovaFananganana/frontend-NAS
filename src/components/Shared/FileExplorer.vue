@@ -24,18 +24,45 @@
         'mb-2': isMobile
       }
     ]" role="toolbar" aria-label="Navigation et modes d'affichage des fichiers">
-      <!-- Bouton de navigation retour -->
+      <!-- Navigation par chemin interactif -->
       <div class="flex items-center gap-2 mb-2">
-        <button v-if="currentPath !== '/'" @click="handleNavigateBack" class="btn btn-sm btn-ghost"
-          :aria-label="`Retour au dossier parent`" title="Retour au dossier parent">
-          <i class="fas fa-arrow-left mr-2"></i>
-          Retour
-        </button>
+        <!-- Navigation history buttons -->
+        <div class="flex items-center gap-1">
+          <button 
+            @click="navigateHistoryBack" 
+            :disabled="!canNavigateBack"
+            class="btn btn-sm btn-ghost"
+            :class="{ 'opacity-50 cursor-not-allowed': !canNavigateBack }"
+            :aria-label="canNavigateBack ? 'Naviguer vers la page précédente' : 'Aucune page précédente'"
+            title="Précédent (Alt+←)"
+          >
+            <i class="fas fa-chevron-left" aria-hidden="true"></i>
+          </button>
+          
+          <button 
+            @click="navigateHistoryForward" 
+            :disabled="!canNavigateForward"
+            class="btn btn-sm btn-ghost"
+            :class="{ 'opacity-50 cursor-not-allowed': !canNavigateForward }"
+            :aria-label="canNavigateForward ? 'Naviguer vers la page suivante' : 'Aucune page suivante'"
+            title="Suivant (Alt+→)"
+          >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          </button>
+          
+          <button v-if="currentPath !== '/'" @click="handleNavigateBack" class="btn btn-sm btn-ghost"
+            :aria-label="`Retour au dossier parent`" title="Retour au dossier parent (Backspace)">
+            <i class="fas fa-arrow-up mr-1" aria-hidden="true"></i>
+            Retour
+          </button>
+        </div>
 
-        <!-- Affichage du chemin actuel -->
-        <div class="text-sm text-base-content opacity-70 flex-1">
-          <i class="fas fa-folder mr-1"></i>
-          {{ currentPath === '/' ? 'Racine' : currentPath }}
+        <!-- Breadcrumb Navigation -->
+        <div class="flex-1">
+          <BreadcrumbNavigation 
+            :current-path="currentPath" 
+            @navigate="handleBreadcrumbNavigation"
+          />
         </div>
       </div>
 
@@ -50,25 +77,26 @@
     <!-- Conteneur principal avec gestion d'erreur -->
     <div id="file-explorer-main" class="file-explorer-content" role="main"
       aria-label="Contenu de l'explorateur de fichiers">
-      <!-- État de chargement global -->
-      <div v-if="loading && !files.length" class="loading-state-enhanced" role="status" aria-live="polite"
-        aria-label="Chargement en cours">
-        <div class="loading-spinner-enhanced" aria-hidden="true"></div>
-        <span class="text-base-content/70">Chargement des fichiers...</span>
-      </div>
 
-      <!-- État d'erreur global -->
-      <div v-else-if="error" class="alert alert-error" role="alert" aria-live="assertive">
-        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-        <div>
-          <h3 class="font-bold">Erreur de chargement</h3>
-          <div class="text-sm">{{ error }}</div>
+        <!-- État de chargement global -->
+        <div v-if="loading && !files.length" class="loading-state-enhanced" role="status" aria-live="polite"
+          aria-label="Chargement en cours">
+          <div class="loading-spinner-enhanced" aria-hidden="true"></div>
+          <span class="text-base-content/70">Chargement des fichiers...</span>
         </div>
-        <button @click="refresh" class="btn btn-sm btn-outline" aria-label="Réessayer le chargement des fichiers">
-          <i class="fas fa-redo mr-1" aria-hidden="true"></i>
-          Réessayer
-        </button>
-      </div>
+
+        <!-- État d'erreur global -->
+        <div v-else-if="error" class="alert alert-error" role="alert" aria-live="assertive">
+          <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+          <div>
+            <h3 class="font-bold">Erreur de chargement</h3>
+            <div class="text-sm">{{ error }}</div>
+          </div>
+          <button @click="refresh" class="btn btn-sm btn-outline" aria-label="Réessayer le chargement des fichiers">
+            <i class="fas fa-redo mr-1" aria-hidden="true"></i>
+            Réessayer
+          </button>
+        </div>
 
       <!-- Composant de vue dynamique -->
       <component v-else :is="currentViewComponent" :current-path="currentPath" :files="files" :loading="loading"
@@ -124,10 +152,11 @@
       operation: isCopyOperation ? 'copy' : (isCutOperation ? 'cut' : null),
       count: operationCount,
       description: getOperationDescription()
-    }" :show-permission-errors="showPermissionErrors" @open="openContextItem" @download="downloadContextFile"
+    }" :show-permission-errors="showPermissionErrors" :is-favorite="isItemFavorite(contextMenu.item)"
+    @open="openContextItem" @download="downloadContextFile"
     @rename="openRenameModal" @copy="copyContextItem" @cut="cutContextItem" @paste="pasteItems"
     @permissions="openPermissions" @move="openMoveModal" @create-folder="openCreateFolderModal" @delete="confirmDelete"
-    @properties="showProperties" />
+    @properties="showProperties" @toggle-favorite="handleToggleFavorite" />
 
   <!-- Modals -->
   <PermissionModal v-if="showPermissionModal" :item="selectedItemForPermissions" @close="showPermissionModal = false"
@@ -145,7 +174,41 @@
 
   <CreateFolderModal v-if="showCreateFolderModal" :current-path="currentPath" @close="showCreateFolderModal = false"
     @created="onFolderCreated" />
+
+  <!-- Notifications -->
+  <div v-if="notification.show" class="toast toast-top toast-end">
+    <div :class="[
+      'alert',
+      notification.type === 'success' ? 'alert-success' : 
+      notification.type === 'error' ? 'alert-error' : 
+      'alert-info'
+    ]">
+      <span>{{ notification.message }}</span>
+    </div>
+  </div>
 </template>
+
+<style scoped>
+.file-explorer-content {
+  min-height: 400px;
+}
+
+/* Animation pour les notifications */
+.toast {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+</style>
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
@@ -159,10 +222,12 @@ import { usePermissions } from '@/composables/usePermissions.js'
 import { useNotifications } from '@/composables/useNotifications.js'
 import { useFileOperations } from '@/composables/useFileOperations.js'
 import { nasAPI } from '@/services/nasAPI.js'
+import { favoritesService } from '@/services/favoritesService.js'
 import { VIEW_MODES } from '@/types/viewMode.js'
 
 // Composants
 import ViewModeSelector from './ViewModeSelector.vue'
+import BreadcrumbNavigation from './BreadcrumbNavigation.vue'
 import NasFolderTree from './NasFolderTree.vue'
 import DetailedListView from './DetailedListView.vue'
 import OptimizedDetailedListView from './OptimizedDetailedListView.vue'
@@ -193,6 +258,10 @@ const props = defineProps({
   userRole: {
     type: String,
     default: 'user'
+  },
+  externalPath: {
+    type: String,
+    default: null
   }
 })
 
@@ -264,6 +333,10 @@ const error = ref('')
 const showShortcutsHelp = ref(false)
 const currentSelectionMode = ref('single')
 
+// Navigation history state
+const navigationHistory = ref([props.initialPath])
+const historyIndex = ref(0)
+
 // Context menu and modals state
 const contextMenu = ref({
   show: false,
@@ -283,6 +356,15 @@ const selectedItemForProperties = ref(null)
 const itemToRename = ref(null)
 const itemsToMove = ref([])
 const itemsToDelete = ref([])
+
+
+
+// Notification state
+const notification = ref({
+  show: false,
+  message: '',
+  type: 'info'
+})
 
 // File operations composable for copy/cut/paste
 const {
@@ -315,6 +397,13 @@ const currentViewComponent = computed(() => {
 
 const fileCount = computed(() => files.value?.length || 0)
 const selectedCount = computed(() => getSelectedCount())
+
+// Watcher pour les changements de chemin externe
+watch(() => props.externalPath, (newPath) => {
+  if (newPath && newPath !== currentPath.value) {
+    handlePathSelected(newPath)
+  }
+})
 
 // Méthodes de chargement des données
 const loadFiles = async (path = currentPath.value) => {
@@ -361,6 +450,57 @@ const refresh = async () => {
   await loadFiles(currentPath.value)
 }
 
+// Navigation history management
+const addToNavigationHistory = (path) => {
+  // Remove any forward history if we're not at the end
+  if (historyIndex.value < navigationHistory.value.length - 1) {
+    navigationHistory.value = navigationHistory.value.slice(0, historyIndex.value + 1)
+  }
+  
+  // Add new path if it's different from current
+  if (navigationHistory.value[navigationHistory.value.length - 1] !== path) {
+    navigationHistory.value.push(path)
+    historyIndex.value = navigationHistory.value.length - 1
+    
+    // Limit history size to prevent memory issues
+    if (navigationHistory.value.length > 50) {
+      navigationHistory.value = navigationHistory.value.slice(-50)
+      historyIndex.value = navigationHistory.value.length - 1
+    }
+  }
+}
+
+const canNavigateBack = computed(() => historyIndex.value > 0)
+const canNavigateForward = computed(() => historyIndex.value < navigationHistory.value.length - 1)
+
+const navigateHistoryBack = async () => {
+  if (canNavigateBack.value) {
+    historyIndex.value--
+    const targetPath = navigationHistory.value[historyIndex.value]
+    await loadFiles(targetPath)
+    
+    emit('navigate', {
+      path: targetPath,
+      source: 'history-back',
+      timestamp: Date.now()
+    })
+  }
+}
+
+const navigateHistoryForward = async () => {
+  if (canNavigateForward.value) {
+    historyIndex.value++
+    const targetPath = navigationHistory.value[historyIndex.value]
+    await loadFiles(targetPath)
+    
+    emit('navigate', {
+      path: targetPath,
+      source: 'history-forward',
+      timestamp: Date.now()
+    })
+  }
+}
+
 // Gestionnaires d'événements
 const handleModeChange = (event) => {
   console.log(`FileExplorer: Mode changed from ${event.oldMode} to ${event.newMode}`)
@@ -380,11 +520,44 @@ const handlePathSelected = async (path) => {
 
   if (normalizedPath !== currentPath.value) {
     const oldPath = currentPath.value
+    
+    // Add to navigation history
+    addToNavigationHistory(normalizedPath)
+    
     await loadFiles(normalizedPath)
 
     emit('path-changed', {
       oldPath: oldPath,
       newPath: normalizedPath,
+      timestamp: Date.now()
+    })
+  }
+}
+
+const handleBreadcrumbNavigation = async (path) => {
+  console.log(`FileExplorer: Breadcrumb navigation to: ${path}`)
+  
+  // Normaliser le chemin
+  const normalizedPath = nasAPI.normalizePath(path)
+  
+  if (normalizedPath !== currentPath.value) {
+    const oldPath = currentPath.value
+    
+    // Add to navigation history
+    addToNavigationHistory(normalizedPath)
+    
+    await loadFiles(normalizedPath)
+
+    emit('path-changed', {
+      oldPath: oldPath,
+      newPath: normalizedPath,
+      source: 'breadcrumb',
+      timestamp: Date.now()
+    })
+
+    emit('navigate', {
+      path: normalizedPath,
+      source: 'breadcrumb',
       timestamp: Date.now()
     })
   }
@@ -452,7 +625,10 @@ const handleSortChanged = (event) => {
 
 // Gestionnaires pour les gestes mobiles
 const handleNavigateBack = () => {
-  if (currentPath.value !== '/') {
+  // Try to use history first, fallback to parent directory
+  if (canNavigateBack.value) {
+    navigateHistoryBack()
+  } else if (currentPath.value !== '/') {
     const parentPath = currentPath.value.split('/').slice(0, -1).join('/') || '/'
     handlePathSelected(parentPath)
   }
@@ -785,6 +961,52 @@ const showProperties = (item) => {
   contextMenu.value.show = false
 }
 
+// Favorites methods
+const handleToggleFavorite = (item) => {
+  if (!item || !item.is_directory) {
+    console.warn('Seuls les dossiers peuvent être ajoutés aux favoris')
+    return
+  }
+
+  const isFavorite = favoritesService.isFavorite(item.path)
+  
+  if (isFavorite) {
+    const success = favoritesService.removeFavorite(item.path)
+    if (success) {
+      showNotification(`${item.name} retiré des favoris`, 'success')
+    } else {
+      showNotification('Erreur lors de la suppression du favori', 'error')
+    }
+  } else {
+    const success = favoritesService.addFavorite(item.path, item.name)
+    if (success) {
+      showNotification(`${item.name} ajouté aux favoris`, 'success')
+    } else {
+      showNotification('Erreur lors de l\'ajout aux favoris', 'error')
+    }
+  }
+  
+  contextMenu.value.show = false
+}
+
+const isItemFavorite = (item) => {
+  if (!item || !item.is_directory) return false
+  return favoritesService.isFavorite(item.path)
+}
+
+const showNotification = (message, type = 'info') => {
+  notification.value = {
+    show: true,
+    message,
+    type
+  }
+  
+  // Auto-hide après 3 secondes
+  setTimeout(() => {
+    notification.value.show = false
+  }, 3000)
+}
+
 // Permission system
 const {
   isAdmin,
@@ -862,14 +1084,20 @@ const onPermissionsUpdated = () => {
   loadFiles(currentPath.value)
 }
 
-const onItemRenamed = async (oldPath, newName) => {
+const onItemRenamed = async (renameData) => {
   try {
-    const result = await nasAPI.renameItem(oldPath, newName)
-    if (result.success) {
-      await loadFiles(currentPath.value)
-    } else {
-      throw new Error(result.error || 'Rename failed')
-    }
+    // renameData is an object: {oldPath, newPath, newName}
+    console.log('Rename data received:', renameData)
+    
+    // The rename has already been completed by the modal, just refresh the view
+    await loadFiles(currentPath.value)
+    
+    // Emit success event
+    emit('success', {
+      message: `Élément renommé avec succès: ${renameData.newName}`,
+      action: 'rename',
+      timestamp: Date.now()
+    })
   } catch (error) {
     console.error('Rename error:', error)
     emit('error', {
@@ -935,6 +1163,21 @@ const additionalShortcuts = {
   'Ctrl+Shift+n': () => {
     // Créer un nouveau dossier
     showCreateFolderModal.value = true
+  },
+  'Alt+ArrowLeft': () => {
+    // Navigation arrière dans l'historique
+    navigateHistoryBack()
+  },
+  'Alt+ArrowRight': () => {
+    // Navigation avant dans l'historique
+    navigateHistoryForward()
+  },
+  'Backspace': () => {
+    // Navigation vers le dossier parent
+    if (currentPath.value !== '/') {
+      const parentPath = currentPath.value.split('/').slice(0, -1).join('/') || '/'
+      handlePathSelected(parentPath)
+    }
   }
 }
 
@@ -1009,6 +1252,12 @@ defineExpose({
   focusedFile,
   showShortcutsHelp,
 
+  // Navigation history
+  navigationHistory: computed(() => navigationHistory.value),
+  historyIndex: computed(() => historyIndex.value),
+  canNavigateBack,
+  canNavigateForward,
+
   // Actions
   clearSelection: clearKeyboardSelection,
   selectAll: selectAllKeyboard,
@@ -1019,6 +1268,9 @@ defineExpose({
   setFocusedIndex,
   handleKeyboardClick,
   handleKeyboardDoubleClick,
+  navigateHistoryBack,
+  navigateHistoryForward,
+  handleBreadcrumbNavigation,
 
   // Gestionnaires
   handleModeChange,
