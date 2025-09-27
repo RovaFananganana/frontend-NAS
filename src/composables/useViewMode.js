@@ -103,7 +103,13 @@ export function useViewMode() {
   const currentMode = computed(() => state.value.currentMode)
   const sortColumn = computed(() => state.value.sortColumn)
   const sortDirection = computed(() => state.value.sortDirection)
-  const selectedFiles = computed(() => state.value.selectedFiles)
+  // selectedFiles doit être une ref pour permettre les modifications
+  const selectedFiles = computed({
+    get: () => state.value.selectedFiles,
+    set: (value) => {
+      state.value.selectedFiles = value
+    }
+  })
   const columnVisibility = computed(() => state.value.columnVisibility)
 
   // Mode d'affichage actuel avec métadonnées

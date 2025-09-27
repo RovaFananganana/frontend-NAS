@@ -26,13 +26,8 @@
             <label class="label">
               <span class="label-text">Rechercher</span>
             </label>
-            <input
-              v-model="filters.search"
-              type="text"
-              placeholder="Utilisateur, action, cible..."
-              class="input input-bordered input-sm"
-              @input="debouncedFilter"
-            >
+            <input v-model="filters.search" type="text" placeholder="Utilisateur, action, cible..."
+              class="input input-bordered input-sm" @input="debouncedFilter">
           </div>
 
           <!-- Action Filter -->
@@ -105,46 +100,44 @@
                 <th>Détails</th>
               </tr>
             </thead>
-           <tbody>
-  <tr v-for="log in paginatedLogs" :key="log.id">
-    <td>
-      <div class="text-sm">
-        <div class="font-medium">{{ formatDate(log.timestamp) }}</div>
-        <div class="opacity-70">{{ formatTime(log.timestamp) }}</div>
-      </div>
-    </td>
-    <td>
-      <div class="flex items-center space-x-2">
-        <div class="mask mask-squircle w-8 h-8 bg-secondary text-secondary-content flex items-center justify-center">
-          {{ (log.user || log.user_id || 'S').toString().charAt(0).toUpperCase() }}
-        </div>
-        <div>
-          <div class="font-medium text-sm">{{ log.user || `ID: ${log.user_id}` }}</div>
-        </div>
-      </div>
-    </td>
-    <td>
-      <div class="badge" :class="getActionBadgeClass(log.action)">
-        {{ getActionLabel(log.action) }}
-      </div>
-    </td>
-    <td>
-      <div class="text-sm max-w-xs truncate" :title="log.target">
-        {{ log.target }}
-      </div>
-    </td>
-    <td>
-      <!-- Toujours afficher le bouton Voir -->
-      <button
-        class="btn btn-ghost btn-xs"
-        @click="showLogDetails(log)"
-      >
-        <i class="fas fa-eye"></i>
-        Voir
-      </button>
-        </td>
-        </tr>
-         </tbody>
+            <tbody>
+              <tr v-for="log in paginatedLogs" :key="log.id">
+                <td>
+                  <div class="text-sm">
+                    <div class="font-medium">{{ formatDate(log.timestamp) }}</div>
+                    <div class="opacity-70">{{ formatTime(log.timestamp) }}</div>
+                  </div>
+                </td>
+                <td>
+                  <div class="flex items-center space-x-2">
+                    <div
+                      class="mask mask-squircle w-8 h-8 bg-secondary text-secondary-content flex items-center justify-center">
+                      {{ (log.user || log.user_id || 'S').toString().charAt(0).toUpperCase() }}
+                    </div>
+                    <div>
+                      <div class="font-medium text-sm">{{ log.user || `ID: ${log.user_id}` }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="badge" :class="getActionBadgeClass(log.action)">
+                    {{ getActionLabel(log.action) }}
+                  </div>
+                </td>
+                <td>
+                  <div class="text-sm max-w-xs truncate" :title="log.target">
+                    {{ log.target }}
+                  </div>
+                </td>
+                <td>
+                  <!-- Toujours afficher le bouton Voir -->
+                  <button class="btn btn-ghost btn-xs" @click="showLogDetails(log)">
+                    <i class="fas fa-eye"></i>
+                    Voir
+                  </button>
+                </td>
+              </tr>
+            </tbody>
 
           </table>
         </div>
@@ -163,32 +156,19 @@
       <div class="text-sm opacity-70">
         Page {{ currentPage }} sur {{ totalPages }} ({{ totalLogs }} entrées)
       </div>
-      
+
       <div class="btn-group">
-        <button
-          class="btn btn-sm"
-          :disabled="currentPage <= 1"
-          @click="changePage(currentPage - 1)"
-        >
+        <button class="btn btn-sm" :disabled="currentPage <= 1" @click="changePage(currentPage - 1)">
           <i class="fas fa-chevron-left"></i>
         </button>
-        
+
         <!-- Page numbers -->
-        <button
-          v-for="page in visiblePages"
-          :key="page"
-          class="btn btn-sm"
-          :class="{ 'btn-active': page === currentPage }"
-          @click="changePage(page)"
-        >
+        <button v-for="page in visiblePages" :key="page" class="btn btn-sm"
+          :class="{ 'btn-active': page === currentPage }" @click="changePage(page)">
           {{ page }}
         </button>
-        
-        <button
-          class="btn btn-sm"
-          :disabled="currentPage >= totalPages"
-          @click="changePage(currentPage + 1)"
-        >
+
+        <button class="btn btn-sm" :disabled="currentPage >= totalPages" @click="changePage(currentPage + 1)">
           <i class="fas fa-chevron-right"></i>
         </button>
       </div>
@@ -198,31 +178,31 @@
     <div v-if="selectedLog" class="modal modal-open">
       <div class="modal-box max-w-2xl">
         <h3 class="font-bold text-lg mb-4">Détails du journal</h3>
-        
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <div class="text-sm font-medium opacity-70">Date/Heure</div>
             <div>{{ formatDateTime(selectedLog.timestamp) }}</div>
           </div>
-          
+
           <div>
             <div class="text-sm font-medium opacity-70">Utilisateur</div>
             <div>{{ selectedLog.user || `ID: ${selectedLog.user_id}` }}</div>
           </div>
-          
+
           <div>
             <div class="text-sm font-medium opacity-70">Action</div>
             <div class="badge" :class="getActionBadgeClass(selectedLog.action)">
               {{ getActionLabel(selectedLog.action) }}
             </div>
           </div>
-          
+
           <div>
             <div class="text-sm font-medium opacity-70">ID Journal</div>
             <div>#{{ selectedLog.id }}</div>
           </div>
         </div>
-        
+
         <div class="mb-4">
           <div class="text-sm font-medium opacity-70 mb-2">Cible</div>
           <div class="bg-base-200 p-3 rounded text-sm">
@@ -282,11 +262,11 @@ const visiblePages = computed(() => {
   const pages = []
   const start = Math.max(1, currentPage.value - 2)
   const end = Math.min(totalPages.value, currentPage.value + 2)
-  
+
   for (let i = start; i <= end; i++) {
     pages.push(i)
   }
-  
+
   return pages
 })
 
@@ -294,8 +274,8 @@ const filteredLogs = computed(() => {
   return logs.value.filter(log => {
     const matchesSearch = filters.value.search
       ? (log.user?.toLowerCase().includes(filters.value.search.toLowerCase()) ||
-         log.action?.toLowerCase().includes(filters.value.search.toLowerCase()) ||
-         log.target?.toLowerCase().includes(filters.value.search.toLowerCase()))
+        log.action?.toLowerCase().includes(filters.value.search.toLowerCase()) ||
+        log.target?.toLowerCase().includes(filters.value.search.toLowerCase()))
       : true
 
     const matchesAction = filters.value.action
@@ -377,9 +357,9 @@ const getActionLabel = (action) => {
     'ADD_USER_TO_GROUP': 'Ajout utilisateur au groupe',
     'REMOVE_USER_FROM_GROUP': 'Retrait du groupe',
     'UPDATE_PROFILE': 'Modifier profil',
-    'GRANT_PERMISSION': 'Accorder permission',
-    'REVOKE_PERMISSION': 'Révoquer permission',
-   'UPDATE_PERMISSION': 'Modifier permission'
+    'CREATE_PERMISSION': 'Accorder permission',
+    'DELETE_PERMISSION': 'Supprimer permission',
+    'UPDATE_PERMISSION': 'Modifier permission'
   }
   return labels[action] || action
 }
@@ -399,7 +379,7 @@ const loadLogs = async () => {
   try {
     const response = await adminAPI.getLogs(currentPage.value, perPage.value)
     const data = response.data
-    
+
     logs.value = data.logs || data || []
     totalLogs.value = data.total || logs.value.length
   } catch (error) {
