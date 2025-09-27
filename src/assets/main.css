@@ -1,5 +1,6 @@
 /* Import accessibility and design system enhancements */
 @import './accessibility.css';
+@import './themes.css';
 
 @tailwind base;
 @tailwind components;

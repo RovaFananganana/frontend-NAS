@@ -1,0 +1,42 @@
+/* Force inclusion of DaisyUI themes */
+
+/* Ensure all themes are included in build */
+[data-theme="light"] { }
+[data-theme="dark"] { }
+[data-theme="valentine"] { }
+[data-theme="retro"] { }
+[data-theme="aqua"] { }
+
+/* Force inclusion of theme-dependent classes */
+.btn-primary,
+.btn-secondary,
+.btn-accent,
+.btn-neutral,
+.bg-primary,
+.bg-secondary,
+.bg-accent,
+.bg-neutral,
+.text-primary,
+.text-secondary,
+.text-accent,
+.text-neutral,
+.alert-info,
+.alert-success,
+.alert-warning,
+.alert-error {
+  /* Classes will be defined by DaisyUI */
+}
+
+/* Debug: Show current theme */
+html::before {
+  content: "Theme: " attr(data-theme);
+  position: fixed;
+  top: 0;
+  right: 0;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 4px 8px;
+  font-size: 12px;
+  z-index: 9999;
+  pointer-events: none;
+}
