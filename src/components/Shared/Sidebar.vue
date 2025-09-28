@@ -92,7 +92,7 @@
           </li>
 
           <!-- Thème -->
-         <li>
+        <li>
   <div class="dropdown dropdown-right w-full">
     <label 
       tabindex="0" 
@@ -103,26 +103,30 @@
       <i class="fas fa-chevron-right ml-auto text-xs"></i>
     </label>
     <div tabindex="0" class="dropdown-content z-[60] card w-64 shadow-xl bg-neutral text-neutral-content ml-2">
-      <div class="card-body p-3">
-        <h3 class="card-title text-sm mb-3">
-          <i class="fas fa-palette mr-2"></i>
-          Choisir un thème
-        </h3>
-        <div class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-          <button
-            v-for="theme in availableThemes"
-            :key="theme.value"
-            @click="changeTheme(theme.value)"
-            class="btn btn-xs justify-start text-left"
-            :class="{ 'btn-primary': currentTheme === theme.value, 'btn-ghost': currentTheme !== theme.value }"
-          >
-            <i :class="theme.icon" class="mr-1 text-xs"></i>
-            {{ theme.name }}
-          </button>
-        </div>
-      </div>
+    <div class="card-body p-3">
+    <!-- <h3 class="card-title text-sm mb-3 flex items-center gap-2">
+      <i class="fas fa-palette"></i>
+      Choisir un thème
+    </h3> -->
+
+    <!-- Liste des thèmes en colonne -->
+    <div class="flex flex-col gap-2 max-h-48 overflow-y-auto">
+      <button
+        v-for="theme in availableThemes"
+        :key="theme.value"
+        @click="changeTheme(theme.value)"
+        class="btn btn-xs flex items-center gap-2 justify-start text-left w-full"
+        :class="{ 'btn-primary': currentTheme === theme.value, 'btn-ghost': currentTheme !== theme.value }"
+      >
+        <span class="w-5 h-5 flex items-center justify-center">
+          <i :class="theme.icon" class="text-sm"></i>
+        </span>
+        <span>{{ theme.name }}</span>
+      </button>
     </div>
   </div>
+</div>
+</div>  
 </li>
 
           <!-- Notifications -->

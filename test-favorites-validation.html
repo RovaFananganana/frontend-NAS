@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Validation des Favoris</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; }
+        .error { background-color: #f8d7da; }
+        .warning { background-color: #fff3cd; }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+        .favorite-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            margin: 4px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .invalid { background-color: #ffe6e6; }
+        .inaccessible { background-color: #fff8e1; }
+        .valid { background-color: #e8f5e8; }
+    </style>
+</head>
+<body>
+    <h1>Test de Validation des Favoris</h1>
+    
+    <div class="test-section">
+        <h2>Favoris de Test</h2>
+        <button onclick="createTestFavorites()">Créer des favoris de test</button>
+        <button onclick="validateFavorites()">Valider tous les favoris</button>
+        <button onclick="cleanInvalidFavorites()">Nettoyer les favoris invalides</button>
+        <button onclick="clearAllFavorites()">Supprimer tous les favoris</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Liste des Favoris</h2>
+        <div id="favorites-list"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Résultats des Tests</h2>
+        <div id="test-results"></div>
+    </div>
+
+    <script type="module">
+        // Simuler le service des favoris pour les tests
+        class MockFavoritesService {
+            constructor() {
+                this.storageKey = 'test-file-favorites'
+                this.maxFavorites = 50
+                this.validationCache = new Map()
+                this.cacheTimeout = 5 * 60 * 1000
+            }
+
+            getFavorites() {
+                try {
+                    const stored = localStorage.getItem(this.storageKey)
+                    const favorites = stored ? JSON.parse(stored) : []
+                    
+                    return favorites.filter(fav => 
+                        fav && 
+                        typeof fav.path === 'string' && 
+                        typeof fav.name === 'string' &&
+                        fav.path.trim() !== '' &&
+                        fav.name.trim() !== ''
+                    ).map(fav => ({
+                        ...fav,
+                        isValid: fav.isValid !== undefined ? fav.isValid : true,
+                        lastValidated: fav.lastValidated || null,
+                        validationError: fav.validationError || null
+                    }))
+                } catch (error) {
+                    console.error('Erreur lors de la récupération des favoris:', error)
+                    return []
+                }
+            }
+
+            addFavorite(path, name) {
+                try {
+                    const favorites = this.getFavorites()
+                    
+                    if (favorites.find(fav => fav.path === path)) {
+                        return false
+                    }
+
+                    if (favorites.length >= this.maxFavorites) {
+                        return false
+                    }
+
+                    const newFavorite = {
+                        path: path.trim(),
+                        name: name.trim(),
+                        addedAt: Date.now(),
+                        isValid: true,
+                        lastValidated: null,
+                        validationError: null
+                    }
+
+                    favorites.push(newFavorite)
+                    favorites.sort((a, b) => a.name.localeCompare(b.name))
+                    
+                    localStorage.setItem(this.storageKey, JSON.stringify(favorites))
+                    return true
+                } catch (error) {
+                    console.error('Erreur lors de l\'ajout du favori:', error)
+                    return false
+                }
+            }
+
+            async validateFavorite(favorite) {
+                // Simuler la validation avec des règles de test
+                await new Promise(resolve => setTimeout(resolve, 100)) // Simuler délai réseau
+                
+                if (favorite.path.includes('/inexistant')) {
+                    return {
+                        isValid: false,
+                        error: 'Dossier inexistant',
+                        canAccess: false
+                    }
+                }
+                
+                if (favorite.path.includes('/prive')) {
+                    return {
+                        isValid: true,
+                        error: 'Accès refusé',
+                        canAccess: false
+                    }
+                }
+                
+                return {
+                    isValid: true,
+                    error: null,
+                    canAccess: true
+                }
+            }
+
+            async validateAllFavorites() {
+                const favorites = this.getFavorites()
+                const results = {
+                    total: favorites.length,
+                    valid: 0,
+                    invalid: 0,
+                    inaccessible: 0,
+                    updated: []
+                }
+
+                const validationPromises = favorites.map(async (favorite) => {
+                    const validation = await this.validateFavorite(favorite)
+                    
+                    const updatedFavorite = {
+                        ...favorite,
+                        isValid: validation.isValid,
+                        canAccess: validation.canAccess,
+                        lastValidated: Date.now(),
+                        validationError: validation.error
+                    }
+
+                    if (validation.isValid && validation.canAccess) {
+                        results.valid++
+                    } else if (validation.isValid && !validation.canAccess) {
+                        results.inaccessible++
+                    } else {
+                        results.invalid++
+                    }
+
+                    results.updated.push(updatedFavorite)
+                    return updatedFavorite
+                })
+
+                const updatedFavorites = await Promise.all(validationPromises)
+                localStorage.setItem(this.storageKey, JSON.stringify(updatedFavorites))
+                
+                return results
+            }
+
+            async removeInvalidFavorites(autoConfirm = false) {
+                const favorites = this.getFavorites()
+                const invalidFavorites = favorites.filter(fav => fav.isValid === false)
+                
+                if (invalidFavorites.length === 0) {
+                    return {
+                        removed: 0,
+                        remaining: favorites.length,
+                        message: 'Aucun favori invalide trouvé'
+                    }
+                }
+
+                if (!autoConfirm) {
+                    return {
+                        needsConfirmation: true,
+                        toRemove: invalidFavorites,
+                        count: invalidFavorites.length
+                    }
+                }
+
+                const validFavorites = favorites.filter(fav => fav.isValid !== false)
+                localStorage.setItem(this.storageKey, JSON.stringify(validFavorites))
+                
+                return {
+                    removed: invalidFavorites.length,
+                    remaining: validFavorites.length,
+                    message: `${invalidFavorites.length} favori(s) invalide(s) supprimé(s)`
+                }
+            }
+
+            clearAllFavorites() {
+                try {
+                    localStorage.removeItem(this.storageKey)
+                    return true
+                } catch (error) {
+                    console.error('Erreur lors de la suppression:', error)
+                    return false
+                }
+            }
+        }
+
+        // Instance du service de test
+        const favoritesService = new MockFavoritesService()
+
+        // Fonctions de test
+        window.createTestFavorites = function() {
+            favoritesService.addFavorite('/home/documents', 'Documents')
+            favoritesService.addFavorite('/home/photos', 'Photos')
+            favoritesService.addFavorite('/home/inexistant', 'Dossier Inexistant')
+            favoritesService.addFavorite('/home/prive', 'Dossier Privé')
+            favoritesService.addFavorite('/home/videos', 'Vidéos')
+            
+            displayFavorites()
+            logResult('Favoris de test créés', 'success')
+        }
+
+        window.validateFavorites = async function() {
+            logResult('Validation en cours...', 'warning')
+            
+            try {
+                const results = await favoritesService.validateAllFavorites()
+                displayFavorites()
+                
+                const message = `Validation terminée: ${results.valid} valide(s), ${results.invalid} invalide(s), ${results.inaccessible} inaccessible(s)`
+                logResult(message, results.invalid > 0 || results.inaccessible > 0 ? 'warning' : 'success')
+            } catch (error) {
+                logResult(`Erreur de validation: ${error.message}`, 'error')
+            }
+        }
+
+        window.cleanInvalidFavorites = async function() {
+            try {
+                const result = await favoritesService.removeInvalidFavorites(true)
+                displayFavorites()
+                logResult(result.message, 'success')
+            } catch (error) {
+                logResult(`Erreur de nettoyage: ${error.message}`, 'error')
+            }
+        }
+
+        window.clearAllFavorites = function() {
+            if (confirm('Supprimer tous les favoris ?')) {
+                favoritesService.clearAllFavorites()
+                displayFavorites()
+                logResult('Tous les favoris supprimés', 'success')
+            }
+        }
+
+        function displayFavorites() {
+            const favorites = favoritesService.getFavorites()
+            const container = document.getElementById('favorites-list')
+            
+            if (favorites.length === 0) {
+                container.innerHTML = '<p>Aucun favori</p>'
+                return
+            }
+
+            container.innerHTML = favorites.map(fav => {
+                let cssClass = 'valid'
+                let statusIcon = '✓'
+                let statusText = 'Valide'
+                
+                if (fav.isValid === false) {
+                    cssClass = 'invalid'
+                    statusIcon = '✗'
+                    statusText = fav.validationError || 'Invalide'
+                } else if (fav.canAccess === false) {
+                    cssClass = 'inaccessible'
+                    statusIcon = '🔒'
+                    statusText = fav.validationError || 'Inaccessible'
+                }
+                
+                return `
+                    <div class="favorite-item ${cssClass}">
+                        <span style="margin-right: 10px;">${statusIcon}</span>
+                        <strong>${fav.name}</strong>
+                        <span style="margin-left: 10px; color: #666;">${fav.path}</span>
+                        <span style="margin-left: auto; font-size: 0.8em;">${statusText}</span>
+                    </div>
+                `
+            }).join('')
+        }
+
+        function logResult(message, type) {
+            const container = document.getElementById('test-results')
+            const timestamp = new Date().toLocaleTimeString()
+            const div = document.createElement('div')
+            div.className = `test-section ${type}`
+            div.innerHTML = `<strong>${timestamp}:</strong> ${message}`
+            container.appendChild(div)
+            container.scrollTop = container.scrollHeight
+        }
+
+        // Initialiser l'affichage
+        displayFavorites()
+        logResult('Interface de test initialisée', 'success')
+    </script>
+</body>
+</html>

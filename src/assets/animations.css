@@ -1,0 +1,429 @@
+/**
+ * Smooth Animations for Favorites Navigation
+ * Provides fluid transitions and micro-interactions for better UX
+ */
+
+/* ===== ANIMATION VARIABLES ===== */
+:root {
+  /* Animation Durations */
+  --animation-fast: 150ms;
+  --animation-normal: 250ms;
+  --animation-slow: 350ms;
+  --animation-extra-slow: 500ms;
+  
+  /* Easing Functions */
+  --ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  
+  /* Transform Origins */
+  --transform-origin-center: center;
+  --transform-origin-top: top;
+  --transform-origin-bottom: bottom;
+}
+
+/* ===== NAVIGATION ANIMATIONS ===== */
+
+/* Smooth path transitions */
+.navigation-transition {
+  transition: all var(--animation-normal) var(--ease-out-cubic);
+}
+
+/* Breadcrumb animations */
+.breadcrumb-enter-active,
+.breadcrumb-leave-active {
+  transition: all var(--animation-normal) var(--ease-out-cubic);
+}
+
+.breadcrumb-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.breadcrumb-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+/* File list animations */
+.file-list-enter-active {
+  transition: all var(--animation-normal) var(--ease-out-cubic);
+}
+
+.file-list-leave-active {
+  transition: all var(--animation-fast) var(--ease-out-cubic);
+}
+
+.file-list-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.file-list-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* Staggered file item animations */
+.file-item-enter-active {
+  transition: all var(--animation-normal) var(--ease-out-cubic);
+  transition-delay: calc(var(--item-index, 0) * 50ms);
+}
+
+.file-item-enter-from {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+}
+
+/* ===== FAVORITES ANIMATIONS ===== */
+
+/* Favorite item hover animations */
+.favorite-item {
+  transition: all var(--animation-fast) var(--ease-out-cubic);
+  transform-origin: var(--transform-origin-center);
+}
+
+.favorite-item:hover {
+  transform: translateX(4px);
+  background-color: var(--base-200);
+}
+
+.favorite-item:active {
+  transform: translateX(2px) scale(0.98);
+}
+
+/* Favorite button animations */
+.favorite-button {
+  transition: all var(--animation-fast) var(--ease-out-cubic);
+  position: relative;
+  overflow: hidden;
+}
+
+.favorite-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transition: left var(--animation-normal) var(--ease-out-cubic);
+}
+
+.favorite-button:hover::before {
+  left: 100%;
+}
+
+/* Favorite status indicators */
+.favorite-status-indicator {
+  transition: all var(--animation-fast) var(--ease-out-cubic);
+  transform-origin: var(--transform-origin-center);
+}
+
+.favorite-status-indicator.error {
+  animation: pulse-error 2s infinite;
+}
+
+.favorite-status-indicator.warning {
+  animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-error {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.7; 
+    transform: scale(1.1);
+  }
+}
+
+@keyframes pulse-warning {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.8; 
+    transform: scale(1.05);
+  }
+}
+
+/* ===== LOADING ANIMATIONS ===== */
+
+/* Enhanced loading spinner */
+.loading-spinner-enhanced {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--base-300);
+  border-top: 3px solid var(--primary);
+  border-radius: 50%;
+  animation: spin var(--animation-extra-slow) linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Loading state for file explorer */
+.loading-state-enhanced {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  gap: var(--space-4);
+  animation: fade-in var(--animation-normal) var(--ease-out-cubic);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Skeleton loading for file items */
+.skeleton-item {
+  background: linear-gradient(
+    90deg,
+    var(--base-200) 25%,
+    var(--base-300) 50%,
+    var(--base-200) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ===== NOTIFICATION ANIMATIONS ===== */
+
+/* Toast notification animations */
+.toast-enter-active {
+  transition: all var(--animation-normal) var(--ease-spring);
+}
+
+.toast-leave-active {
+  transition: all var(--animation-normal) var(--ease-out-cubic);
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateX(100%) scale(0.8);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(100%) scale(0.8);
+}
+
+/* Progress bar animation for notifications */
+.notification-progress {
+  height: 3px;
+  background: var(--primary);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  transform-origin: left;
+  animation: progress-countdown 3s linear forwards;
+}
+
+@keyframes progress-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* ===== FOCUS AND INTERACTION ANIMATIONS ===== */
+
+/* Enhanced focus indicators */
+.focus-enhanced:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+  animation: focus-pulse var(--animation-normal) var(--ease-out-cubic);
+}
+
+@keyframes focus-pulse {
+  0% { 
+    outline-color: transparent; 
+    transform: scale(1);
+  }
+  50% { 
+    outline-color: var(--primary); 
+    transform: scale(1.02);
+  }
+  100% { 
+    outline-color: var(--primary); 
+    transform: scale(1);
+  }
+}
+
+/* Button press animations */
+.btn-animated {
+  transition: all var(--animation-fast) var(--ease-out-cubic);
+  transform-origin: var(--transform-origin-center);
+}
+
+.btn-animated:active {
+  transform: scale(0.95);
+}
+
+.btn-animated:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ===== RESPONSIVE ANIMATIONS ===== */
+
+/* Reduce animations on mobile for better performance */
+@media (max-width: 768px) {
+  .favorite-item:hover {
+    transform: none;
+  }
+  
+  .btn-animated:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  
+  .file-item-enter-active {
+    transition-delay: 0ms;
+  }
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .favorite-item:hover,
+  .btn-animated:hover,
+  .btn-animated:active {
+    transform: none !important;
+  }
+}
+
+/* ===== MICRO-INTERACTIONS ===== */
+
+/* Ripple effect for buttons */
+.ripple-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-effect::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width var(--animation-normal) var(--ease-out-cubic),
+              height var(--animation-normal) var(--ease-out-cubic);
+}
+
+.ripple-effect:active::after {
+  width: 200px;
+  height: 200px;
+}
+
+/* Icon animations */
+.icon-animated {
+  transition: transform var(--animation-fast) var(--ease-out-cubic);
+}
+
+.icon-animated:hover {
+  transform: scale(1.1);
+}
+
+/* Chevron rotation for expandable items */
+.chevron-rotate {
+  transition: transform var(--animation-fast) var(--ease-out-cubic);
+}
+
+.chevron-rotate.expanded {
+  transform: rotate(90deg);
+}
+
+/* ===== ACCESSIBILITY ENHANCEMENTS ===== */
+
+/* High contrast mode animations */
+@media (prefers-contrast: high) {
+  .favorite-item:hover {
+    background-color: var(--base-content) !important;
+    color: var(--base-100) !important;
+  }
+  
+  .focus-enhanced:focus-visible {
+    outline: 3px solid var(--base-content) !important;
+    outline-offset: 3px;
+  }
+}
+
+/* Dark mode optimizations */
+@media (prefers-color-scheme: dark) {
+  .favorite-button::before {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.05),
+      transparent
+    );
+  }
+  
+  .skeleton-item {
+    background: linear-gradient(
+      90deg,
+      var(--base-300) 25%,
+      var(--base-200) 50%,
+      var(--base-300) 75%
+    );
+  }
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+/* Animation control utilities */
+.animate-none {
+  animation: none !important;
+  transition: none !important;
+}
+
+.animate-fast {
+  animation-duration: var(--animation-fast) !important;
+  transition-duration: var(--animation-fast) !important;
+}
+
+.animate-slow {
+  animation-duration: var(--animation-slow) !important;
+  transition-duration: var(--animation-slow) !important;
+}
+
+/* Transform utilities */
+.transform-gpu {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.transform-smooth {
+  transition: transform var(--animation-normal) var(--ease-out-cubic);
+}

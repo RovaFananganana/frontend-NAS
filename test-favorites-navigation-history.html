@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Favorites Navigation History</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .history-display {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Favorites Navigation History</h1>
+    <p>This page tests the navigation history functionality for favorites navigation in the FileExplorer component.</p>
+
+    <div class="test-section">
+        <h2>Navigation History Simulation</h2>
+        <p>This simulates the FileExplorer navigation history logic:</p>
+        
+        <div class="history-display" id="historyDisplay">
+            History: ["/"]<br>
+            Index: 0<br>
+            Current Path: /
+        </div>
+
+        <div>
+            <button onclick="navigateToPath('/documents', 'manual')">Navigate to /documents</button>
+            <button onclick="navigateToPath('/photos', 'manual')">Navigate to /photos</button>
+            <button onclick="navigateToPath('/favorites/work', 'favorite')">Navigate to Favorite: /favorites/work</button>
+            <button onclick="navigateToPath('/favorites/personal', 'external_path')">External Path: /favorites/personal</button>
+        </div>
+
+        <div>
+            <button onclick="navigateBack()" id="backBtn">← Back</button>
+            <button onclick="navigateForward()" id="forwardBtn">Forward →</button>
+            <button onclick="clearHistory()">Clear History</button>
+        </div>
+
+        <div id="testResults"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Scenarios</h2>
+        <button onclick="runAllTests()">Run All Tests</button>
+        <div id="scenarioResults"></div>
+    </div>
+
+    <script>
+        // Simulate the FileExplorer navigation history logic
+        let navigationHistory = ['/'];
+        let historyIndex = 0;
+        let currentPath = '/';
+
+        // Simulate nasAPI.normalizePath
+        function normalizePath(path) {
+            return path.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+        }
+
+        function addToNavigationHistory(path) {
+            const normalizedPath = normalizePath(path);
+            
+            console.log('Adding to navigation history', {
+                originalPath: path,
+                normalizedPath,
+                currentHistoryLength: navigationHistory.length,
+                currentIndex: historyIndex
+            });
+            
+            // Remove any forward history if we're not at the end
+            if (historyIndex < navigationHistory.length - 1) {
+                const removedItems = navigationHistory.slice(historyIndex + 1);
+                navigationHistory = navigationHistory.slice(0, historyIndex + 1);
+                console.log('Removed forward history items', { removedItems });
+            }
+            
+            // Get the last path in history for comparison
+            const lastPath = navigationHistory.length > 0 
+                ? normalizePath(navigationHistory[navigationHistory.length - 1])
+                : null;
+            
+            // Add new path if it's different from the last one in history
+            if (lastPath !== normalizedPath) {
+                navigationHistory.push(normalizedPath);
+                historyIndex = navigationHistory.length - 1;
+                
+                console.log('Added path to history', {
+                    path: normalizedPath,
+                    newHistoryLength: navigationHistory.length,
+                    newIndex: historyIndex
+                });
+                
+                // Limit history size to prevent memory issues
+                if (navigationHistory.length > 50) {
+                    const removedItems = navigationHistory.slice(0, navigationHistory.length - 50);
+                    navigationHistory = navigationHistory.slice(-50);
+                    historyIndex = navigationHistory.length - 1;
+                    console.log('Trimmed history to prevent memory issues', {
+                        removedCount: removedItems.length,
+                        newLength: navigationHistory.length
+                    });
+                }
+            } else {
+                console.log('Path already in history, not adding duplicate', {
+                    path: normalizedPath,
+                    lastPath
+                });
+            }
+        }
+
+        function navigateToPath(path, source = 'manual') {
+            console.log('Navigate to path', { path, source, currentPath });
+
+            const normalizedPath = normalizePath(path);
+            
+            // Always add to navigation history for favorites and manual navigation
+            const shouldAddToHistory = (
+                normalizedPath !== currentPath || 
+                source === 'favorite' || 
+                source === 'external_path'
+            );
+
+            if (shouldAddToHistory) {
+                addToNavigationHistory(normalizedPath);
+                currentPath = normalizedPath;
+                
+                logResult(`Navigated to ${normalizedPath} (source: ${source})`, 'success');
+            } else {
+                logResult(`Path already current, no navigation needed: ${normalizedPath}`, 'info');
+            }
+            
+            updateDisplay();
+        }
+
+        function navigateBack() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                const targetPath = navigationHistory[historyIndex];
+                currentPath = targetPath;
+                
+                console.log('Navigating back in history', {
+                    targetPath,
+                    newIndex: historyIndex,
+                    historyLength: navigationHistory.length
+                });
+                
+                logResult(`Navigated back to ${targetPath}`, 'success');
+                updateDisplay();
+            } else {
+                logResult('Cannot navigate back - at beginning of history', 'error');
+            }
+        }
+
+        function navigateForward() {
+            if (historyIndex < navigationHistory.length - 1) {
+                historyIndex++;
+                const targetPath = navigationHistory[historyIndex];
+                currentPath = targetPath;
+                
+                console.log('Navigating forward in history', {
+                    targetPath,
+                    newIndex: historyIndex,
+                    historyLength: navigationHistory.length
+                });
+                
+                logResult(`Navigated forward to ${targetPath}`, 'success');
+                updateDisplay();
+            } else {
+                logResult('Cannot navigate forward - at end of history', 'error');
+            }
+        }
+
+        function clearHistory() {
+            navigationHistory = ['/'];
+            historyIndex = 0;
+            currentPath = '/';
+            logResult('History cleared', 'info');
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const canGoBack = historyIndex > 0;
+            const canGoForward = historyIndex < navigationHistory.length - 1;
+            
+            document.getElementById('historyDisplay').innerHTML = `
+                History: [${navigationHistory.map((p, i) => i === historyIndex ? `<strong>"${p}"</strong>` : `"${p}"`).join(', ')}]<br>
+                Index: ${historyIndex}<br>
+                Current Path: ${currentPath}<br>
+                Can Go Back: ${canGoBack}<br>
+                Can Go Forward: ${canGoForward}
+            `;
+            
+            document.getElementById('backBtn').disabled = !canGoBack;
+            document.getElementById('forwardBtn').disabled = !canGoForward;
+        }
+
+        function logResult(message, type) {
+            const resultsDiv = document.getElementById('testResults');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            resultsDiv.appendChild(resultDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function runAllTests() {
+            const resultsDiv = document.getElementById('scenarioResults');
+            resultsDiv.innerHTML = '';
+            
+            function testResult(name, passed, message) {
+                const div = document.createElement('div');
+                div.className = `test-result ${passed ? 'success' : 'error'}`;
+                div.textContent = `${name}: ${passed ? 'PASS' : 'FAIL'} - ${message}`;
+                resultsDiv.appendChild(div);
+                return passed;
+            }
+
+            // Reset for testing
+            clearHistory();
+            
+            let allPassed = true;
+
+            // Test 1: Basic navigation
+            navigateToPath('/documents', 'manual');
+            allPassed &= testResult('Basic Navigation', 
+                navigationHistory.includes('/documents') && currentPath === '/documents',
+                'Should add /documents to history');
+
+            // Test 2: Favorites navigation
+            navigateToPath('/favorites/work', 'favorite');
+            allPassed &= testResult('Favorites Navigation', 
+                navigationHistory.includes('/favorites/work') && currentPath === '/favorites/work',
+                'Should add favorite path to history');
+
+            // Test 3: External path navigation
+            navigateToPath('/external/path', 'external_path');
+            allPassed &= testResult('External Path Navigation', 
+                navigationHistory.includes('/external/path') && currentPath === '/external/path',
+                'Should add external path to history');
+
+            // Test 4: Duplicate path handling
+            const historyLengthBefore = navigationHistory.length;
+            navigateToPath('/external/path', 'manual');
+            allPassed &= testResult('Duplicate Path Handling', 
+                navigationHistory.length === historyLengthBefore,
+                'Should not add duplicate paths to history');
+
+            // Test 5: Path normalization
+            navigateToPath('/folder1/', 'manual');
+            navigateToPath('/folder1//subfolder/', 'manual');
+            allPassed &= testResult('Path Normalization', 
+                navigationHistory.includes('/folder1') && navigationHistory.includes('/folder1/subfolder'),
+                'Should normalize paths correctly');
+
+            // Test 6: Back navigation
+            const initialIndex = historyIndex;
+            navigateBack();
+            allPassed &= testResult('Back Navigation', 
+                historyIndex === initialIndex - 1,
+                'Should navigate back in history');
+
+            // Test 7: Forward navigation
+            const backIndex = historyIndex;
+            navigateForward();
+            allPassed &= testResult('Forward Navigation', 
+                historyIndex === backIndex + 1,
+                'Should navigate forward in history');
+
+            // Test 8: Forward history clearing
+            navigateBack();
+            navigateBack();
+            const beforeNewNav = navigationHistory.length;
+            navigateToPath('/new/path', 'manual');
+            allPassed &= testResult('Forward History Clearing', 
+                navigationHistory.length <= beforeNewNav,
+                'Should clear forward history when navigating to new path');
+
+            // Summary
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = `test-result ${allPassed ? 'success' : 'error'}`;
+            summaryDiv.innerHTML = `<strong>Overall Result: ${allPassed ? 'ALL TESTS PASSED' : 'SOME TESTS FAILED'}</strong>`;
+            resultsDiv.appendChild(summaryDiv);
+        }
+
+        // Initialize display
+        updateDisplay();
+    </script>
+</body>
+</html>
