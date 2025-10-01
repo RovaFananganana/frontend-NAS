@@ -15,16 +15,10 @@
           </span>
         </div>
         
-        <!-- Mode de sélection -->
+        <!-- Mode de sélection simplifié -->
         <div v-if="selectionMode !== 'single'" class="text-sm text-primary/70">
-          <span v-if="selectionMode === 'multiple'">
-            <i class="fas fa-mouse-pointer mr-1"></i>
-            Sélection multiple (Ctrl+Clic)
-          </span>
-          <span v-else-if="selectionMode === 'range'">
-            <i class="fas fa-arrows-alt-v mr-1"></i>
-            Sélection par plage (Shift+Clic)
-          </span>
+          <i class="fas fa-check-square mr-1"></i>
+          Mode sélection
         </div>
       </div>
       
@@ -73,35 +67,7 @@
       </div>
     </div>
     
-    <!-- Raccourcis clavier -->
-    <div v-if="showShortcuts" class="mt-3 pt-2 border-t border-primary/20">
-      <div class="text-xs text-primary/70">
-        <div class="grid grid-cols-2 gap-2">
-          <div class="flex items-center space-x-2">
-            <kbd class="kbd kbd-xs">Ctrl</kbd>
-            <span>+</span>
-            <kbd class="kbd kbd-xs">Clic</kbd>
-            <span>Sélection multiple</span>
-          </div>
-          <div class="flex items-center space-x-2">
-            <kbd class="kbd kbd-xs">Shift</kbd>
-            <span>+</span>
-            <kbd class="kbd kbd-xs">Clic</kbd>
-            <span>Sélection par plage</span>
-          </div>
-          <div class="flex items-center space-x-2">
-            <kbd class="kbd kbd-xs">Ctrl</kbd>
-            <span>+</span>
-            <kbd class="kbd kbd-xs">A</kbd>
-            <span>Tout sélectionner</span>
-          </div>
-          <div class="flex items-center space-x-2">
-            <kbd class="kbd kbd-xs">Échap</kbd>
-            <span>Désélectionner</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Raccourcis clavier supprimés pour simplifier l'interface -->
   </div>
 </template>
 

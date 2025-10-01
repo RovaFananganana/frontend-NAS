@@ -15,16 +15,22 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts.js'
 // Constantes pour les modes d'affichage disponibles
 const AVAILABLE_MODES = [
   {
+    id: VIEW_MODES.DETAILED_LIST,
+    label: 'Liste',
+    icon: 'fas fa-list',
+    component: 'DetailedListView'
+  },
+  {
     id: VIEW_MODES.TREE,
     label: 'Arbre',
     icon: 'fas fa-sitemap',
     component: 'TreeView'
   },
   {
-    id: VIEW_MODES.DETAILED_LIST,
-    label: 'Liste détaillée',
-    icon: 'fas fa-list',
-    component: 'DetailedListView'
+    id: VIEW_MODES.MOSAIC,
+    label: 'Mosaïque',
+    icon: 'fas fa-th',
+    component: 'MosaicView'
   }
 ]
 

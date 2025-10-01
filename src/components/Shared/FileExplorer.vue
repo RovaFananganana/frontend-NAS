@@ -64,9 +64,12 @@
             @navigate="handleBreadcrumbNavigation"
           />
         </div>
-      </div>
 
-      <ViewModeSelector :show-shortcuts="!isMobile" @mode-changed="handleModeChange" />
+        <!-- View Mode Selector à droite -->
+        <div class="ml-4">
+          <ViewModeSelector :show-shortcuts="!isMobile" @mode-changed="handleModeChange" />
+        </div>
+      </div>
     </div>
 
     <!-- Indicateur de sélection -->
@@ -231,6 +234,8 @@ import BreadcrumbNavigation from './BreadcrumbNavigation.vue'
 import NasFolderTree from './NasFolderTree.vue'
 import DetailedListView from './DetailedListView.vue'
 import OptimizedDetailedListView from './OptimizedDetailedListView.vue'
+import MosaicView from './MosaicView.vue'
+import TreeFileView from './TreeFileView.vue'
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp.vue'
 import SelectionIndicator from './SelectionIndicator.vue'
 import ContextMenu from './ContextMenu.vue'
@@ -387,10 +392,11 @@ const {
 // Computed
 const currentViewComponent = computed(() => {
   const componentMap = {
-    [VIEW_MODES.TREE]: DetailedListView, // Temporairement utiliser DetailedListView pour éviter l'erreur DOM
+    [VIEW_MODES.TREE]: TreeFileView,
     [VIEW_MODES.DETAILED_LIST]: shouldUseVirtualization(files.value.length, isMobile.value)
       ? OptimizedDetailedListView
-      : DetailedListView
+      : DetailedListView,
+    [VIEW_MODES.MOSAIC]: MosaicView
   }
   return componentMap[currentMode.value] || DetailedListView
 })

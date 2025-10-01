@@ -86,7 +86,8 @@
 // Export des constantes utiles
 export const VIEW_MODES = {
   TREE: 'tree',
-  DETAILED_LIST: 'detailed-list'
+  DETAILED_LIST: 'detailed-list',
+  MOSAIC: 'mosaic'
 }
 
 export const SORT_DIRECTIONS = {
