@@ -58,7 +58,7 @@ export function isValidTheme(theme) {
  */
 export function initializeTheme() {
   const savedTheme = getCurrentTheme()
-  
+
   // Appliquer uniquement le thème sauvegardé
   if (!isValidTheme(savedTheme)) {
     console.warn(`Theme sauvegardé "${savedTheme}" invalide, utilisation du thème par défaut`)
@@ -169,7 +169,7 @@ export function checkThemeSupport() {
 export function getCurrentThemeVariables() {
   const rootStyles = getComputedStyle(document.documentElement)
   const variables = {}
-  
+
   const daisyUIVars = [
     '--p', '--pc',
     '--s', '--sc',

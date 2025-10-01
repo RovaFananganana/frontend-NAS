@@ -99,14 +99,9 @@
                 <i class="fas fa-ellipsis-v"></i>
               </button>
               <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52">
-                <li><a @click="openAddPermissionModal(folder)"><i class="fas fa-plus mr-2"></i>Add Permission</a></li>
-                <li><a @click="viewFolderDetails(folder)"><i class="fas fa-eye mr-2"></i>View Details</a></li>
-                <li><a @click="exportFolderPermissions(folder)"><i class="fas fa-download mr-2"></i>Export</a></li>
-                <li>
-                  <hr class="my-1">
-                </li>
-                <li><a @click="confirmDeleteFolder(folder)" class="text-error"><i class="fas fa-trash mr-2"></i>Delete
-                    Folder</a></li>
+                <li><a @click="openAddPermissionModal(folder)"><i class="fas fa-plus mr-2"></i>Ajouter permission</a></li>
+                <li><a @click="viewFolderDetails(folder)"><i class="fas fa-eye mr-2"></i>Voir détails</a></li>
+                <li><a @click="exportFolderPermissions(folder)"><i class="fas fa-download mr-2"></i>Exporter</a></li>
               </ul>
             </div>
           </div>
@@ -131,44 +126,36 @@
               <div class="flex gap-1 mr-3">
                 <button :class="['badge badge-xs cursor-pointer transition-colors',
                   perm.can_read ? 'badge-success' : 'badge-outline hover:badge-success']"
-                  @click="toggleRight(folder, perm, 'can_read')"
-                  :title="perm.can_read ? 'Remove read access' : 'Grant read access'">
+                  @click="confirmTogglePermission(folder, perm, 'can_read', !perm.can_read)"
+                  :title="perm.can_read ? 'Retirer l\'accès en lecture' : 'Accorder l\'accès en lecture'">
                   R
                 </button>
                 <button :class="['badge badge-xs cursor-pointer transition-colors',
                   perm.can_write ? 'badge-warning' : 'badge-outline hover:badge-warning']"
-                  @click="toggleRight(folder, perm, 'can_write')"
-                  :title="perm.can_write ? 'Remove write access' : 'Grant write access'">
+                  @click="confirmTogglePermission(folder, perm, 'can_write', !perm.can_write)"
+                  :title="perm.can_write ? 'Retirer l\'accès en écriture' : 'Accorder l\'accès en écriture'">
                   W
                 </button>
                 <button :class="['badge badge-xs cursor-pointer transition-colors',
                   perm.can_delete ? 'badge-error' : 'badge-outline hover:badge-error']"
-                  @click="toggleRight(folder, perm, 'can_delete')"
-                  :title="perm.can_delete ? 'Remove delete access' : 'Grant delete access'">
+                  @click="confirmTogglePermission(folder, perm, 'can_delete', !perm.can_delete)"
+                  :title="perm.can_delete ? 'Retirer l\'accès en suppression' : 'Accorder l\'accès en suppression'">
                   D
                 </button>
                 <button :class="['badge badge-xs cursor-pointer transition-colors',
                   perm.can_share ? 'badge-info' : 'badge-outline hover:badge-info']"
-                  @click="toggleRight(folder, perm, 'can_share')"
-                  :title="perm.can_share ? 'Remove share access' : 'Grant share access'">
+                  @click="confirmTogglePermission(folder, perm, 'can_share', !perm.can_share)"
+                  :title="perm.can_share ? 'Retirer l\'accès au partage' : 'Accorder l\'accès au partage'">
                   S
                 </button>
               </div>
 
               <!-- Actions -->
-              <div class="dropdown dropdown-end">
-                <button tabindex="0" class="btn btn-ghost btn-xs">
-                  <i class="fas fa-cog"></i>
-                </button>
-                <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-48">
-                  <li><a @click="editPermission(folder, perm)"><i class="fas fa-edit mr-2"></i>Edit</a></li>
-                  <li>
-                    <hr class="my-1">
-                  </li>
-                  <li><a @click="removePermission(folder, perm)" class="text-error"><i
-                        class="fas fa-trash mr-2"></i>Remove</a></li>
-                </ul>
-              </div>
+              <button @click="confirmRemovePermission(folder, perm)" 
+                class="btn btn-ghost btn-xs text-error hover:bg-error hover:text-error-content"
+                title="Supprimer cette permission">
+                <i class="fas fa-trash"></i>
+              </button>
             </div>
 
             <!-- Empty permissions state -->
@@ -389,6 +376,216 @@
           <button class="btn btn-error" @click="deleteFolderDirect" :disabled="loading">
             <i class="fas fa-trash mr-2"></i>
             Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de détails du dossier -->
+    <div v-if="detailsModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-[600px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="font-bold text-xl flex items-center">
+            <i class="fas fa-folder text-primary mr-3"></i>
+            Détails des permissions - {{ detailsModal.folder?.name }}
+          </h3>
+          <button @click="closeDetailsModal" class="btn btn-ghost btn-sm">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div v-if="detailsModal.folder?.permissions?.length === 0" class="text-center py-12">
+          <i class="fas fa-lock text-6xl text-gray-300 mb-4"></i>
+          <h4 class="text-lg font-semibold text-gray-600 mb-2">Aucune permission définie</h4>
+          <p class="text-gray-500 mb-4">Ce dossier n'a pas encore de permissions accordées.</p>
+          <button class="btn btn-primary" @click="openAddPermissionModal(detailsModal.folder)">
+            <i class="fas fa-plus mr-2"></i>
+            Ajouter une permission
+          </button>
+        </div>
+
+        <div v-else class="space-y-4">
+          <div v-for="perm in detailsModal.folder?.permissions" :key="perm.id"
+            class="border border-base-300 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center">
+                <div class="avatar placeholder mr-3">
+                  <div class="bg-neutral-focus text-neutral-content rounded-full w-10">
+                    <i class="fas" :class="perm.target_type === 'user' ? 'fa-user' : 'fa-users'"></i>
+                  </div>
+                </div>
+                <div>
+                  <div class="font-semibold text-lg">{{ perm.target_name }}</div>
+                  <div class="text-sm text-base-content/70 capitalize">{{ perm.target_type === 'user' ? 'Utilisateur' : 'Groupe' }}</div>
+                </div>
+              </div>
+              <button @click="confirmRemovePermission(detailsModal.folder, perm)" 
+                class="btn btn-error btn-sm">
+                <i class="fas fa-trash mr-2"></i>
+                Supprimer
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <div class="flex items-center">
+                  <i class="fas fa-eye text-success mr-2"></i>
+                  <span class="font-medium">Lecture</span>
+                </div>
+                <input type="checkbox" :checked="perm.can_read" 
+                  @change="confirmTogglePermission(detailsModal.folder, perm, 'can_read', $event.target.checked)"
+                  class="toggle toggle-success" />
+              </div>
+              <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <div class="flex items-center">
+                  <i class="fas fa-edit text-warning mr-2"></i>
+                  <span class="font-medium">Écriture</span>
+                </div>
+                <input type="checkbox" :checked="perm.can_write" 
+                  @change="confirmTogglePermission(detailsModal.folder, perm, 'can_write', $event.target.checked)"
+                  class="toggle toggle-warning" />
+              </div>
+              <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <div class="flex items-center">
+                  <i class="fas fa-trash text-error mr-2"></i>
+                  <span class="font-medium">Suppression</span>
+                </div>
+                <input type="checkbox" :checked="perm.can_delete" 
+                  @change="confirmTogglePermission(detailsModal.folder, perm, 'can_delete', $event.target.checked)"
+                  class="toggle toggle-error" />
+              </div>
+              <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <div class="flex items-center">
+                  <i class="fas fa-share text-info mr-2"></i>
+                  <span class="font-medium">Partage</span>
+                </div>
+                <input type="checkbox" :checked="perm.can_share" 
+                  @change="confirmTogglePermission(detailsModal.folder, perm, 'can_share', $event.target.checked)"
+                  class="toggle toggle-info" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 mt-6">
+          <button class="btn btn-outline" @click="closeDetailsModal">Fermer</button>
+          <button class="btn btn-primary" @click="openAddPermissionModal(detailsModal.folder)">
+            <i class="fas fa-plus mr-2"></i>
+            Ajouter permission
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de confirmation pour toggle de permission -->
+    <div v-if="toggleModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <h3 class="font-bold text-lg mb-4 flex items-center">
+          <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
+          Confirmer la modification
+        </h3>
+        <div class="mb-6">
+          <p class="mb-4">Voulez-vous {{ toggleModal.newValue ? 'accorder' : 'retirer' }} la permission suivante ?</p>
+          <div class="bg-base-200 p-4 rounded-lg">
+            <div class="font-semibold mb-2">
+              <i class="fas fa-folder mr-2"></i>{{ toggleModal.folder?.name }}
+            </div>
+            <div class="mb-2">
+              <i class="fas mr-2" :class="toggleModal.permission?.target_type === 'user' ? 'fa-user' : 'fa-users'"></i>
+              {{ toggleModal.permission?.target_name }} ({{ toggleModal.permission?.target_type === 'user' ? 'Utilisateur' : 'Groupe' }})
+            </div>
+            <div class="flex items-center">
+              <i class="fas mr-2" :class="getPermissionIcon(toggleModal.permissionType)"></i>
+              <span class="font-medium">{{ getPermissionLabel(toggleModal.permissionType) }}</span>
+              <span :class="['badge ml-2', toggleModal.newValue ? 'badge-success' : 'badge-error']">
+                {{ toggleModal.newValue ? 'Accordée' : 'Retirée' }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-outline" @click="closeToggleModal">Annuler</button>
+          <button class="btn btn-primary" @click="confirmToggleChange">
+            <i class="fas fa-check mr-2"></i>
+            Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de succès pour toggle -->
+    <div v-if="toggleSuccessModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <div class="text-center">
+          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-success text-success-content mb-4">
+            <i class="fas fa-check text-xl"></i>
+          </div>
+          <h3 class="font-bold text-lg mb-2">Permission modifiée avec succès !</h3>
+          <p class="text-base-content/70 mb-6">
+            La permission {{ toggleSuccessModal.permissionLabel }} a été {{ toggleSuccessModal.granted ? 'accordée à' : 'retirée de' }} 
+            {{ toggleSuccessModal.targetName }} pour le dossier {{ toggleSuccessModal.folderName }}.
+          </p>
+          <button class="btn btn-primary" @click="closeToggleSuccessModal">
+            <i class="fas fa-thumbs-up mr-2"></i>
+            Parfait !
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de confirmation pour suppression de permission -->
+    <div v-if="removePermissionModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <h3 class="font-bold text-lg mb-4 flex items-center">
+          <i class="fas fa-exclamation-triangle text-error mr-2"></i>
+          Supprimer la permission
+        </h3>
+        <div class="mb-6">
+          <p class="mb-4">Êtes-vous sûr de vouloir supprimer cette permission ?</p>
+          <div class="bg-base-200 p-4 rounded-lg">
+            <div class="font-semibold mb-2">
+              <i class="fas fa-folder mr-2"></i>{{ removePermissionModal.folder?.name }}
+            </div>
+            <div class="mb-2">
+              <i class="fas mr-2" :class="removePermissionModal.permission?.target_type === 'user' ? 'fa-user' : 'fa-users'"></i>
+              {{ removePermissionModal.permission?.target_name }} ({{ removePermissionModal.permission?.target_type === 'user' ? 'Utilisateur' : 'Groupe' }})
+            </div>
+            <div class="flex gap-2 flex-wrap">
+              <span v-if="removePermissionModal.permission?.can_read" class="badge badge-success">Lecture</span>
+              <span v-if="removePermissionModal.permission?.can_write" class="badge badge-warning">Écriture</span>
+              <span v-if="removePermissionModal.permission?.can_delete" class="badge badge-error">Suppression</span>
+              <span v-if="removePermissionModal.permission?.can_share" class="badge badge-info">Partage</span>
+            </div>
+          </div>
+          <div class="alert alert-warning mt-4">
+            <i class="fas fa-info-circle"></i>
+            <span class="text-sm">Cette action est irréversible.</span>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-outline" @click="closeRemovePermissionModal">Annuler</button>
+          <button class="btn btn-error" @click="confirmRemovePermissionAction" :disabled="loading">
+            <i class="fas fa-trash mr-2"></i>
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de succès pour suppression de permission -->
+    <div v-if="removeSuccessModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
+        <div class="text-center">
+          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-success text-success-content mb-4">
+            <i class="fas fa-check text-xl"></i>
+          </div>
+          <h3 class="font-bold text-lg mb-2">Permission supprimée avec succès !</h3>
+          <p class="text-base-content/70 mb-6">
+            La permission a été supprimée pour {{ removeSuccessModal.targetName }} sur le dossier {{ removeSuccessModal.folderName }}.
+          </p>
+          <button class="btn btn-primary" @click="closeRemoveSuccessModal">
+            <i class="fas fa-thumbs-up mr-2"></i>
+            Parfait !
           </button>
         </div>
       </div>
@@ -647,6 +844,40 @@ const bulkModal = ref({
   selectedUsers: [],
   selectedGroups: [],
   permissions: { can_read: false, can_write: false, can_delete: false, can_share: false }
+})
+
+// Nouveaux modals
+const detailsModal = ref({
+  visible: false,
+  folder: null
+})
+
+const toggleModal = ref({
+  visible: false,
+  folder: null,
+  permission: null,
+  permissionType: '',
+  newValue: false
+})
+
+const toggleSuccessModal = ref({
+  visible: false,
+  targetName: '',
+  folderName: '',
+  permissionLabel: '',
+  granted: false
+})
+
+const removePermissionModal = ref({
+  visible: false,
+  folder: null,
+  permission: null
+})
+
+const removeSuccessModal = ref({
+  visible: false,
+  targetName: '',
+  folderName: ''
 })
 
 // Computed properties
@@ -1043,22 +1274,7 @@ const showOrphanedFolders = async () => {
   }
 }
 
-// Toggle droit
-const toggleRight = async (folder, perm, right) => {
-  const payload = { [right]: !perm[right] }
-  try {
-    if (perm.target_type === 'user') {
-      await permissionAPI.setFolderUserPermission(folder.id, perm.id, payload)
-    } else {
-      await permissionAPI.setFolderGroupPermission(folder.id, perm.id, payload)
-    }
-    perm[right] = !perm[right]
-    store.dispatch('showSuccess', `Permission ${right} mise à jour pour ${perm.target_name}`)
-  } catch (err) {
-    console.error(err)
-    store.dispatch('showError', 'Impossible de modifier la permission')
-  }
-}
+
 
 // Supprimer permission
 const removePermission = async (folder, perm) => {
@@ -1175,36 +1391,9 @@ const openBulkPermissionModal = () => {
   bulkModal.value.permissions = { can_read: false, can_write: false, can_delete: false, can_share: false }
 }
 
-const viewFolderDetails = (folder) => {
-  // Navigate to folder details view or open details modal
-  console.log('View folder details:', folder)
-  store.dispatch('showInfo', `Viewing details for ${folder.name}`)
-}
 
-const exportFolderPermissions = (folder) => {
-  // Export folder permissions to CSV or JSON
-  const permissions = folder.permissions.map(p => ({
-    folder: folder.name,
-    target: p.target_name,
-    type: p.target_type,
-    read: p.can_read,
-    write: p.can_write,
-    delete: p.can_delete,
-    share: p.can_share
-  }))
 
-  const dataStr = JSON.stringify(permissions, null, 2)
-  const dataBlob = new Blob([dataStr], { type: 'application/json' })
-  const url = URL.createObjectURL(dataBlob)
 
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `${folder.name}_permissions.json`
-  link.click()
-
-  URL.revokeObjectURL(url)
-  store.dispatch('showSuccess', `Permissions exported for ${folder.name}`)
-}
 
 
 // Bulk permissions methods
@@ -1310,6 +1499,260 @@ const getFolderName = (folderId) => {
 watch(searchQuery, () => {
   currentPage.value = 1 // Reset to first page when searching
 })
+
+// Nouvelles méthodes pour les modals
+
+// Modal de détails du dossier
+const viewFolderDetails = (folder) => {
+  detailsModal.value.folder = folder
+  detailsModal.value.visible = true
+}
+
+const closeDetailsModal = () => {
+  detailsModal.value.visible = false
+  detailsModal.value.folder = null
+}
+
+// Modal de confirmation pour toggle de permission
+const confirmTogglePermission = (folder, permission, permissionType, newValue) => {
+  toggleModal.value.folder = folder
+  toggleModal.value.permission = permission
+  toggleModal.value.permissionType = permissionType
+  toggleModal.value.newValue = newValue
+  toggleModal.value.visible = true
+}
+
+const closeToggleModal = () => {
+  toggleModal.value.visible = false
+  toggleModal.value.folder = null
+  toggleModal.value.permission = null
+  toggleModal.value.permissionType = ''
+  toggleModal.value.newValue = false
+}
+
+const confirmToggleChange = async () => {
+  try {
+    const { folder, permission, permissionType, newValue } = toggleModal.value
+    
+    // Appeler l'API pour modifier la permission
+    await toggleRight(folder, permission, permissionType, newValue)
+    
+    // Fermer le modal de confirmation
+    closeToggleModal()
+    
+    // Afficher le modal de succès
+    toggleSuccessModal.value.targetName = permission.target_name
+    toggleSuccessModal.value.folderName = folder.name
+    toggleSuccessModal.value.permissionLabel = getPermissionLabel(permissionType)
+    toggleSuccessModal.value.granted = newValue
+    toggleSuccessModal.value.visible = true
+    
+  } catch (error) {
+    console.error('Erreur lors de la modification de la permission:', error)
+    // Ici on pourrait afficher un toast d'erreur
+  }
+}
+
+const closeToggleSuccessModal = () => {
+  toggleSuccessModal.value.visible = false
+  toggleSuccessModal.value.targetName = ''
+  toggleSuccessModal.value.folderName = ''
+  toggleSuccessModal.value.permissionLabel = ''
+  toggleSuccessModal.value.granted = false
+}
+
+// Modal de confirmation pour suppression de permission
+const confirmRemovePermission = (folder, permission) => {
+  removePermissionModal.value.folder = folder
+  removePermissionModal.value.permission = permission
+  removePermissionModal.value.visible = true
+}
+
+const closeRemovePermissionModal = () => {
+  removePermissionModal.value.visible = false
+  removePermissionModal.value.folder = null
+  removePermissionModal.value.permission = null
+}
+
+const closeRemoveSuccessModal = () => {
+  removeSuccessModal.value.visible = false
+  removeSuccessModal.value.targetName = ''
+  removeSuccessModal.value.folderName = ''
+}
+
+const confirmRemovePermissionAction = async () => {
+  try {
+    const { folder, permission } = removePermissionModal.value
+    
+    // Appeler l'API pour supprimer la permission
+    await permissionAPI.deleteFolderPermission(folder.id, permission.id)
+    
+    // Supprimer localement de la liste
+    folder.permissions = folder.permissions.filter(p => p.id !== permission.id)
+    
+    // Fermer le modal de confirmation
+    closeRemovePermissionModal()
+    
+    // Afficher le modal de succès
+    removeSuccessModal.value.targetName = permission.target_name
+    removeSuccessModal.value.folderName = folder.name
+    removeSuccessModal.value.visible = true
+    
+    // Invalider le cache
+    permissionCache.delete(`folder-permissions-${folder.id}`)
+    
+  } catch (error) {
+    console.error('Erreur lors de la suppression de la permission:', error)
+    store.dispatch('showError', 'Impossible de supprimer la permission')
+    closeRemovePermissionModal()
+  }
+}
+
+// Méthodes utilitaires
+const getPermissionIcon = (permissionType) => {
+  const icons = {
+    can_read: 'fa-eye text-success',
+    can_write: 'fa-edit text-warning', 
+    can_delete: 'fa-trash text-error',
+    can_share: 'fa-share text-info'
+  }
+  return icons[permissionType] || 'fa-question'
+}
+
+const getPermissionLabel = (permissionType) => {
+  const labels = {
+    can_read: 'Lecture',
+    can_write: 'Écriture',
+    can_delete: 'Suppression', 
+    can_share: 'Partage'
+  }
+  return labels[permissionType] || permissionType
+}
+
+// Méthode pour exporter en PDF
+const exportFolderPermissions = async (folder) => {
+  try {
+    // Importer jsPDF dynamiquement
+    const { jsPDF } = await import('jspdf')
+    
+    const doc = new jsPDF()
+    
+    // Titre du document
+    doc.setFontSize(20)
+    doc.text('Rapport des Permissions', 20, 20)
+    
+    // Informations du dossier
+    doc.setFontSize(16)
+    doc.text(`Dossier: ${folder.name}`, 20, 40)
+    
+    doc.setFontSize(12)
+    doc.text(`Date d'export: ${new Date().toLocaleDateString('fr-FR')}`, 20, 50)
+    doc.text(`Nombre de permissions: ${folder.permissions.length}`, 20, 60)
+    
+    // Ligne de séparation
+    doc.line(20, 70, 190, 70)
+    
+    let yPosition = 80
+    
+    if (folder.permissions.length === 0) {
+      doc.text('Aucune permission définie pour ce dossier.', 20, yPosition)
+    } else {
+      // En-têtes du tableau
+      doc.setFontSize(10)
+      doc.text('Utilisateur/Groupe', 20, yPosition)
+      doc.text('Type', 80, yPosition)
+      doc.text('Lecture', 110, yPosition)
+      doc.text('Écriture', 130, yPosition)
+      doc.text('Suppression', 150, yPosition)
+      doc.text('Partage', 175, yPosition)
+      
+      yPosition += 10
+      doc.line(20, yPosition - 5, 190, yPosition - 5)
+      
+      // Données des permissions
+      folder.permissions.forEach((perm, index) => {
+        if (yPosition > 270) { // Nouvelle page si nécessaire
+          doc.addPage()
+          yPosition = 20
+        }
+        
+        doc.text(perm.target_name, 20, yPosition)
+        doc.text(perm.target_type === 'user' ? 'Utilisateur' : 'Groupe', 80, yPosition)
+        doc.text(perm.can_read ? 'Oui' : 'Non', 110, yPosition)
+        doc.text(perm.can_write ? 'Oui' : 'Non', 130, yPosition)
+        doc.text(perm.can_delete ? 'Oui' : 'Non', 150, yPosition)
+        doc.text(perm.can_share ? 'Oui' : 'Non', 175, yPosition)
+        
+        yPosition += 8
+      })
+    }
+    
+    // Pied de page
+    const pageCount = doc.internal.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.text(`Page ${i} sur ${pageCount}`, 170, 290)
+      doc.text('Généré par le système NAS', 20, 290)
+    }
+    
+    // Télécharger le PDF
+    const fileName = `permissions_${folder.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
+    doc.save(fileName)
+    
+    // Afficher un message de succès
+    store.dispatch('showSuccess', 'Export PDF généré avec succès')
+    
+  } catch (error) {
+    console.error('Erreur lors de l\'export PDF:', error)
+    store.dispatch('showError', 'Erreur lors de l\'export PDF')
+  }
+}
+
+// Modifier la méthode toggleRight existante pour ne pas avoir de modal automatique
+const toggleRight = async (folder, permission, right, newValue = null) => {
+  try {
+    const currentValue = permission[right]
+    const targetValue = newValue !== null ? newValue : !currentValue
+    
+    // Créer l'objet de permissions avec la nouvelle valeur
+    const permissions = {
+      can_read: permission.can_read,
+      can_write: permission.can_write,
+      can_delete: permission.can_delete,
+      can_share: permission.can_share,
+      [right]: targetValue
+    }
+    
+    // Trouver l'ID de l'utilisateur/groupe à partir du nom
+    let targetId
+    if (permission.target_type === 'user') {
+      const user = users.value.find(u => u.username === permission.target_name)
+      if (!user) {
+        throw new Error(`Utilisateur ${permission.target_name} non trouvé`)
+      }
+      targetId = user.id
+      await permissionAPI.setFolderUserPermission(folder.id, targetId, permissions)
+    } else {
+      const group = groups.value.find(g => g.name === permission.target_name)
+      if (!group) {
+        throw new Error(`Groupe ${permission.target_name} non trouvé`)
+      }
+      targetId = group.id
+      await permissionAPI.setFolderGroupPermission(folder.id, targetId, permissions)
+    }
+
+    // Mettre à jour localement
+    permission[right] = targetValue
+    
+    // Invalider le cache
+    permissionCache.delete(`folder-permissions-${folder.id}`)
+    
+  } catch (error) {
+    console.error('Erreur lors de la modification de la permission:', error)
+    throw error
+  }
+}
 
 onMounted(() => loadFolders())
 </script>
