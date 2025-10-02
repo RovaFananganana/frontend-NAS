@@ -38,21 +38,21 @@
     </td>
     
     <!-- Colonne Taille -->
-    <td v-if="shouldShowColumn('size')" class="px-3 py-2 text-right">
+    <td class="px-3 py-2 text-right">
       <span class="text-sm text-base-content/70 font-mono">
         {{ formattedSize }}
       </span>
     </td>
     
     <!-- Colonne Type -->
-    <td v-if="shouldShowColumn('type')" class="px-3 py-2 text-center">
+    <td class="px-3 py-2 text-center">
       <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-base-200 text-base-content/80">
         {{ fileType }}
       </span>
     </td>
     
     <!-- Colonne Date de modification -->
-    <td v-if="shouldShowColumn('date')" class="px-3 py-2">
+    <td class="px-3 py-2">
       <span class="text-sm text-base-content/60">
         {{ formattedDate }}
       </span>
@@ -256,6 +256,11 @@ const formattedDate = computed(() => {
 // Computed pour nettoyer le nom du fichier
 const cleanFileName = computed(() => {
   let name = props.file.name || ''
+  
+  // Debug temporaire pour voir les données
+  if (name.includes('dossier') || name.includes('fichier')) {
+    console.log('FileListItem - Nom original:', name, 'File object:', props.file)
+  }
   
   // Nettoyer les suffixes ajoutés automatiquement
   name = name.replace(/ - dossier$/i, '')

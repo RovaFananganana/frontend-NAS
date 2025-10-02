@@ -27,6 +27,7 @@
         :selected="props.isSelected(file.path || file.name)"
         :focused="focusedIndex === getFileIndex(file)"
         :level="0"
+        :is-selected="props.isSelected"
         @click="handleItemClick"
         @double-click="handleItemDoubleClick"
         @context-menu="handleContextMenu"

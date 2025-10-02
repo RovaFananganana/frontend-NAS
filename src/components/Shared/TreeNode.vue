@@ -95,9 +95,10 @@
         v-for="child in children"
         :key="child.path"
         :file="child"
-        :selected="false"
+        :selected="props.isSelected(child.path || child.name)"
         :focused="false"
         :level="level + 1"
+        :is-selected="props.isSelected"
         @click="(eventData) => $emit('click', eventData)"
         @double-click="(eventData) => $emit('double-click', eventData)"
         @context-menu="(eventData) => $emit('context-menu', eventData)"
@@ -127,6 +128,10 @@ const props = defineProps({
   level: {
     type: Number,
     default: 0
+  },
+  isSelected: {
+    type: Function,
+    default: () => false
   }
 })
 
@@ -148,9 +153,19 @@ const toggleExpanded = async () => {
   
   if (expanded.value && children.value.length === 0) {
     // Charger les enfants du dossier
-    // TODO: Implémenter le chargement des enfants via l'API
-    // Pour l'instant, on simule un dossier vide
-    children.value = []
+    try {
+      const { nasAPI } = await import('@/services/nasAPI.js')
+      const response = await nasAPI.browse(props.file.path)
+      
+      if (response.success && response.items) {
+        children.value = response.items
+      } else {
+        children.value = []
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des enfants:', error)
+      children.value = []
+    }
   }
 }
 
