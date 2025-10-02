@@ -75,7 +75,7 @@
             v-for="(file, index) in sortedFiles"
             :key="file.path || file.name"
             :file="file"
-            :selected="isSelected(file.path || file.name)"
+            :selected="props.isSelected(file.path || file.name)"
             :focused="focusedIndex === index"
             :visible-columns="displayedColumns"
             @click="handleFileClick"
@@ -151,6 +151,10 @@ const props = defineProps({
       isItemInOperation: () => false,
       getItemIndicatorClass: () => ''
     })
+  },
+  isSelected: {
+    type: Function,
+    default: () => false
   }
 })
 
@@ -173,7 +177,6 @@ const {
   sortDirection,
   visibleColumns,
   setSortColumn,
-  isSelected,
   sortFiles,
   addShortcut
 } = useViewMode()
@@ -216,19 +219,19 @@ const displayedColumns = computed(() => {
     { 
       key: 'size', 
       label: 'Taille', 
-      required: false, 
+      required: true, // Forcer l'affichage
       width: '15%'
     },
     { 
       key: 'type', 
       label: 'Type', 
-      required: false, 
+      required: true, // Forcer l'affichage
       width: '15%'
     },
     { 
       key: 'date', 
       label: 'Date de modification', 
-      required: false, 
+      required: true, // Forcer l'affichage
       width: '30%'
     }
   ]

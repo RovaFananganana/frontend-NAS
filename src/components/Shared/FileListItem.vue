@@ -31,9 +31,9 @@
         ]"></i>
       </div>
       
-      <!-- Nom du fichier -->
+      <!-- Nom du fichier seulement -->
       <span class="text-sm font-medium truncate min-w-0 flex-1">
-        {{ file.name }}
+        {{ cleanFileName }}
       </span>
     </td>
     
@@ -243,12 +243,27 @@ const formattedSize = computed(() => {
     return '—'
   }
   
-  return formatBytes(props.file.size || 0)
+  // S'assurer que la taille est affichée même si elle est 0
+  const size = props.file.size || 0
+  return formatBytes(size)
 })
 
 // Computed pour la date formatée (compact et lisible)
 const formattedDate = computed(() => {
   return formatDate(props.file.modified_time)
+})
+
+// Computed pour nettoyer le nom du fichier
+const cleanFileName = computed(() => {
+  let name = props.file.name || ''
+  
+  // Nettoyer les suffixes ajoutés automatiquement
+  name = name.replace(/ - dossier$/i, '')
+  name = name.replace(/ - fichier$/i, '')
+  name = name.replace(/ - folder$/i, '')
+  name = name.replace(/ - file$/i, '')
+  
+  return name
 })
 
 // Computed pour déterminer si une colonne doit être affichée

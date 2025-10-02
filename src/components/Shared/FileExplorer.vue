@@ -72,10 +72,7 @@
       </div>
     </div>
 
-    <!-- Indicateur de sélection -->
-    <SelectionIndicator v-if="selectedCount > 0" :selected-count="selectedCount" :total-count="fileCount"
-      :selection-mode="currentSelectionMode" :show-progress="selectedCount > 1" :show-shortcuts="selectedCount === 1"
-      @select-all="handleSelectAll" @invert-selection="handleInvertSelection" @clear-selection="handleClearSelection" />
+
 
     <!-- Conteneur principal avec gestion d'erreur -->
     <div id="file-explorer-main" class="file-explorer-content" role="main"
@@ -110,7 +107,7 @@
           operationItems,
           isItemInOperation,
           getItemIndicatorClass
-        }" @path-selected="handlePathSelected" @file-selected="handleFileSelected"
+        }" :is-selected="isSelected" @path-selected="handlePathSelected" @file-selected="handleFileSelected"
         @file-double-click="handleFileDoubleClick" @sort-changed="handleSortChanged" @navigate-back="handleNavigateBack"
         @show-actions="handleShowActions" @context-menu="showContextMenu" />
     </div>
@@ -237,7 +234,7 @@ import OptimizedDetailedListView from './OptimizedDetailedListView.vue'
 import MosaicView from './MosaicView.vue'
 import TreeFileView from './TreeFileView.vue'
 import KeyboardShortcutsHelp from './KeyboardShortcutsHelp.vue'
-import SelectionIndicator from './SelectionIndicator.vue'
+
 import ContextMenu from './ContextMenu.vue'
 import PermissionModal from './PermissionModal.vue'
 import RenameModal from './RenameModal.vue'
@@ -296,7 +293,8 @@ const {
   addSelectedFile,
   removeSelectedFile,
   toggleSelectedFile,
-  selectAll
+  selectAll,
+  isSelected
 } = useViewMode()
 
 const {

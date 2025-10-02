@@ -27,12 +27,13 @@
           'mosaic-item group cursor-pointer rounded-lg border-2 transition-all duration-200',
           'hover:shadow-lg hover:scale-105',
           {
-            'border-primary bg-primary/10': selectedFiles.includes(file.path),
-            'border-base-300 hover:border-primary/50': !selectedFiles.includes(file.path)
+            'border-primary bg-primary/10': props.isSelected(file.path || file.name),
+            'border-base-300 hover:border-primary/50': !props.isSelected(file.path || file.name)
           }
         ]"
         @click="handleItemClick(file, $event)"
-        @dblclick="handleItemDoubleClick(file)"
+        @dblclick="handleItemDoubleClick(file, $event)"
+        @contextmenu="handleContextMenu(file, $event)"
         :title="file.name"
       >
         <!-- Icône du fichier -->
@@ -59,7 +60,7 @@
         </div>
 
         <!-- Indicateur de sélection -->
-        <div v-if="selectedFiles.includes(file.path)" 
+        <div v-if="props.isSelected(file.path || file.name)" 
           class="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
           <i class="fas fa-check text-white text-xs"></i>
         </div>
@@ -83,17 +84,52 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
-  selectedFiles: {
-    type: Array,
-    default: () => []
+  loading: {
+    type: Boolean,
+    default: false
+  },
+  error: {
+    type: String,
+    default: ''
+  },
+  currentPath: {
+    type: String,
+    default: '/'
+  },
+  focusedIndex: {
+    type: Number,
+    default: -1
+  },
+  userRole: {
+    type: String,
+    default: 'user'
+  },
+  fileOperationsState: {
+    type: Object,
+    default: () => ({
+      hasOperation: false,
+      isCopyOperation: false,
+      isCutOperation: false,
+      operationItems: [],
+      isItemInOperation: () => false,
+      getItemIndicatorClass: () => ''
+    })
+  },
+  isSelected: {
+    type: Function,
+    default: () => false
   }
 })
 
 // Émissions
 const emit = defineEmits([
-  'file-click',
+  'file-selected',
   'file-double-click',
-  'selection-change'
+  'path-selected',
+  'sort-changed',
+  'context-menu',
+  'navigate-back',
+  'show-actions'
 ])
 
 // État local
@@ -139,14 +175,46 @@ const sortedFiles = computed(() => {
 // Méthodes
 const toggleSortDirection = () => {
   sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+  
+  emit('sort-changed', {
+    column: sortBy.value,
+    direction: sortDirection.value
+  })
+}
+
+
+
+const getFileIndex = (file) => {
+  return sortedFiles.value.findIndex(f => (f.path || f.name) === (file.path || file.name))
 }
 
 const handleItemClick = (file, event) => {
-  emit('file-click', file, event)
+  const fileIndex = getFileIndex(file)
+  
+  emit('file-selected', {
+    file,
+    event,
+    multiSelect: event.ctrlKey || event.metaKey,
+    rangeSelect: event.shiftKey,
+    currentIndex: fileIndex,
+    files: sortedFiles.value
+  })
 }
 
-const handleItemDoubleClick = (file) => {
-  emit('file-double-click', file)
+const handleItemDoubleClick = (file, event) => {
+  if (file.is_directory) {
+    emit('path-selected', file.path)
+  } else {
+    emit('file-double-click', {
+      file,
+      event
+    })
+  }
+}
+
+const handleContextMenu = (file, event) => {
+  event.preventDefault()
+  emit('context-menu', event, file)
 }
 
 // Utilitaires pour les types de fichiers

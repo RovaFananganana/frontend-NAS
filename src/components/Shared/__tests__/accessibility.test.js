@@ -105,7 +105,7 @@ describe('Accessibilité des composants de modes d\'affichage', () => {
             DetailedListView: true,
             OptimizedDetailedListView: true,
             KeyboardShortcutsHelp: true,
-            SelectionIndicator: true,
+
             PermissionModal: true,
             RenameModal: true,
             MoveModal: true,
@@ -161,7 +161,7 @@ describe('Accessibilité des composants de modes d\'affichage', () => {
             DetailedListView: true,
             OptimizedDetailedListView: true,
             KeyboardShortcutsHelp: true,
-            SelectionIndicator: true,
+
             PermissionModal: true,
             RenameModal: true,
             MoveModal: true,
@@ -194,7 +194,7 @@ describe('Accessibilité des composants de modes d\'affichage', () => {
             DetailedListView: true,
             OptimizedDetailedListView: true,
             KeyboardShortcutsHelp: true,
-            SelectionIndicator: true,
+
             PermissionModal: true,
             RenameModal: true,
             MoveModal: true,
@@ -443,7 +443,7 @@ describe('Accessibilité des composants de modes d\'affichage', () => {
             NasFolderTree: true,
             DetailedListView: true,
             KeyboardShortcutsHelp: true,
-            SelectionIndicator: true,
+
             PermissionModal: true,
             RenameModal: true,
             MoveModal: true,
