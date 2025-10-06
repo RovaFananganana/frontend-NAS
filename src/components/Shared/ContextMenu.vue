@@ -81,9 +81,9 @@
       Permissions
     </button>
 
-    <!-- Ajouter/Retirer des favoris -->
+    <!-- Ajouter/Retirer des favoris (Utilisateurs seulement) -->
     <button 
-      v-if="item"
+      v-if="item && !isAdmin"
       class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
       @click="$emit('toggle-favorite', item)"
     >

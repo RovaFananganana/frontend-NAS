@@ -11,53 +11,34 @@
           Favoris
         </h3>
         <div class="flex items-center gap-1">
-          <button
-            @click="showImportExport = !showImportExport"
-            class="btn btn-xs btn-ghost tooltip tooltip-bottom"
+          <button @click="showImportExport = !showImportExport" class="btn btn-xs btn-ghost tooltip tooltip-bottom"
             data-tip="Import/Export"
-            :aria-label="showImportExport ? 'Masquer import/export' : 'Afficher import/export'"
-          >
+            :aria-label="showImportExport ? 'Masquer import/export' : 'Afficher import/export'">
             <i class="fas fa-cog" aria-hidden="true"></i>
           </button>
-          <button
-            @click="refresh"
-            class="btn btn-xs btn-ghost tooltip tooltip-bottom"
-            data-tip="Actualiser"
-            aria-label="Actualiser les favoris"
-          >
+          <button @click="refresh" class="btn btn-xs btn-ghost tooltip tooltip-bottom" data-tip="Actualiser"
+            aria-label="Actualiser les favoris">
             <i class="fas fa-redo" :class="{ 'animate-spin': refreshing }" aria-hidden="true"></i>
           </button>
         </div>
       </div>
-      
+
       <!-- Panneau d'import/export -->
       <div v-if="showImportExport" class="mt-3 p-3 bg-base-200 rounded-lg">
         <div class="flex gap-2 mb-2">
-          <button
-            @click="exportFavorites"
-            class="btn btn-xs btn-outline flex-1"
-            :disabled="favorites.length === 0"
-          >
+          <button @click="exportFavorites" class="btn btn-xs btn-outline flex-1"
+            :disabled="!favorites || favorites.length === 0">
             <i class="fas fa-download mr-1" aria-hidden="true"></i>
             Exporter
           </button>
           <label class="btn btn-xs btn-outline flex-1 cursor-pointer">
             <i class="fas fa-upload mr-1" aria-hidden="true"></i>
             Importer
-            <input
-              ref="importInput"
-              type="file"
-              accept=".json"
-              class="hidden"
-              @change="importFavorites"
-            />
+            <input ref="importInput" type="file" accept=".json" class="hidden" @change="importFavorites" />
           </label>
         </div>
-        <button
-          v-if="favorites.length > 0"
-          @click="confirmClearAll"
-          class="btn btn-xs btn-error btn-outline w-full"
-        >
+        <button v-if="favorites && favorites.length > 0" @click="confirmClearAll"
+          class="btn btn-xs btn-error btn-outline w-full">
           <i class="fas fa-trash mr-1" aria-hidden="true"></i>
           Tout supprimer
         </button>
@@ -89,27 +70,18 @@
         'favorites-list space-y-1',
         compact ? 'p-0' : 'p-2'
       ]" role="list">
-        <li
-          v-for="favorite in (favorites || [])"
-          :key="favorite.path"
-          class="favorite-item group"
-          role="listitem"
-          @contextmenu="showFavoriteContextMenu($event, favorite)"
-        >
+        <li v-for="favorite in (favorites || [])" :key="favorite.path" class="favorite-item group" role="listitem"
+          @contextmenu="showFavoriteContextMenu($event, favorite)">
           <div :class="[
             'flex items-center rounded-lg transition-colors duration-150',
             compact ? 'hover:bg-base-300' : 'bg-base-100 hover:bg-base-200'
           ]">
             <!-- Bouton de navigation -->
-            <button
-              @click="navigateToFavorite(favorite)"
-              :class="[
-                'favorite-button flex-1 flex items-center text-left rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset',
-                compact ? 'gap-2 p-2' : 'gap-3 p-3'
-              ]"
-              :title="`Naviguer vers ${favorite.path}`"
-              :aria-label="`Naviguer vers le dossier favori ${favorite.name}`"
-            >
+            <button @click="navigateToFavorite(favorite)" :class="[
+              'favorite-button flex-1 flex items-center text-left rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset',
+              compact ? 'gap-2 p-2' : 'gap-3 p-3'
+            ]" :title="`Naviguer vers ${favorite.path}`"
+              :aria-label="`Naviguer vers le dossier favori ${favorite.name}`">
               <i class="fas fa-folder text-primary flex-shrink-0" aria-hidden="true"></i>
               <div class="flex-1 min-w-0">
                 <div :class="[
@@ -125,15 +97,10 @@
             </button>
 
             <!-- Bouton de suppression -->
-            <button
-              @click="removeFavoriteLocal(favorite)"
-              :class="[
-                'remove-favorite text-base-content/40 hover:text-error hover:bg-error/10 rounded-r-lg opacity-0 group-hover:opacity-100 transition-all duration-150 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-error focus:ring-inset',
-                compact ? 'p-1' : 'p-2'
-              ]"
-              :title="`Retirer ${favorite.name} des favoris`"
-              :aria-label="`Retirer ${favorite.name} des favoris`"
-            >
+            <button @click="removeFavoriteLocal(favorite)" :class="[
+              'remove-favorite text-base-content/40 hover:text-error hover:bg-error/10 rounded-r-lg opacity-0 group-hover:opacity-100 transition-all duration-150 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-error focus:ring-inset',
+              compact ? 'p-1' : 'p-2'
+            ]" :title="`Retirer ${favorite.name} des favoris`" :aria-label="`Retirer ${favorite.name} des favoris`">
               <i class="fas fa-times text-xs" aria-hidden="true"></i>
             </button>
           </div>
@@ -142,7 +109,8 @@
     </div>
 
     <!-- Pied du panneau avec statistiques -->
-    <div v-if="favorites.length > 0 && !compact" class="favorites-footer p-3 border-t border-base-300 text-xs text-base-content/60">
+    <div v-if="favorites && favorites.length > 0 && !compact"
+      class="favorites-footer p-3 border-t border-base-300 text-xs text-base-content/60">
       {{ favorites.length }} favori{{ favorites.length > 1 ? 's' : '' }}
       <span v-if="maxFavorites > 0">
         / {{ maxFavorites }} max
@@ -172,34 +140,27 @@
   <div v-if="notification.show" class="toast toast-top toast-end">
     <div :class="[
       'alert',
-      notification.type === 'success' ? 'alert-success' : 
-      notification.type === 'error' ? 'alert-error' : 
-      'alert-info'
+      notification.type === 'success' ? 'alert-success' :
+        notification.type === 'error' ? 'alert-error' :
+          'alert-info'
     ]">
       <span>{{ notification.message }}</span>
     </div>
 
     <!-- Menu contextuel pour les favoris -->
-    <div 
-      v-if="contextMenu.show"
+    <div v-if="contextMenu.show"
       class="fixed bg-base-100 border border-base-300 shadow-lg rounded-lg py-2 z-50 min-w-48"
-      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
-      @click.stop
-    >
-      <button 
-        class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-        @click="navigateToFavorite(contextMenu.favorite)"
-      >
+      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }" @click.stop>
+      <button class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
+        @click="navigateToFavorite(contextMenu.favorite)">
         <i class="fas fa-folder-open w-4"></i>
         Ouvrir le dossier
       </button>
-      
+
       <div class="divider my-1"></div>
-      
-      <button 
-        class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 text-error"
-        @click="removeFavoriteFromContext"
-      >
+
+      <button class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 text-error"
+        @click="removeFavoriteFromContext">
         <i class="fas fa-star w-4"></i>
         Retirer des favoris
       </button>
@@ -231,6 +192,10 @@ const emit = defineEmits([
   'error'
 ])
 
+// Store pour vérifier l'authentification
+import { useStore } from 'vuex'
+const store = useStore()
+
 // Composable pour les favoris
 const {
   favorites,
@@ -242,6 +207,12 @@ const {
   exportFavorites: exportFavoritesData,
   getFavoritesStats
 } = useFavorites()
+
+// Watch for changes in favorites to ensure reactivity
+import { watch } from 'vue'
+watch(favorites, (newFavorites) => {
+  console.log('🔄 FavoritesPanel: Favorites updated, count:', newFavorites?.length || 0)
+}, { deep: true })
 
 // État réactif
 const showImportExport = ref(false)
@@ -308,14 +279,14 @@ const exportFavorites = () => {
     const jsonData = JSON.stringify(favorites.value, null, 2)
     const blob = new Blob([jsonData], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
-    
+
     const link = document.createElement('a')
     link.href = url
     link.download = `favoris-${new Date().toISOString().split('T')[0]}.json`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    
+
     URL.revokeObjectURL(url)
     showNotification('Favoris exportés avec succès', 'success')
   } catch (error) {
@@ -339,7 +310,7 @@ const importFavorites = (event) => {
     }
   }
   reader.readAsText(file)
-  
+
   // Reset input
   if (importInput.value) {
     importInput.value.value = ''
@@ -374,7 +345,7 @@ const showNotification = (message, type = 'info') => {
     message,
     type
   }
-  
+
   // Auto-hide après 3 secondes
   setTimeout(() => {
     notification.value.show = false
@@ -389,7 +360,7 @@ const addCurrentPathToFavorites = async (name = null) => {
   try {
     const folderName = name || props.currentPath.split('/').pop() || 'Racine'
     const success = await addFavorite(props.currentPath, folderName, 'folder')
-    
+
     if (success) {
       // Les favoris se rechargent automatiquement via le composable
       emit('favorite-added', {
@@ -422,7 +393,7 @@ const showFavoriteContextMenu = (event, favorite) => {
     y: event.clientY,
     favorite
   }
-  
+
   // Fermer le menu quand on clique ailleurs
   const hideMenu = () => {
     contextMenu.value.show = false
@@ -444,13 +415,35 @@ const removeFavoriteFromContext = async () => {
 defineExpose({
   addCurrentPathToFavorites,
   isCurrentPathFavorite,
-  refresh: loadFavorites
+  refresh: loadFavoritesFromBackend
 })
 
+// Listen for global favorite changes
+const handleGlobalFavoriteChange = () => {
+  console.log('🔄 Global favorite change detected, refreshing...')
+  loadFavoritesFromBackend()
+}
+
 // Lifecycle hooks
-onMounted(() => {
-  // Les favoris se chargent automatiquement via le composable useFavorites
-  // qui se synchronise automatiquement avec le backend
+onMounted(async () => {
+  console.log('🔄 FavoritesPanel mounted')
+  console.log('🔐 Is authenticated:', store.getters.isAuthenticated)
+  console.log('🎫 Has token:', !!store.getters.authToken)
+
+  if (store.getters.isAuthenticated) {
+    console.log('✅ User is authenticated, loading favorites...')
+    try {
+      await loadFavoritesFromBackend()
+      console.log('✅ Favorites loaded in FavoritesPanel:', favorites.value?.length || 0)
+    } catch (error) {
+      console.error('❌ Error loading favorites in FavoritesPanel:', error)
+    }
+  } else {
+    console.log('❌ User not authenticated, skipping favorites loading')
+  }
+
+  // Listen for custom events that indicate favorites have changed
+  window.addEventListener('favorites-changed', handleGlobalFavoriteChange)
 })
 
 onUnmounted(() => {
@@ -458,6 +451,9 @@ onUnmounted(() => {
   if (unsubscribeFavoritesChanged) {
     unsubscribeFavoritesChanged()
   }
+
+  // Remove global event listener
+  window.removeEventListener('favorites-changed', handleGlobalFavoriteChange)
 })
 </script>
 
@@ -490,6 +486,7 @@ onUnmounted(() => {
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -509,11 +506,11 @@ onUnmounted(() => {
     min-width: 200px;
     max-width: 280px;
   }
-  
+
   .favorite-button {
     padding: 0.5rem;
   }
-  
+
   .favorites-header h3 {
     font-size: 1rem;
   }

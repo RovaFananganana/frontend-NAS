@@ -19,25 +19,9 @@ class FavoritesService {
    * @param {string} name - Nom du dossier
    */
   async _logFavoriteActivity(action, path, name) {
-    try {
-      // Utiliser l'API backend pour enregistrer l'activité
-      // Note: Cette API devra être implémentée côté backend
-      await fetch('/api/users/log-activity', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify({
-          action: action,
-          target: `${name} (${path})`,
-          details: action === 'favorite_add' ? 'Ajout aux favoris' : 'Suppression des favoris'
-        })
-      })
-    } catch (error) {
-      // Ne pas faire échouer l'opération principale si le logging échoue
-      console.warn('Erreur lors de l\'enregistrement de l\'activité favori:', error)
-    }
+    // TODO: Implémenter l'endpoint /users/log-activity côté backend
+    // Temporairement désactivé pour éviter les erreurs 404
+    console.log(`Favorite activity: ${action} for ${name} (${path})`)
   }
 
   /**

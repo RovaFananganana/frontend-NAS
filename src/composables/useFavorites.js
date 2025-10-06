@@ -113,10 +113,11 @@ export function useFavorites() {
       }
       
       const data = await response.json()
+      console.log('🔄 Favorites API response:', data)
       favorites.value = data.favorites || []
       lastSyncTime.value = Date.now()
       
-      console.log(`Loaded ${favorites.value.length} favorites`)
+      console.log(`✅ Loaded ${favorites.value.length} favorites from backend`)
       return true
       
     } catch (err) {
@@ -198,14 +199,29 @@ export function useFavorites() {
       }
       
       const data = await response.json()
+      console.log('🔄 Add favorite API response:', data)
       
       // Ajouter à la liste locale
-      favorites.value.push(data.favorite)
+      const newFavorite = data.favorite || {
+        item_path: path,
+        item_name: name,
+        item_type: type,
+        created_at: new Date().toISOString()
+      }
+      
+      favorites.value.push(newFavorite)
       
       // Trier par nom pour cohérence
       favorites.value.sort((a, b) => a.item_name.localeCompare(b.item_name))
       
-      console.log(`Added favorite: ${name}`)
+      console.log(`✅ Added favorite: ${name}`)
+      console.log('🔄 Updated favorites array, count:', favorites.value.length)
+      
+      // Dispatch global event to notify all components
+      window.dispatchEvent(new CustomEvent('favorites-changed', {
+        detail: { action: 'added', favorite: newFavorite }
+      }))
+      
       return true
       
     } catch (err) {
@@ -264,6 +280,12 @@ export function useFavorites() {
       favorites.value = favorites.value.filter(fav => fav.item_path !== path)
       
       console.log(`Removed favorite: ${favoriteToRemove?.item_name || path}`)
+      
+      // Dispatch global event to notify all components
+      window.dispatchEvent(new CustomEvent('favorites-changed', {
+        detail: { action: 'removed', favorite: favoriteToRemove }
+      }))
+      
       return true
       
     } catch (err) {

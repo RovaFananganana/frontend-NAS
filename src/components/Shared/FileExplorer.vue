@@ -15,7 +15,8 @@
       'mobile-optimized': isMobile,
       'touch-optimized': isTouch
     }
-  ]" role="application" aria-label="Explorateur de fichiers" :aria-busy="loading">
+  ]" role="application" aria-label="Explorateur de fichiers" :aria-busy="loading"
+    @contextmenu="handleGlobalContextMenu">
 
     <!-- Navigation et sélecteur de mode d'affichage -->
     <div id="view-mode-selector" :class="[
@@ -135,8 +136,8 @@
   <KeyboardShortcutsHelp :show="showShortcutsHelp" @close="showShortcutsHelp = false" />
 
   <!-- Context Menu -->
-  <ContextMenu v-if="contextMenu.show && contextMenu.item" :show="contextMenu.show" :x="contextMenu.x"
-    :y="contextMenu.y" :item="contextMenu.item" :permissions="contextMenuPermissions" :clipboard-info="{
+  <ContextMenu v-if="contextMenu.show" :show="contextMenu.show" :x="contextMenu.x" :y="contextMenu.y"
+    :item="contextMenu.item" :permissions="contextMenuPermissions" :clipboard-info="{
       items: operationItems,
       operation: isCopyOperation ? 'copy' : (isCutOperation ? 'cut' : null),
       count: operationCount,
@@ -489,21 +490,14 @@ const loadFilePermissions = async () => {
 
 // Load permissions for context menu item
 const loadContextMenuPermissions = async (item) => {
-  if (!item) {
-    contextMenuPermissions.value = {
-      can_read: false,
-      can_write: false,
-      can_delete: false,
-      can_share: false
-    }
-    return
-  }
-
   try {
     showPermissionErrors.value = false
 
+    // For empty space (item is null), check permissions on current directory
+    const pathToCheck = item ? item.path : currentPath.value
+
     // Use the permissions composable to check permissions
-    const permissions = await loadPermissions(item.path)
+    const permissions = await loadPermissions(pathToCheck)
 
     contextMenuPermissions.value = {
       can_read: permissions?.can_read || false,
@@ -777,9 +771,33 @@ const {
 } = useFileExplorerNavigation(navigationOptions)
 
 // Context menu and file operations methods
+const handleGlobalContextMenu = (event) => {
+  console.log('� Global lcontext menu triggered on:', event.target.tagName, event.target.className)
+
+  // Check if the click is on empty space (not on a file item or UI element)
+  const isOnFileItem = event.target.closest('.file-list-item') ||
+    event.target.closest('tr[role="row"]') ||
+    event.target.closest('.file-tile') ||
+    event.target.closest('button') ||
+    event.target.closest('.btn')
+
+  if (!isOnFileItem) {
+    console.log('✅ Global empty space detected, preventing default and showing context menu')
+    event.preventDefault()
+    event.stopPropagation()
+    showContextMenu(event, null)
+  } else {
+    console.log('❌ Click on UI element, letting it handle contextmenu')
+  }
+}
+
 const showContextMenu = async (event, item) => {
+  console.log('🎯 FileExplorer showContextMenu called:', { item: item?.name || 'empty space', permissions: contextMenuPermissions.value })
+
   // Load permissions for the item
   await loadContextMenuPermissions(item)
+
+  console.log('📋 Context menu permissions loaded:', contextMenuPermissions.value)
 
   contextMenu.value = {
     show: true,
@@ -1044,7 +1062,8 @@ const handleToggleFavorite = async (item) => {
   }
 
   try {
-    const wasAdded = await toggleFavorite(item.path, item.name, item.is_directory)
+    const itemType = item.is_directory ? 'folder' : 'file'
+    const wasAdded = await toggleFavorite(item.path, item.name, itemType)
 
     if (wasAdded) {
       showNotification(`${item.name} ajouté aux favoris`, 'success')
@@ -1147,7 +1166,10 @@ const onItemsDeleted = async (items) => {
   }
 }
 
-const onFolderCreated = () => {
+const onFolderCreated = (event) => {
+  // Show success notification
+  showNotification(`Dossier "${event?.folderName || 'nouveau dossier'}" créé avec succès`, 'success')
+  // Refresh the file list
   loadFiles(currentPath.value)
 }
 

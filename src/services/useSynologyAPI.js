@@ -1,6 +1,7 @@
 // services/useSynologyAPI.js
 import { ref } from 'vue'
 import axios from 'axios'
+import TokenService from './tokenService.js'
 
 // Utilitaires pour gérer les chemins NAS
 export const NasPathUtils = {
@@ -50,7 +51,7 @@ export function useSynologyAPI() {
   // Intercepteur pour ajouter le token JWT
   api.interceptors.request.use(
     config => {
-      const token = localStorage.getItem('token')
+      const token = TokenService.getToken()
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }
@@ -250,7 +251,7 @@ export function useSynologyAPI() {
 
   // URL de téléchargement
   const getDownloadUrl = (filePath) => {
-    const token = localStorage.getItem('token')
+    const token = TokenService.getToken()
     const normalizedPath = NasPathUtils.normalize(filePath)
     const encodedPath = encodeURIComponent(normalizedPath)
     

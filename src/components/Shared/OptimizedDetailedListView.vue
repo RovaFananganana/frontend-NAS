@@ -289,9 +289,17 @@ const handleFileDoubleClick = (file, event) => {
 }
 
 const handleEmptySpaceContextMenu = (event) => {
-  // Only trigger if the click is on the container itself, not on a file row
-  if (event.target === event.currentTarget || event.target.tagName === 'TABLE' || event.target.tagName === 'TBODY') {
+  // More comprehensive check for empty space
+  const isEmptySpace = event.target === event.currentTarget || 
+                      event.target.tagName === 'TABLE' || 
+                      event.target.tagName === 'TBODY' ||
+                      event.target.classList.contains('overflow-y-auto') ||
+                      event.target.classList.contains('custom-scrollbar') ||
+                      event.target.closest('.file-list-item') === null
+  
+  if (isEmptySpace) {
     event.preventDefault()
+    event.stopPropagation()
     emit('context-menu', event, null) // null indicates empty space
   }
 }
