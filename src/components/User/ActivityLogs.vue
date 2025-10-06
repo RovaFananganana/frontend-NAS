@@ -8,8 +8,8 @@
 
     <div class="space-y-2">
       <div v-for="log in logs" :key="log.id" class="p-2 bg-gray-50 rounded">
-        <div class="text-sm text-gray-600">{{ formatDate(log.created_at) }} — {{ log.action }}</div>
-        <div class="text-xs text-gray-700">{{ log.details }}</div>
+        <div class="text-sm text-gray-600">{{ formatDate(log.timestamp || log.created_at) }} — {{ log.action }}</div>
+        <div class="text-xs text-gray-700">{{ log.target || log.details || 'Aucun détail' }}</div>
       </div>
     </div>
 
@@ -44,10 +44,13 @@ async function load() {
   error.value = ''
   try {
     const { data } = await userAPI.getLogs(page.value, perPage.value)
-    // expect { items, total }
-    logs.value = data?.items || data || []
+    // Backend returns { logs, total, pages, current_page }
+    logs.value = data?.logs || data?.items || data || []
     total.value = data?.total ?? logs.value.length
+    console.log('ActivityLogs - Données reçues:', data)
+    console.log('ActivityLogs - Logs traités:', logs.value)
   } catch (e) {
+    console.error('ActivityLogs - Erreur:', e)
     error.value = e?.response?.data?.message || e?.message || 'Erreur récupération journaux'
   }
 }

@@ -99,6 +99,7 @@
       v-else 
       class="max-h-96 overflow-y-auto custom-scrollbar"
       :style="getOptimizedStyles()"
+      @contextmenu="handleEmptySpaceContextMenu"
     >
       <table class="table table-sm w-full">
         <tbody>
@@ -109,6 +110,7 @@
             :index="index"
             :selected="isSelected(file.path || file.name)"
             :focused="focusedIndex === index"
+            :is-favorite="props.isFavorite(file.path || file.name)"
             @click="handleFileClick"
             @double-click="handleFileDoubleClick"
           />
@@ -195,6 +197,10 @@ const props = defineProps({
   virtualizationThreshold: {
     type: Number,
     default: 100
+  },
+  isFavorite: {
+    type: Function,
+    default: () => false
   }
 })
 
@@ -279,6 +285,14 @@ const handleFileDoubleClick = (file, event) => {
       file,
       event
     })
+  }
+}
+
+const handleEmptySpaceContextMenu = (event) => {
+  // Only trigger if the click is on the container itself, not on a file row
+  if (event.target === event.currentTarget || event.target.tagName === 'TABLE' || event.target.tagName === 'TBODY') {
+    event.preventDefault()
+    emit('context-menu', event, null) // null indicates empty space
   }
 }
 

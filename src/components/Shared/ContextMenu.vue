@@ -81,9 +81,9 @@
       Permissions
     </button>
 
-    <!-- Ajouter/Retirer des favoris (dossiers seulement) -->
+    <!-- Ajouter/Retirer des favoris -->
     <button 
-      v-if="item && item.is_directory"
+      v-if="item"
       class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
       @click="$emit('toggle-favorite', item)"
     >
@@ -109,6 +109,16 @@
     >
       <i class="fas fa-folder-plus w-4"></i>
       Nouveau dossier
+    </button>
+
+    <!-- Nouveau fichier (sur espace vide seulement) -->
+    <button 
+      v-if="!item && permissions.can_write"
+      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
+      @click="$emit('create-file')"
+    >
+      <i class="fas fa-file-plus w-4"></i>
+      Nouveau fichier
     </button>
 
     <div v-if="permissions.can_delete" class="divider my-1"></div>
@@ -199,6 +209,7 @@ const emit = defineEmits([
   'permissions',
   'move',
   'create-folder',
+  'create-file',
   'delete',
   'properties',
   'toggle-favorite'

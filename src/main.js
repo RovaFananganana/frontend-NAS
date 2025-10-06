@@ -38,4 +38,9 @@ app.config.warnHandler = (msg, instance, trace) => {
   }
 }
 
+app.config.errorHandler = (err, vm, info) => {
+  console.error("⚠️ [Global Vue Error]", err);
+  console.log("🧱 Component name:", vm?.$options?.name);
+  console.log("ℹ️ Info:", info);
+};
 app.mount('#app')

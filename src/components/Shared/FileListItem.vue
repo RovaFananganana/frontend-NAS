@@ -20,7 +20,7 @@
     <!-- Colonne Nom avec icône -->
     <td class="flex items-center gap-2 px-3 py-2">
       <!-- Icône de fichier -->
-      <div class="flex-shrink-0">
+      <div class="flex-shrink-0 relative">
         <i :class="[
           fileIcon, 
           'w-4 h-4 text-base-content/70',
@@ -29,6 +29,12 @@
             'text-base-content/60': !file.is_directory
           }
         ]"></i>
+        
+        <!-- Indicateur favori -->
+        <i v-if="isFavorite" 
+           class="fas fa-star absolute -top-1 -right-1 w-2 h-2 text-warning"
+           title="Favori"
+           aria-label="Élément favori"></i>
       </div>
       
       <!-- Nom du fichier seulement -->
@@ -40,21 +46,21 @@
     <!-- Colonne Taille -->
     <td class="px-3 py-2 text-right">
       <span class="text-sm text-base-content/70 font-mono">
-        {{ formattedSize }}
+        {{ formattedSize || '—' }}
       </span>
     </td>
     
     <!-- Colonne Type -->
     <td class="px-3 py-2 text-center">
       <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-base-200 text-base-content/80">
-        {{ fileType }}
+        {{ fileType || 'Inconnu' }}
       </span>
     </td>
     
     <!-- Colonne Date de modification -->
     <td class="px-3 py-2">
       <span class="text-sm text-base-content/60">
-        {{ formattedDate }}
+        {{ formattedDate || 'Date inconnue' }}
       </span>
     </td>
   </tr>
@@ -81,6 +87,10 @@ const props = defineProps({
   visibleColumns: {
     type: Array,
     default: () => []
+  },
+  isFavorite: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -245,22 +255,39 @@ const formattedSize = computed(() => {
   
   // S'assurer que la taille est affichée même si elle est 0
   const size = props.file.size || 0
-  return formatBytes(size)
+  try {
+    return formatBytes(size)
+  } catch (error) {
+    console.error('Erreur formatBytes:', error, 'size:', size)
+    return size + ' B'
+  }
 })
 
 // Computed pour la date formatée (compact et lisible)
 const formattedDate = computed(() => {
-  return formatDate(props.file.modified_time)
+  try {
+    const result = formatDate(props.file.modified_time)
+    return result || 'Date inconnue'
+  } catch (error) {
+    console.error('Erreur formatDate:', error, 'date:', props.file.modified_time)
+    return 'Date inconnue'
+  }
 })
 
 // Computed pour nettoyer le nom du fichier
 const cleanFileName = computed(() => {
   let name = props.file.name || ''
   
-  // Debug temporaire pour voir les données
-  if (name.includes('dossier') || name.includes('fichier')) {
-    console.log('FileListItem - Nom original:', name, 'File object:', props.file)
-  }
+  // Debug complet pour voir toutes les données
+  console.log('FileListItem - Debug complet:', {
+    name: name,
+    size: props.file.size,
+    modified_time: props.file.modified_time,
+    is_directory: props.file.is_directory,
+    fullFile: props.file,
+    formattedSize: formatBytes(props.file.size || 0),
+    formattedDate: formatDate(props.file.modified_time)
+  })
   
   // Nettoyer les suffixes ajoutés automatiquement
   name = name.replace(/ - dossier$/i, '')

@@ -68,7 +68,7 @@
     </div>
     
     <!-- Body -->
-    <div v-else class="overflow-y-auto max-h-96">
+    <div v-else class="overflow-y-auto max-h-96" @contextmenu="handleEmptySpaceContextMenu">
       <table class="table w-full table-fixed">
         <tbody>
           <FileListItem
@@ -78,6 +78,7 @@
             :selected="props.isSelected(file.path || file.name)"
             :focused="focusedIndex === index"
             :visible-columns="displayedColumns"
+            :is-favorite="props.isFavorite(file.path || file.name)"
             @click="handleFileClick"
             @double-click="handleFileDoubleClick"
             @context-menu="handleContextMenu"
@@ -153,6 +154,10 @@ const props = defineProps({
     })
   },
   isSelected: {
+    type: Function,
+    default: () => false
+  },
+  isFavorite: {
     type: Function,
     default: () => false
   }
@@ -301,6 +306,14 @@ const handleFileDoubleClick = (file, event) => {
 
 const handleContextMenu = (file, event) => {
   emit('context-menu', event, file)
+}
+
+const handleEmptySpaceContextMenu = (event) => {
+  // Only trigger if the click is on the container itself, not on a file row
+  if (event.target === event.currentTarget || event.target.tagName === 'TABLE' || event.target.tagName === 'TBODY') {
+    event.preventDefault()
+    emit('context-menu', event, null) // null indicates empty space
+  }
 }
 
 

@@ -16,6 +16,7 @@
       'touch-optimized': isTouch
     }
   ]" role="application" aria-label="Explorateur de fichiers" :aria-busy="loading">
+
     <!-- Navigation et sélecteur de mode d'affichage -->
     <div id="view-mode-selector" :class="[
       'file-explorer-header',
@@ -24,32 +25,25 @@
         'mb-2': isMobile
       }
     ]" role="toolbar" aria-label="Navigation et modes d'affichage des fichiers">
+
       <!-- Navigation par chemin interactif -->
       <div class="flex items-center gap-2 mb-2">
         <!-- Navigation history buttons -->
         <div class="flex items-center gap-1">
-          <button 
-            @click="navigateHistoryBack" 
-            :disabled="!canNavigateBack"
-            class="btn btn-sm btn-ghost"
+          <button @click="navigateHistoryBack" :disabled="!canNavigateBack" class="btn btn-sm btn-ghost"
             :class="{ 'opacity-50 cursor-not-allowed': !canNavigateBack }"
             :aria-label="canNavigateBack ? 'Naviguer vers la page précédente' : 'Aucune page précédente'"
-            title="Précédent (Alt+←)"
-          >
+            title="Précédent (Alt+←)">
             <i class="fas fa-chevron-left" aria-hidden="true"></i>
           </button>
-          
-          <button 
-            @click="navigateHistoryForward" 
-            :disabled="!canNavigateForward"
-            class="btn btn-sm btn-ghost"
+
+          <button @click="navigateHistoryForward" :disabled="!canNavigateForward" class="btn btn-sm btn-ghost"
             :class="{ 'opacity-50 cursor-not-allowed': !canNavigateForward }"
             :aria-label="canNavigateForward ? 'Naviguer vers la page suivante' : 'Aucune page suivante'"
-            title="Suivant (Alt+→)"
-          >
+            title="Suivant (Alt+→)">
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
           </button>
-          
+
           <button v-if="currentPath !== '/'" @click="handleNavigateBack" class="btn btn-sm btn-ghost"
             :aria-label="`Retour au dossier parent`" title="Retour au dossier parent (Backspace)">
             <i class="fas fa-arrow-up mr-1" aria-hidden="true"></i>
@@ -59,10 +53,7 @@
 
         <!-- Breadcrumb Navigation -->
         <div class="flex-1">
-          <BreadcrumbNavigation 
-            :current-path="currentPath" 
-            @navigate="handleBreadcrumbNavigation"
-          />
+          <BreadcrumbNavigation :current-path="currentPath" @navigate="handleBreadcrumbNavigation" />
         </div>
 
         <!-- View Mode Selector à droite -->
@@ -72,31 +63,29 @@
       </div>
     </div>
 
-
-
     <!-- Conteneur principal avec gestion d'erreur -->
     <div id="file-explorer-main" class="file-explorer-content" role="main"
       aria-label="Contenu de l'explorateur de fichiers">
 
-        <!-- État de chargement global -->
-        <div v-if="loading && !files.length" class="loading-state-enhanced" role="status" aria-live="polite"
-          aria-label="Chargement en cours">
-          <div class="loading-spinner-enhanced" aria-hidden="true"></div>
-          <span class="text-base-content/70">Chargement des fichiers...</span>
-        </div>
+      <!-- État de chargement global -->
+      <div v-if="loading && !files.length" class="loading-state-enhanced" role="status" aria-live="polite"
+        aria-label="Chargement en cours">
+        <div class="loading-spinner-enhanced" aria-hidden="true"></div>
+        <span class="text-base-content/70">Chargement des fichiers...</span>
+      </div>
 
-        <!-- État d'erreur global -->
-        <div v-else-if="error" class="alert alert-error" role="alert" aria-live="assertive">
-          <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-          <div>
-            <h3 class="font-bold">Erreur de chargement</h3>
-            <div class="text-sm">{{ error }}</div>
-          </div>
-          <button @click="refresh" class="btn btn-sm btn-outline" aria-label="Réessayer le chargement des fichiers">
-            <i class="fas fa-redo mr-1" aria-hidden="true"></i>
-            Réessayer
-          </button>
+      <!-- État d'erreur global -->
+      <div v-else-if="error" class="alert alert-error" role="alert" aria-live="assertive">
+        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+        <div>
+          <h3 class="font-bold">Erreur de chargement</h3>
+          <div class="text-sm">{{ error }}</div>
         </div>
+        <button @click="refresh" class="btn btn-sm btn-outline" aria-label="Réessayer le chargement des fichiers">
+          <i class="fas fa-redo mr-1" aria-hidden="true"></i>
+          Réessayer
+        </button>
+      </div>
 
       <!-- Composant de vue dynamique -->
       <component v-else :is="currentViewComponent" :current-path="currentPath" :files="files" :loading="loading"
@@ -107,9 +96,9 @@
           operationItems,
           isItemInOperation,
           getItemIndicatorClass
-        }" :is-selected="isSelected" @path-selected="handlePathSelected" @file-selected="handleFileSelected"
-        @file-double-click="handleFileDoubleClick" @sort-changed="handleSortChanged" @navigate-back="handleNavigateBack"
-        @show-actions="handleShowActions" @context-menu="showContextMenu" />
+        }" :is-selected="isSelected" :is-favorite="isItemFavorite" @path-selected="handlePathSelected"
+        @file-selected="handleFileSelected" @file-double-click="handleFileDoubleClick" @sort-changed="handleSortChanged"
+        @navigate-back="handleNavigateBack" @show-actions="handleShowActions" @context-menu="showContextMenu" />
     </div>
 
     <!-- Barre d'état avec informations -->
@@ -146,69 +135,55 @@
   <KeyboardShortcutsHelp :show="showShortcutsHelp" @close="showShortcutsHelp = false" />
 
   <!-- Context Menu -->
-  <ContextMenu :show="contextMenu.show" :x="contextMenu.x" :y="contextMenu.y" :item="contextMenu.item"
-    :permissions="contextMenuPermissions" :clipboard-info="{
+  <ContextMenu v-if="contextMenu.show && contextMenu.item" :show="contextMenu.show" :x="contextMenu.x"
+    :y="contextMenu.y" :item="contextMenu.item" :permissions="contextMenuPermissions" :clipboard-info="{
       items: operationItems,
       operation: isCopyOperation ? 'copy' : (isCutOperation ? 'cut' : null),
       count: operationCount,
       description: getOperationDescription()
     }" :show-permission-errors="showPermissionErrors" :is-favorite="isItemFavorite(contextMenu.item)"
-    @open="openContextItem" @download="downloadContextFile"
-    @rename="openRenameModal" @copy="copyContextItem" @cut="cutContextItem" @paste="pasteItems"
-    @permissions="openPermissions" @move="openMoveModal" @create-folder="openCreateFolderModal" @delete="confirmDelete"
+    @open="openContextItem" @download="downloadContextFile" @rename="openRenameModal" @copy="copyContextItem"
+    @cut="cutContextItem" @paste="pasteItems" @permissions="openPermissions" @move="openMoveModal"
+    @create-folder="openCreateFolderModal" @create-file="openCreateFileModal" @delete="confirmDelete"
     @properties="showProperties" @toggle-favorite="handleToggleFavorite" />
 
   <!-- Modals -->
-  <PermissionModal v-if="showPermissionModal" :item="selectedItemForPermissions" @close="showPermissionModal = false"
-    @updated="onPermissionsUpdated" />
+  <PermissionModal v-if="showPermissionModal && selectedItemForPermissions" :item="selectedItemForPermissions"
+    @close="showPermissionModal = false" @updated="onPermissionsUpdated" />
 
-  <RenameModal v-if="showRenameModal" :item="itemToRename" @close="showRenameModal = false" @renamed="onItemRenamed" />
+  <RenameModal v-if="showRenameModal && itemToRename" :item="itemToRename" @close="showRenameModal = false"
+    @renamed="onItemRenamed" />
 
-  <MoveModal v-if="showMoveModal" :items="itemsToMove" :current-path="currentPath" @close="showMoveModal = false"
-    @moved="onItemsMoved" />
+  <MoveModal v-if="showMoveModal && itemsToMove.length > 0" :items="itemsToMove" :current-path="currentPath"
+    @close="showMoveModal = false" @moved="onItemsMoved" />
 
-  <DeleteConfirmModal v-if="showDeleteModal" :items="itemsToDelete" @close="showDeleteModal = false"
-    @confirmed="onItemsDeleted" />
+  <DeleteConfirmModalFixed :show="showDeleteModal && itemsToDelete.length > 0" :items="itemsToDelete"
+    @close="showDeleteModal = false" @confirmed="onItemsDeleted" />
 
-  <PropertiesModal v-if="showPropertiesModal" :item="selectedItemForProperties" @close="showPropertiesModal = false" />
+  <PropertiesModal v-if="showPropertiesModal && selectedItemForProperties" :item="selectedItemForProperties"
+    @close="showPropertiesModal = false" />
 
-  <CreateFolderModal v-if="showCreateFolderModal" :current-path="currentPath" @close="showCreateFolderModal = false"
-    @created="onFolderCreated" />
+  <CreateFolderModal v-if="showCreateFolderModal && currentPath" :current-path="currentPath"
+    @close="showCreateFolderModal = false" @created="onFolderCreated" />
+
+  <CreateFileModal v-if="showCreateFileModal && currentPath" :current-path="currentPath"
+    @close="showCreateFileModal = false" @created="onFileCreated" />
+
+  <UploadModal v-if="showUploadModal && currentPath" :current-path="currentPath" @close="showUploadModal = false"
+    @uploaded="onFilesUploaded" @error="handleUploadError" />
 
   <!-- Notifications -->
   <div v-if="notification.show" class="toast toast-top toast-end">
     <div :class="[
       'alert',
-      notification.type === 'success' ? 'alert-success' : 
-      notification.type === 'error' ? 'alert-error' : 
-      'alert-info'
+      notification.type === 'success' ? 'alert-success' :
+        notification.type === 'error' ? 'alert-error' :
+          'alert-info'
     ]">
       <span>{{ notification.message }}</span>
     </div>
   </div>
 </template>
-
-<style scoped>
-.file-explorer-content {
-  min-height: 400px;
-}
-
-/* Animation pour les notifications */
-.toast {
-  animation: slideInRight 0.3s ease-out;
-}
-
-@keyframes slideInRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-</style>
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
@@ -221,8 +196,8 @@ import { useAccessibility } from '@/composables/useAccessibility.js'
 import { usePermissions } from '@/composables/usePermissions.js'
 import { useNotifications } from '@/composables/useNotifications.js'
 import { useFileOperations } from '@/composables/useFileOperations.js'
+import { useFavorites } from '@/composables/useFavorites.js'
 import { nasAPI } from '@/services/nasAPI.js'
-import { favoritesService } from '@/services/favoritesService.js'
 import { VIEW_MODES } from '@/types/viewMode.js'
 
 // Composants
@@ -239,9 +214,11 @@ import ContextMenu from './ContextMenu.vue'
 import PermissionModal from './PermissionModal.vue'
 import RenameModal from './RenameModal.vue'
 import MoveModal from './MoveModal.vue'
-import DeleteConfirmModal from './DeleteConfirmModal.vue'
+import DeleteConfirmModalFixed from './DeleteConfirmModalFixed.vue'
 import PropertiesModal from './PropertiesModal.vue'
 import CreateFolderModal from './CreateFolderModal.vue'
+import CreateFileModal from './CreateFileModal.vue'
+import UploadModal from './UploadModal.vue'
 
 // Props
 const props = defineProps({
@@ -279,7 +256,10 @@ const emit = defineEmits([
   'error',
   'show-mobile-actions',
   'navigate-back',
-  'navigate'
+  'navigate',
+  'info',
+  'success',
+  'download-progress'
 ])
 
 // Composables
@@ -325,7 +305,7 @@ const {
 } = useTouchGestures(explorerContainer, {
   enableSwipe: true,
   enablePinch: false,
-  swipeThreshold: 80 // Plus élevé pour éviter les faux positifs
+  swipeThreshold: 80
 })
 
 // État local
@@ -354,13 +334,13 @@ const showMoveModal = ref(false)
 const showDeleteModal = ref(false)
 const showPropertiesModal = ref(false)
 const showCreateFolderModal = ref(false)
+const showCreateFileModal = ref(false)
+const showUploadModal = ref(false)
 const selectedItemForPermissions = ref(null)
 const selectedItemForProperties = ref(null)
 const itemToRename = ref(null)
 const itemsToMove = ref([])
 const itemsToDelete = ref([])
-
-
 
 // Notification state
 const notification = ref({
@@ -387,6 +367,38 @@ const {
   canPasteToDestination
 } = useFileOperations()
 
+// Favorites composable
+const {
+  favorites,
+  loading: favoritesLoading,
+  isFavorite,
+  addFavorite,
+  removeFavorite,
+  toggleFavorite,
+  loadFavorites
+} = useFavorites()
+
+// Permissions composable
+const {
+  isAdmin,
+  canPerformAction,
+  getPermissionErrorMessage,
+  loadPermissions
+} = usePermissions()
+
+// Notification system
+const { showPermissionError, showError } = useNotifications()
+
+// Permission state
+const contextMenuPermissions = ref({
+  can_read: false,
+  can_write: false,
+  can_delete: false,
+  can_share: false
+})
+
+const showPermissionErrors = ref(false)
+
 // Computed
 const currentViewComponent = computed(() => {
   const componentMap = {
@@ -402,6 +414,10 @@ const currentViewComponent = computed(() => {
 const fileCount = computed(() => files.value?.length || 0)
 const selectedCount = computed(() => getSelectedCount())
 
+// Navigation history management
+const canNavigateBack = computed(() => historyIndex.value > 0)
+const canNavigateForward = computed(() => historyIndex.value < navigationHistory.value.length - 1)
+
 // Watcher pour les changements de chemin externe
 watch(() => props.externalPath, (newPath) => {
   if (newPath && newPath !== currentPath.value) {
@@ -409,7 +425,7 @@ watch(() => props.externalPath, (newPath) => {
   }
 })
 
-// Méthodes de chargement des données
+// Méthodes de chargement des données avec vrais appels API
 const loadFiles = async (path = currentPath.value) => {
   if (loading.value) return
 
@@ -418,6 +434,8 @@ const loadFiles = async (path = currentPath.value) => {
 
   try {
     console.log(`FileExplorer: Loading files for path: ${path}`)
+
+    // Vrai appel API via nasAPI
     const response = await nasAPI.browse(path)
 
     if (!response.success) {
@@ -433,6 +451,11 @@ const loadFiles = async (path = currentPath.value) => {
     }
 
     currentPath.value = path
+
+    // Charger les permissions pour chaque fichier si nécessaire
+    if (files.value.length > 0) {
+      await loadFilePermissions()
+    }
 
   } catch (err) {
     console.error('FileExplorer: Error loading files:', err)
@@ -450,6 +473,57 @@ const loadFiles = async (path = currentPath.value) => {
   }
 }
 
+// Charger les permissions pour les fichiers affichés
+const loadFilePermissions = async () => {
+  try {
+    // Charger les permissions en lot pour optimiser
+    const paths = files.value.map(file => file.path)
+    const permissionsPromises = paths.map(path => loadPermissions(path))
+
+    await Promise.allSettled(permissionsPromises)
+    console.log('Permissions loaded for current files')
+  } catch (error) {
+    console.error('Error loading file permissions:', error)
+  }
+}
+
+// Load permissions for context menu item
+const loadContextMenuPermissions = async (item) => {
+  if (!item) {
+    contextMenuPermissions.value = {
+      can_read: false,
+      can_write: false,
+      can_delete: false,
+      can_share: false
+    }
+    return
+  }
+
+  try {
+    showPermissionErrors.value = false
+
+    // Use the permissions composable to check permissions
+    const permissions = await loadPermissions(item.path)
+
+    contextMenuPermissions.value = {
+      can_read: permissions?.can_read || false,
+      can_write: permissions?.can_write || false,
+      can_delete: permissions?.can_delete || false,
+      can_share: permissions?.can_share || false
+    }
+
+  } catch (error) {
+    console.error('Error loading context menu permissions:', error)
+    showPermissionErrors.value = true
+    contextMenuPermissions.value = {
+      can_read: false,
+      can_write: false,
+      can_delete: false,
+      can_share: false
+    }
+  }
+}
+
 const refresh = async () => {
   await loadFiles(currentPath.value)
 }
@@ -460,12 +534,12 @@ const addToNavigationHistory = (path) => {
   if (historyIndex.value < navigationHistory.value.length - 1) {
     navigationHistory.value = navigationHistory.value.slice(0, historyIndex.value + 1)
   }
-  
+
   // Add new path if it's different from current
   if (navigationHistory.value[navigationHistory.value.length - 1] !== path) {
     navigationHistory.value.push(path)
     historyIndex.value = navigationHistory.value.length - 1
-    
+
     // Limit history size to prevent memory issues
     if (navigationHistory.value.length > 50) {
       navigationHistory.value = navigationHistory.value.slice(-50)
@@ -474,15 +548,12 @@ const addToNavigationHistory = (path) => {
   }
 }
 
-const canNavigateBack = computed(() => historyIndex.value > 0)
-const canNavigateForward = computed(() => historyIndex.value < navigationHistory.value.length - 1)
-
 const navigateHistoryBack = async () => {
   if (canNavigateBack.value) {
     historyIndex.value--
     const targetPath = navigationHistory.value[historyIndex.value]
     await loadFiles(targetPath)
-    
+
     emit('navigate', {
       path: targetPath,
       source: 'history-back',
@@ -496,7 +567,7 @@ const navigateHistoryForward = async () => {
     historyIndex.value++
     const targetPath = navigationHistory.value[historyIndex.value]
     await loadFiles(targetPath)
-    
+
     emit('navigate', {
       path: targetPath,
       source: 'history-forward',
@@ -524,10 +595,10 @@ const handlePathSelected = async (path) => {
 
   if (normalizedPath !== currentPath.value) {
     const oldPath = currentPath.value
-    
+
     // Add to navigation history
     addToNavigationHistory(normalizedPath)
-    
+
     await loadFiles(normalizedPath)
 
     emit('path-changed', {
@@ -540,16 +611,16 @@ const handlePathSelected = async (path) => {
 
 const handleBreadcrumbNavigation = async (path) => {
   console.log(`FileExplorer: Breadcrumb navigation to: ${path}`)
-  
+
   // Normaliser le chemin
   const normalizedPath = nasAPI.normalizePath(path)
-  
+
   if (normalizedPath !== currentPath.value) {
     const oldPath = currentPath.value
-    
+
     // Add to navigation history
     addToNavigationHistory(normalizedPath)
-    
+
     await loadFiles(normalizedPath)
 
     emit('path-changed', {
@@ -647,69 +718,6 @@ const handleShowActions = () => {
   })
 }
 
-const handleSelectAll = () => {
-  selectAll(files.value) // Use the proper selectAll from useViewMode
-  selectAllKeyboard()
-  currentSelectionMode.value = 'multiple'
-
-  emit('selection-changed', {
-    selectedFiles: selectedFiles.value,
-    action: 'selectAll',
-    timestamp: Date.now()
-  })
-}
-
-const handleInvertSelection = () => {
-  const allFiles = files.value.map(f => f.path || f.name)
-  const currentSelection = selectedFiles.value
-  const invertedSelection = allFiles.filter(filePath => !currentSelection.includes(filePath))
-
-  setSelectedFiles(invertedSelection)
-  currentSelectionMode.value = invertedSelection.length > 1 ? 'multiple' : 'single'
-
-  emit('selection-changed', {
-    selectedFiles: invertedSelection,
-    action: 'invertSelection',
-    timestamp: Date.now()
-  })
-}
-
-const handleClearSelection = () => {
-  clearSelection() // Use the proper clearSelection from useViewMode
-  clearKeyboardSelection()
-  currentSelectionMode.value = 'single'
-
-  emit('selection-changed', {
-    selectedFiles: [],
-    action: 'clearSelection',
-    timestamp: Date.now()
-  })
-}
-
-const handleRangeSelection = (targetFilePath) => {
-  const currentSelection = selectedFiles.value
-  if (currentSelection.length === 0) {
-    setSelectedFiles([targetFilePath])
-    return
-  }
-
-  const lastSelected = currentSelection[currentSelection.length - 1]
-  const fileNames = files.value.map(f => f.path || f.name)
-
-  const startIndex = fileNames.indexOf(lastSelected)
-  const endIndex = fileNames.indexOf(targetFilePath)
-
-  if (startIndex !== -1 && endIndex !== -1) {
-    const minIndex = Math.min(startIndex, endIndex)
-    const maxIndex = Math.max(startIndex, endIndex)
-
-    const rangeFiles = fileNames.slice(minIndex, maxIndex + 1)
-    const newSelection = [...new Set([...currentSelection, ...rangeFiles])]
-
-    setSelectedFiles(newSelection)
-  }
-}
-
 // Configuration de la navigation clavier
 const navigationOptions = {
   files,
@@ -800,7 +808,31 @@ const openContextItem = (item) => {
 
 const downloadContextFile = async (item) => {
   try {
-    const blob = await nasAPI.downloadFile(item.path)
+    // Skip system files that might cause issues
+    const systemFiles = ['desktop.ini', 'thumbs.db', '.ds_store', 'folder.jpg', 'albumartsmall.jpg']
+    if (systemFiles.includes(item.name.toLowerCase())) {
+      emit('error', {
+        error: new Error('Cannot download system files'),
+        action: 'download',
+        file: item,
+        message: 'Les fichiers système ne peuvent pas être téléchargés',
+        timestamp: Date.now()
+      })
+      return
+    }
+
+    emit('info', `Téléchargement de ${item.name} en cours...`)
+
+    const blob = await nasAPI.downloadFile(item.path, (percentage, loaded, total) => {
+      // Emit progress updates
+      emit('download-progress', {
+        file: item,
+        percentage: Math.round(percentage),
+        loaded,
+        total,
+        timestamp: Date.now()
+      })
+    })
 
     // Create download link
     const url = window.URL.createObjectURL(blob)
@@ -813,12 +845,22 @@ const downloadContextFile = async (item) => {
     window.URL.revokeObjectURL(url)
 
     emit('file-downloaded', { file: item, timestamp: Date.now() })
+    emit('success', `Téléchargement de ${item.name} terminé`)
   } catch (err) {
     console.error('Error downloading file:', err)
+
+    let errorMessage = `Erreur lors du téléchargement: ${err.message}`
+    if (err.status === 403) {
+      errorMessage = 'Permission refusée pour télécharger ce fichier'
+    } else if (err.status === 404) {
+      errorMessage = 'Fichier introuvable'
+    }
+
     emit('error', {
       error: err,
       action: 'download',
       file: item,
+      message: errorMessage,
       timestamp: Date.now()
     })
   }
@@ -913,9 +955,14 @@ const openRenameModal = async (item) => {
     return
   }
 
+  // Close context menu first
+  contextMenu.value.show = false
+
+  // Wait for next tick to ensure DOM is ready
+  await nextTick()
+
   itemToRename.value = item
   showRenameModal.value = true
-  contextMenu.value.show = false
 }
 
 const openMoveModal = async (item) => {
@@ -945,6 +992,19 @@ const openCreateFolderModal = async () => {
   contextMenu.value.show = false
 }
 
+const openCreateFileModal = async () => {
+  // Check write permission for creating files
+  const canCreateFile = await canPerformAction(currentPath.value, 'write')
+  if (!canCreateFile) {
+    showPermissionError('write')
+    contextMenu.value.show = false
+    return
+  }
+
+  showCreateFileModal.value = true
+  contextMenu.value.show = false
+}
+
 const confirmDelete = async (item) => {
   // Check delete permission
   const canDelete = await canPerformAction(item.path, 'delete')
@@ -954,48 +1014,62 @@ const confirmDelete = async (item) => {
     return
   }
 
+  // Close context menu first
+  contextMenu.value.show = false
+
+  // Wait for next tick to ensure DOM is ready
+  await nextTick()
+
   itemsToDelete.value = [item]
   showDeleteModal.value = true
-  contextMenu.value.show = false
 }
 
-const showProperties = (item) => {
+const showProperties = async (item) => {
+  // Close context menu first
+  contextMenu.value.show = false
+
+  // Wait for next tick to ensure DOM is ready
+  await nextTick()
+
   selectedItemForProperties.value = item
   showPropertiesModal.value = true
-  contextMenu.value.show = false
 }
 
 // Favorites methods
-const handleToggleFavorite = (item) => {
-  if (!item || !item.is_directory) {
-    console.warn('Seuls les dossiers peuvent être ajoutés aux favoris')
+const handleToggleFavorite = async (item) => {
+  console.log('Toggle favorite for:', item)
+  if (!item) {
+    console.error('No item provided for favorite toggle')
     return
   }
 
-  const isFavorite = favoritesService.isFavorite(item.path)
-  
-  if (isFavorite) {
-    const success = favoritesService.removeFavorite(item.path)
-    if (success) {
-      showNotification(`${item.name} retiré des favoris`, 'success')
-    } else {
-      showNotification('Erreur lors de la suppression du favori', 'error')
-    }
-  } else {
-    const success = favoritesService.addFavorite(item.path, item.name)
-    if (success) {
+  try {
+    const wasAdded = await toggleFavorite(item.path, item.name, item.is_directory)
+
+    if (wasAdded) {
       showNotification(`${item.name} ajouté aux favoris`, 'success')
     } else {
-      showNotification('Erreur lors de l\'ajout aux favoris', 'error')
+      showNotification(`${item.name} retiré des favoris`, 'success')
     }
+
+    contextMenu.value.show = false
+
+  } catch (err) {
+    console.error('Error toggling favorite:', err)
+    showNotification(`Erreur: ${err.message}`, 'error')
+
+    emit('error', {
+      error: err,
+      action: 'toggle-favorite',
+      file: item,
+      timestamp: Date.now()
+    })
   }
-  
-  contextMenu.value.show = false
 }
 
 const isItemFavorite = (item) => {
-  if (!item || !item.is_directory) return false
-  return favoritesService.isFavorite(item.path)
+  if (!item) return false
+  return isFavorite(item.path)
 }
 
 const showNotification = (message, type = 'info') => {
@@ -1004,83 +1078,11 @@ const showNotification = (message, type = 'info') => {
     message,
     type
   }
-  
-  // Auto-hide après 3 secondes
+
+  // Auto-hide after 3 seconds
   setTimeout(() => {
     notification.value.show = false
   }, 3000)
-}
-
-// Permission system
-const {
-  isAdmin,
-  canPerformAction,
-  getPermissionErrorMessage,
-  loadPermissions
-} = usePermissions()
-
-// Notification system
-const { showPermissionError, showError } = useNotifications()
-
-// Permission state
-const contextMenuPermissions = ref({
-  can_read: false,
-  can_write: false,
-  can_delete: false,
-  can_share: false,
-  can_modify: false
-})
-
-const showPermissionErrors = ref(false)
-
-// Load permissions for context menu item
-const loadContextMenuPermissions = async (item) => {
-  if (!item) {
-    contextMenuPermissions.value = {
-      can_read: false,
-      can_write: false,
-      can_delete: false,
-      can_share: false,
-      can_modify: false
-    }
-    return
-  }
-
-  try {
-    const permissions = await loadPermissions(item.path)
-    contextMenuPermissions.value = permissions || {
-      can_read: false,
-      can_write: false,
-      can_delete: false,
-      can_share: false,
-      can_modify: false
-    }
-  } catch (error) {
-    console.error('Error loading context menu permissions:', error)
-    showPermissionErrors.value = true
-    contextMenuPermissions.value = {
-      can_read: false,
-      can_write: false,
-      can_delete: false,
-      can_share: false,
-      can_modify: false
-    }
-  }
-}
-
-// Legacy permission functions for backward compatibility
-const canModifyItem = async (item) => {
-  if (!item) return false
-  return await canPerformAction(item.path, 'write')
-}
-
-const canDeleteItem = async (item) => {
-  if (!item) return false
-  return await canPerformAction(item.path, 'delete')
-}
-
-const canModifyCurrentFolder = async () => {
-  return await canPerformAction(currentPath.value, 'write')
 }
 
 // Modal event handlers
@@ -1091,24 +1093,28 @@ const onPermissionsUpdated = () => {
 const onItemRenamed = async (renameData) => {
   try {
     // renameData is an object: {oldPath, newPath, newName}
-    console.log('Rename data received:', renameData)
-    
-    // The rename has already been completed by the modal, just refresh the view
+    console.log('Item renamed:', renameData)
+
+    // Show success notification
+    showNotification(`Élément renommé en "${renameData.newName}"`, 'success')
+
+    // Refresh the file list to show changes
     await loadFiles(currentPath.value)
-    
-    // Emit success event
-    emit('success', {
-      message: `Élément renommé avec succès: ${renameData.newName}`,
-      action: 'rename',
-      timestamp: Date.now()
-    })
+
+    // Update selection if the renamed item was selected
+    const oldPath = renameData.oldPath
+    const newPath = renameData.newPath
+
+    if (selectedFiles.value.includes(oldPath)) {
+      const updatedSelection = selectedFiles.value.map(path =>
+        path === oldPath ? newPath : path
+      )
+      setSelectedFiles(updatedSelection)
+    }
+
   } catch (error) {
-    console.error('Rename error:', error)
-    emit('error', {
-      error,
-      action: 'rename',
-      timestamp: Date.now()
-    })
+    console.error('Error handling rename:', error)
+    showNotification(`Erreur lors du renommage: ${error.message}`, 'error')
   }
 }
 
@@ -1119,20 +1125,25 @@ const onItemsMoved = () => {
 const onItemsDeleted = async (items) => {
   try {
     for (const item of items) {
-      const result = await nasAPI.deleteItem(item.path)
-      if (!result.success) {
-        throw new Error(result.error || `Failed to delete ${item.name}`)
+      // Remove from selection if it was selected
+      if (selectedFiles.value.includes(item.path)) {
+        removeSelectedFile(item.path)
       }
     }
 
+    // Show success notification
+    const itemCount = items.length
+    showNotification(
+      `${itemCount} élément${itemCount > 1 ? 's' : ''} supprimé${itemCount > 1 ? 's' : ''}`,
+      'success'
+    )
+
+    // Refresh the file list
     await loadFiles(currentPath.value)
+
   } catch (error) {
-    console.error('Delete error:', error)
-    emit('error', {
-      error,
-      action: 'delete',
-      timestamp: Date.now()
-    })
+    console.error('Error handling deletion:', error)
+    showNotification(`Erreur lors de la suppression: ${error.message}`, 'error')
   }
 }
 
@@ -1140,259 +1151,110 @@ const onFolderCreated = () => {
   loadFiles(currentPath.value)
 }
 
-// Raccourcis clavier additionnels spécifiques au FileExplorer
-const additionalShortcuts = {
-  'F1': () => {
-    showShortcutsHelp.value = true
-  },
-  '?': () => {
-    showShortcutsHelp.value = true
-  },
-  'Escape': () => {
-    if (showShortcutsHelp.value) {
-      showShortcutsHelp.value = false
-    } else if (contextMenu.value.show) {
-      contextMenu.value.show = false
-    } else if (hasKeyboardSelection.value) {
-      clearKeyboardSelection()
-    }
-  },
-  'Ctrl+Shift+e': () => {
-    // Focus sur l'explorateur de fichiers
-    const explorerElement = document.querySelector('.file-explorer')
-    if (explorerElement) {
-      explorerElement.focus()
-    }
-  },
-  'Ctrl+Shift+n': () => {
-    // Créer un nouveau dossier
-    showCreateFolderModal.value = true
-  },
-  'Alt+ArrowLeft': () => {
-    // Navigation arrière dans l'historique
-    navigateHistoryBack()
-  },
-  'Alt+ArrowRight': () => {
-    // Navigation avant dans l'historique
-    navigateHistoryForward()
-  },
-  'Backspace': () => {
-    // Navigation vers le dossier parent
-    if (currentPath.value !== '/') {
-      const parentPath = currentPath.value.split('/').slice(0, -1).join('/') || '/'
-      handlePathSelected(parentPath)
-    }
-  }
+const onFileCreated = (event) => {
+  // Show success notification
+  showNotification(`Fichier "${event.fileName}" créé avec succès`, 'success')
+  // Refresh the file list
+  loadFiles(currentPath.value)
 }
 
-// Initialisation des raccourcis clavier additionnels
-const { setActive: setAdditionalShortcutsActive } = useKeyboardShortcuts(additionalShortcuts, {
-  preventDefault: true,
-  stopPropagation: false,
-  context: 'fileExplorerGlobal'
-})
+const onFilesUploaded = (event) => {
+  // Show success notification
+  showNotification(`${event.files?.length || 1} fichier(s) uploadé(s) avec succès`, 'success')
+  // Refresh the file list
+  loadFiles(currentPath.value)
+}
 
-// Watchers
-watch(() => props.initialPath, (newPath) => {
-  if (newPath !== currentPath.value) {
-    handlePathSelected(newPath)
-  }
-})
+const handleUploadError = (error) => {
+  // Show error notification
+  showNotification(`Erreur d'upload: ${error.message}`, 'error')
+}
 
 // Lifecycle hooks
 onMounted(async () => {
-  console.log('FileExplorer: Component mounted')
-
   if (props.autoLoad) {
-    await loadFiles(props.initialPath)
+    await loadFiles(currentPath.value)
   }
 
-  // Activer les raccourcis clavier (seulement sur desktop)
-  if (!isMobile.value) {
-    activateNavigation()
-    setAdditionalShortcutsActive(true)
-  }
+  // Load favorites
+  await loadFavorites()
 
-  // Écouter les événements de gestes tactiles
-  if (explorerContainer.value && isTouch.value) {
-    explorerContainer.value.addEventListener('swipe', (event) => {
-      const { direction, velocity } = event.detail
-
-      // Swipe rapide vers la droite = navigation retour
-      if (direction === 'right' && velocity > 0.5) {
-        handleNavigateBack()
-      }
-      // Swipe vers la gauche = actions
-      else if (direction === 'left' && velocity > 0.3) {
-        handleShowActions()
-      }
-    })
-  }
+  // Activate keyboard navigation
+  activateNavigation()
 })
 
 onUnmounted(() => {
-  console.log('FileExplorer: Component unmounted')
-
-  // Désactiver les raccourcis clavier
+  // Deactivate keyboard navigation
   deactivateNavigation()
-  setAdditionalShortcutsActive(false)
-})
-
-// API publique pour utilisation externe
-defineExpose({
-  // Méthodes
-  loadFiles,
-  refresh,
-  goToPath: handlePathSelected,
-
-  // État
-  currentPath: computed(() => currentPath.value),
-  files: computed(() => files.value),
-  loading: computed(() => loading.value),
-  error: computed(() => error.value),
-  selectedFiles,
-  selectedCount,
-  focusedIndex,
-  focusedFile,
-  showShortcutsHelp,
-
-  // Navigation history
-  navigationHistory: computed(() => navigationHistory.value),
-  historyIndex: computed(() => historyIndex.value),
-  canNavigateBack,
-  canNavigateForward,
-
-  // Actions
-  clearSelection: clearKeyboardSelection,
-  selectAll: selectAllKeyboard,
-
-  // Navigation
-  activateNavigation,
-  deactivateNavigation,
-  setFocusedIndex,
-  handleKeyboardClick,
-  handleKeyboardDoubleClick,
-  navigateHistoryBack,
-  navigateHistoryForward,
-  handleBreadcrumbNavigation,
-
-  // Gestionnaires
-  handleModeChange,
-  handlePathSelected
 })
 </script>
 
 <style scoped>
-.file-explorer {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+.file-explorer-content {
   min-height: 400px;
 }
 
-.file-explorer-header {
-  flex-shrink: 0;
+/* Animation pour les notifications */
+.toast {
+  animation: slideInRight 0.3s ease-out;
 }
 
-.file-explorer-content {
-  flex: 1;
-  min-height: 0;
-  /* Important pour le scroll dans les enfants */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.loading-state-enhanced {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  min-height: 200px;
 }
 
-.file-explorer-status {
-  flex-shrink: 0;
-  padding: 0.5rem 0;
-  border-top: 1px solid hsl(var(--b3));
-  background: hsl(var(--b1));
-}
-
-/* Optimisations mobiles et tactiles */
-.mobile-optimized {
-  padding: 0;
-}
-
-.mobile-optimized .file-explorer-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: hsl(var(--b1));
-  border-bottom: 1px solid hsl(var(--b3));
-}
-
-.touch-optimized {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Responsive adaptations */
-@media (max-width: 768px) {
-  .file-explorer {
-    height: 100vh;
-    min-height: 100vh;
-  }
-
-  .file-explorer-content {
-    flex: 1;
-    overflow: hidden;
-  }
-
-  .file-explorer-status {
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: flex-start;
-    padding: 0.75rem;
-    background: hsl(var(--b1));
-    border-top: 1px solid hsl(var(--b3));
-    position: sticky;
-    bottom: 0;
-  }
-
-  .file-explorer-status>div {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-
-@media (max-width: 480px) {
-  .file-explorer-status {
-    padding: 0.5rem;
-    font-size: 0.75rem;
-  }
-
-  .file-explorer-status .btn {
-    padding: 0.25rem;
-    min-height: 2rem;
-  }
-}
-
-/* Animation pour les changements de mode */
-.file-explorer-content>* {
-  transition: opacity 0.2s ease-in-out;
-}
-
-/* Amélioration de l'accessibilité */
-.file-explorer:focus-within {
-  outline: 2px solid hsl(var(--p));
-  outline-offset: 2px;
-  border-radius: 0.5rem;
-}
-
-/* Styles pour les états de chargement */
-.loading {
-  color: hsl(var(--p));
-}
-
-/* Styles pour les alertes */
-.alert {
-  border-radius: 0.5rem;
+.loading-spinner-enhanced {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
   margin-bottom: 1rem;
 }
 
-.alert .btn {
-  margin-left: auto;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skip-links {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  z-index: 1000;
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  text-decoration: none;
+  z-index: 1000;
+}
+
+.skip-link:focus {
+  top: 6px;
 }
 </style>

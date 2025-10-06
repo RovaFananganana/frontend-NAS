@@ -19,7 +19,10 @@
     </div>
 
     <!-- Grille mosaïque -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+    <div 
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 min-h-64"
+      @contextmenu="handleEmptySpaceContextMenu"
+    >
       <div
         v-for="file in sortedFiles"
         :key="file.path"
@@ -63,6 +66,13 @@
         <div v-if="props.isSelected(file.path || file.name)" 
           class="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
           <i class="fas fa-check text-white text-xs"></i>
+        </div>
+        
+        <!-- Indicateur favori -->
+        <div v-if="props.isFavorite(file.path || file.name)" 
+          class="absolute top-2 left-2 w-5 h-5 bg-warning rounded-full flex items-center justify-center"
+          title="Favori">
+          <i class="fas fa-star text-white text-xs"></i>
         </div>
       </div>
     </div>
@@ -116,6 +126,10 @@ const props = defineProps({
     })
   },
   isSelected: {
+    type: Function,
+    default: () => false
+  },
+  isFavorite: {
     type: Function,
     default: () => false
   }
@@ -215,6 +229,14 @@ const handleItemDoubleClick = (file, event) => {
 const handleContextMenu = (file, event) => {
   event.preventDefault()
   emit('context-menu', event, file)
+}
+
+const handleEmptySpaceContextMenu = (event) => {
+  // Only trigger if the click is on the grid container itself, not on a file item
+  if (event.target === event.currentTarget) {
+    event.preventDefault()
+    emit('context-menu', event, null) // null indicates empty space
+  }
 }
 
 // Utilitaires pour les types de fichiers

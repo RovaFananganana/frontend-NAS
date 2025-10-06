@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen flex items-center justify-center bg-base-200">
     <div class="max-w-md w-full bg-base-100 rounded-lg shadow-md p-8">
-      
+
       <!-- Logo et Nom de l'application -->
       <div class="text-center mb-6">
         <img src="@/assets/logo.png" alt="Logo" class="mx-auto w-24 h-24 mb-2">
@@ -12,33 +12,18 @@
       <form @submit.prevent="handleLogin" class="space-y-4">
         <div>
           <label class="block text-base-content font-medium mb-1" for="username">Nom d'utilisateur</label>
-          <input
-            type="text"
-            id="username"
-            v-model="username"
-            placeholder="Entrez votre nom d'utilisateur"
-            class="input input-bordered w-full"
-            required
-          >
+          <input type="text" id="username" v-model="username" placeholder="Entrez votre nom d'utilisateur"
+            class="input input-bordered w-full" required>
         </div>
 
         <div>
           <label class="block text-base-content font-medium mb-1" for="password">Mot de passe</label>
           <div class="relative">
-            <input
-              :type="showPassword ? 'text' : 'password'"
-              id="password"
-              v-model="password"
-              placeholder="Entrez votre mot de passe"
-              class="input input-bordered w-full pr-10"
-              required
-            >
+            <input :type="showPassword ? 'text' : 'password'" id="password" v-model="password"
+              placeholder="Entrez votre mot de passe" class="input input-bordered w-full pr-10" required>
             <!-- Bouton œil -->
-            <button 
-              type="button"
-              @click="togglePassword"
-              class="absolute inset-y-0 right-0 flex items-center px-3 text-base-content opacity-60 hover:opacity-100"
-            >
+            <button type="button" @click="togglePassword"
+              class="absolute inset-y-0 right-0 flex items-center px-3 text-base-content opacity-60 hover:opacity-100">
               <span v-if="showPassword">👁️‍🗨️</span>
               <span v-else>👁️</span>
             </button>
@@ -54,11 +39,7 @@
         </div>
 
         <div>
-          <button
-            type="submit"
-            :disabled="loading"
-            class="btn btn-primary w-full"
-          >
+          <button type="submit" :disabled="loading" class="btn btn-primary w-full">
             {{ loading ? "Connexion..." : "Se connecter" }}
           </button>
         </div>

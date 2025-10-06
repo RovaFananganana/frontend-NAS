@@ -113,7 +113,7 @@ const rename = async () => {
   error.value = ''
 
   try {
-    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
     
     if (!token) {
       throw new Error('Token d\'authentification manquant')

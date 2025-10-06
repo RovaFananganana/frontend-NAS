@@ -5,6 +5,8 @@
  * Provides methods for file operations, sync management, and Drive Client integration
  */
 
+import TokenService from './tokenService.js'
+
 class NASAPIError extends Error {
   constructor(message, status, code) {
     super(message)
@@ -24,10 +26,7 @@ class NASAPIService {
    * Get authorization headers
    */
   getHeaders() {
-    // Try both possible token keys for compatibility
-    const token = localStorage.getItem('auth_token') || 
-                  sessionStorage.getItem('auth_token') || 
-                  localStorage.getItem('token')
+    const token = TokenService.getToken()
     
     if (!token) {
       console.warn('No authentication token found')
@@ -181,6 +180,19 @@ class NASAPIService {
   }
 
   /**
+   * Create a new file
+   */
+  async createFile(parentPath, fileName) {
+    return await this.request('/create-file', {
+      method: 'POST',
+      body: JSON.stringify({
+        parent_path: parentPath,
+        name: fileName
+      })
+    })
+  }
+
+  /**
    * Upload file
    */
   async uploadFile(file, destinationPath, overwrite = false, onProgress = null) {
@@ -226,32 +238,73 @@ class NASAPIService {
       })
 
       xhr.open('POST', `${this.baseURL}/upload`)
-      xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('token')}`)
+      xhr.setRequestHeader('Authorization', `Bearer ${TokenService.getToken()}`)
       xhr.timeout = 300000 // 5 minutes for uploads
       xhr.send(formData)
     })
   }
 
   /**
-   * Download file
+   * Download file with progress tracking
    */
-  async downloadFile(filePath) {
-    const encodedPath = encodeURIComponent(filePath)
-    const response = await fetch(`${this.baseURL}/download/${encodedPath}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+  async downloadFile(filePath, onProgress = null) {
+    // Better encoding for special characters
+    const encodedPath = filePath.split('/').map(segment => encodeURIComponent(segment)).join('/')
+    
+    try {
+      const response = await fetch(`${this.baseURL}/download/${encodedPath}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${TokenService.getToken()}`
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new NASAPIError(
+          errorData.error || `Download failed: ${response.statusText}`,
+          response.status
+        )
       }
-    })
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new NASAPIError(
-        errorData.error || `Download failed: ${response.statusText}`,
-        response.status
-      )
+      // Get the total file size from headers
+      const contentLength = response.headers.get('Content-Length')
+      const total = contentLength ? parseInt(contentLength, 10) : 0
+
+      if (!response.body || !onProgress || total === 0) {
+        // Fallback to simple blob if no progress tracking needed or supported
+        return response.blob()
+      }
+
+      // Create a readable stream to track progress
+      const reader = response.body.getReader()
+      let loaded = 0
+      const chunks = []
+
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) break
+        
+        chunks.push(value)
+        loaded += value.length
+        
+        // Call progress callback
+        if (onProgress && total > 0) {
+          const percentComplete = (loaded / total) * 100
+          onProgress(percentComplete, loaded, total)
+        }
+      }
+
+      // Combine all chunks into a single blob
+      return new Blob(chunks)
+      
+    } catch (error) {
+      if (error instanceof NASAPIError) {
+        throw error
+      }
+      throw new NASAPIError(`Download failed: ${error.message}`, 0, 'DOWNLOAD_ERROR')
     }
-
-    return response.blob()
   }
 
   /**

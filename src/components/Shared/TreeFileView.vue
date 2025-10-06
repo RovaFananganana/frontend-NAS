@@ -19,7 +19,7 @@
     </div>
 
     <!-- Vue arbre des fichiers -->
-    <div class="tree-structure">
+    <div class="tree-structure min-h-64" @contextmenu="handleEmptySpaceContextMenu">
       <TreeNode
         v-for="file in sortedFiles"
         :key="file.path"
@@ -28,6 +28,7 @@
         :focused="focusedIndex === getFileIndex(file)"
         :level="0"
         :is-selected="props.isSelected"
+        :is-favorite="props.isFavorite"
         @click="handleItemClick"
         @double-click="handleItemDoubleClick"
         @context-menu="handleContextMenu"
@@ -85,6 +86,10 @@ const props = defineProps({
     })
   },
   isSelected: {
+    type: Function,
+    default: () => false
+  },
+  isFavorite: {
     type: Function,
     default: () => false
   }
@@ -186,6 +191,14 @@ const handleItemDoubleClick = (eventData) => {
 const handleContextMenu = (eventData) => {
   const { file, event } = eventData
   emit('context-menu', event, file)
+}
+
+const handleEmptySpaceContextMenu = (event) => {
+  // Only trigger if the click is on the tree structure container itself
+  if (event.target === event.currentTarget) {
+    event.preventDefault()
+    emit('context-menu', event, null) // null indicates empty space
+  }
 }
 </script>
 

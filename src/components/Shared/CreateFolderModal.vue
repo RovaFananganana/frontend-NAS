@@ -112,6 +112,7 @@ export default {
       try {
         await synologyAPI.createFolder(props.currentPath, folderName.value.trim())
         emit('created')
+        emit('close') // Close modal automatically after successful creation
       } catch (err) {
         error.value = err.message || 'Erreur lors de la création'
       } finally {

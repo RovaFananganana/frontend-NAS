@@ -17,13 +17,32 @@
 
       <!-- Page content -->
       <div class="flex-1 overflow-auto">
-        <!-- Dynamic component -->
-        <component 
-          :is="currentComponent" 
-          :user-role="'admin'" 
-          :external-path="activeTab === 'explorer' ? currentPath : null"
-          @path-changed="handlePathChanged"
-        />
+        <!-- Dynamic component with safety checks -->
+        <div v-if="activeTab === 'dash'">
+          <Dashboard />
+        </div>
+        <div v-else-if="activeTab === 'users'">
+          <UserManagement />
+        </div>
+        <div v-else-if="activeTab === 'groups'">
+          <GroupManagement />
+        </div>
+        <div v-else-if="activeTab === 'explorer'">
+          <FileExplorer 
+            :user-role="'admin'" 
+            :external-path="currentPath"
+            @path-changed="handlePathChanged"
+          />
+        </div>
+        <div v-else-if="activeTab === 'perms'">
+          <PermissionManager />
+        </div>
+        <div v-else-if="activeTab === 'logs'">
+          <AccessLogs />
+        </div>
+        <div v-else>
+          <Dashboard />
+        </div>
       </div>
     </div>
   </div>

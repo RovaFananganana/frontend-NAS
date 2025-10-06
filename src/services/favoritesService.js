@@ -3,10 +3,41 @@
  * Permet d'ajouter, supprimer et gérer les dossiers favoris de l'utilisateur
  */
 
+// Import de l'API pour le logging d'activité
+import { userAPI } from './api.js'
+
 class FavoritesService {
   constructor() {
     this.storageKey = 'file-favorites'
     this.maxFavorites = 50 // Limite pour éviter les problèmes de performance
+  }
+
+  /**
+   * Enregistre une activité de favori dans les logs utilisateur
+   * @param {string} action - Action effectuée ('favorite_add' ou 'favorite_remove')
+   * @param {string} path - Chemin du dossier
+   * @param {string} name - Nom du dossier
+   */
+  async _logFavoriteActivity(action, path, name) {
+    try {
+      // Utiliser l'API backend pour enregistrer l'activité
+      // Note: Cette API devra être implémentée côté backend
+      await fetch('/api/users/log-activity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          action: action,
+          target: `${name} (${path})`,
+          details: action === 'favorite_add' ? 'Ajout aux favoris' : 'Suppression des favoris'
+        })
+      })
+    } catch (error) {
+      // Ne pas faire échouer l'opération principale si le logging échoue
+      console.warn('Erreur lors de l\'enregistrement de l\'activité favori:', error)
+    }
   }
 
   /**
@@ -76,6 +107,9 @@ class FavoritesService {
       // Émettre un événement pour notifier les composants
       this._emitFavoritesChanged('added', newFavorite)
       
+      // Enregistrer l'activité dans les logs
+      this._logFavoriteActivity('favorite_add', path, name)
+      
       return true
     } catch (error) {
       console.error('Erreur lors de l\'ajout du favori:', error)
@@ -108,6 +142,12 @@ class FavoritesService {
       
       // Émettre un événement pour notifier les composants
       this._emitFavoritesChanged('removed', { path })
+      
+      // Enregistrer l'activité dans les logs (récupérer le nom du favori supprimé)
+      const removedFavorite = favorites.find(fav => fav.path === path)
+      if (removedFavorite) {
+        this._logFavoriteActivity('favorite_remove', path, removedFavorite.name)
+      }
       
       return true
     } catch (error) {

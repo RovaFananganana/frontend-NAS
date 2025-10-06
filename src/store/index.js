@@ -9,6 +9,7 @@ import {
   setUser, 
   setToken 
 } from '../services/auth'
+import TokenService from '../services/tokenService'
 // Performance monitoring removed for now
 
 export default createStore({
@@ -57,6 +58,8 @@ export default createStore({
   },
 
   getters: {
+    isAuthenticated: (state) => state.isAuthenticated,
+    authToken: () => TokenService.getToken(),
     isAdmin: (state) => state.user?.role === 'ADMIN',
     username: (state) => state.user?.username || '',
     userEmail: (state) => state.user?.email || '',
@@ -445,6 +448,9 @@ export default createStore({
 
     // Initialize app
     async initializeApp({ commit, dispatch }) {
+      // Clean up legacy tokens
+      TokenService.cleanupLegacyTokens()
+      
       // Set initial theme
       const theme = localStorage.getItem('theme') || 'light'
       document.documentElement.setAttribute('data-theme', theme)

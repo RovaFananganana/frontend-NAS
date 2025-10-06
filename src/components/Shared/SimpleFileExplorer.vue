@@ -363,6 +363,46 @@
       :item="selectedItemForProperties"
       @close="showPropertiesModal = false"
     />
+
+    <!-- Download Progress Modal -->
+    <div v-if="downloadProgress.show" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-base-100 rounded-lg p-6 w-96 max-w-md mx-4">
+        <h3 class="text-lg font-semibold mb-4">
+          <i class="fas fa-download mr-2"></i>
+          Téléchargement en cours
+        </h3>
+        
+        <div class="mb-4">
+          <div class="text-sm text-base-content opacity-70 mb-2">
+            {{ downloadProgress.fileName }}
+          </div>
+          
+          <!-- Progress Bar -->
+          <div class="w-full bg-base-300 rounded-full h-2.5 mb-2">
+            <div 
+              class="bg-primary h-2.5 rounded-full transition-all duration-300" 
+              :style="{ width: downloadProgress.percentage + '%' }"
+            ></div>
+          </div>
+          
+          <!-- Progress Text -->
+          <div class="flex justify-between text-xs text-base-content opacity-70">
+            <span>{{ downloadProgress.percentage }}%</span>
+            <span v-if="downloadProgress.total > 0">
+              {{ formatBytes(downloadProgress.loaded) }} / {{ formatBytes(downloadProgress.total) }}
+            </span>
+          </div>
+        </div>
+        
+        <!-- Cancel Button (optional for future enhancement) -->
+        <div class="flex justify-end">
+          <div class="text-xs text-base-content opacity-50">
+            <i class="fas fa-info-circle mr-1"></i>
+            Le téléchargement se terminera automatiquement
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -546,11 +586,48 @@ const openItem = (item) => {
   }
 }
 
+// Download progress state
+const downloadProgress = ref({
+  show: false,
+  fileName: '',
+  percentage: 0,
+  loaded: 0,
+  total: 0
+})
+
 const downloadFile = async (item) => {
   try {
+    // Skip system files that might cause issues
+    const systemFiles = ['desktop.ini', 'thumbs.db', '.ds_store', 'folder.jpg', 'albumartsmall.jpg']
+    if (systemFiles.includes(item.name.toLowerCase())) {
+      store.dispatch('showError', 'Les fichiers système ne peuvent pas être téléchargés')
+      return
+    }
+    
+    // Show progress indicator
+    downloadProgress.value = {
+      show: true,
+      fileName: item.name,
+      percentage: 0,
+      loaded: 0,
+      total: 0
+    }
+    
     store.dispatch('showInfo', `Téléchargement de ${item.name} en cours...`)
     
-    const blob = await nasAPI.downloadFile(item.path)
+    const blob = await nasAPI.downloadFile(item.path, (percentage, loaded, total) => {
+      // Update progress
+      downloadProgress.value = {
+        show: true,
+        fileName: item.name,
+        percentage: Math.round(percentage),
+        loaded,
+        total
+      }
+    })
+    
+    // Hide progress indicator
+    downloadProgress.value.show = false
     
     // Create download link
     const url = window.URL.createObjectURL(blob)
@@ -565,6 +642,10 @@ const downloadFile = async (item) => {
     store.dispatch('showSuccess', `Téléchargement de ${item.name} terminé`)
   } catch (err) {
     console.error('Error downloading file:', err)
+    
+    // Hide progress indicator on error
+    downloadProgress.value.show = false
+    
     if (err instanceof NASAPIError) {
       if (err.status === 403) {
         store.dispatch('showError', 'Permission refusée pour télécharger ce fichier')

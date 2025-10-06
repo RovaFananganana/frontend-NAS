@@ -42,7 +42,7 @@
       <div v-else class="w-6"></div>
 
       <!-- Icône de type -->
-      <div class="w-8 flex justify-center mr-3">
+      <div class="w-8 flex justify-center mr-3 relative">
         <i v-if="file.is_directory" :class="[
           expanded ? 'fas fa-folder-open' : 'fas fa-folder',
           'text-blue-500'
@@ -54,6 +54,12 @@
         <i v-else-if="isArchiveFile(file)" class="fas fa-file-archive text-orange-500"></i>
         <i v-else-if="isCodeFile(file)" class="fas fa-file-code text-yellow-500"></i>
         <i v-else class="fas fa-file text-gray-500"></i>
+        
+        <!-- Indicateur favori -->
+        <i v-if="isFavorite(file.path || file.name)" 
+           class="fas fa-star absolute -top-1 -right-1 w-2 h-2 text-warning"
+           title="Favori"
+           aria-label="Élément favori"></i>
       </div>
       
       <!-- Nom du fichier -->
@@ -130,6 +136,10 @@ const props = defineProps({
     default: 0
   },
   isSelected: {
+    type: Function,
+    default: () => false
+  },
+  isFavorite: {
     type: Function,
     default: () => false
   }

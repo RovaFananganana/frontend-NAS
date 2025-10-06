@@ -228,9 +228,45 @@ const canDelete = ref(true)
 const canShare = ref(true)
 
 // Methods
-const downloadFile = () => {
-  // Trigger download
-  emit('close')
+const downloadFile = async () => {
+  if (props.item.is_directory) {
+    return // Don't download directories
+  }
+  
+  try {
+    const { nasAPI, NASAPIError } = await import('@/services/nasAPI.js')
+    const { useStore } = await import('vuex')
+    const store = useStore()
+    
+    store.dispatch('showInfo', `Téléchargement de ${props.item.name} en cours...`)
+    
+    const blob = await nasAPI.downloadFile(props.item.path)
+    
+    // Create download link
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = props.item.name
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    store.dispatch('showSuccess', `Téléchargement de ${props.item.name} terminé`)
+    emit('close')
+  } catch (err) {
+    console.error('Error downloading file:', err)
+    const { useStore } = await import('vuex')
+    const store = useStore()
+    
+    if (err.status === 403) {
+      store.dispatch('showError', 'Permission refusée pour télécharger ce fichier')
+    } else if (err.status === 404) {
+      store.dispatch('showError', 'Fichier introuvable')
+    } else {
+      store.dispatch('showError', `Erreur lors du téléchargement: ${err.message}`)
+    }
+  }
 }
 
 const renameFile = () => {

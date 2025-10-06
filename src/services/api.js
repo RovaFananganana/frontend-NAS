@@ -56,6 +56,7 @@ export const userAPI = {
   // Profile
   getProfile: () => api.get("/users/me"),
   updateProfile: (data) => api.put("/users/me", data),
+  updatePassword: (data) => api.put("/users/me", data),
 
   // Dashboard
   getDashboard: () => api.get("/users/dashboard"),

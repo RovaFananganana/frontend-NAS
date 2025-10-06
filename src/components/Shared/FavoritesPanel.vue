@@ -70,7 +70,7 @@
       compact ? 'max-h-48' : ''
     ]">
       <!-- État vide -->
-      <div v-if="favorites.length === 0" :class="[
+      <div v-if="!favorites || favorites.length === 0" :class="[
         'empty-state text-center text-base-content/60',
         compact ? 'p-2' : 'p-4'
       ]">
@@ -90,10 +90,11 @@
         compact ? 'p-0' : 'p-2'
       ]" role="list">
         <li
-          v-for="favorite in favorites"
+          v-for="favorite in (favorites || [])"
           :key="favorite.path"
           class="favorite-item group"
           role="listitem"
+          @contextmenu="showFavoriteContextMenu($event, favorite)"
         >
           <div :class="[
             'flex items-center rounded-lg transition-colors duration-150',
@@ -125,7 +126,7 @@
 
             <!-- Bouton de suppression -->
             <button
-              @click="removeFavorite(favorite)"
+              @click="removeFavoriteLocal(favorite)"
               :class="[
                 'remove-favorite text-base-content/40 hover:text-error hover:bg-error/10 rounded-r-lg opacity-0 group-hover:opacity-100 transition-all duration-150 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-error focus:ring-inset',
                 compact ? 'p-1' : 'p-2'
@@ -177,12 +178,38 @@
     ]">
       <span>{{ notification.message }}</span>
     </div>
+
+    <!-- Menu contextuel pour les favoris -->
+    <div 
+      v-if="contextMenu.show"
+      class="fixed bg-base-100 border border-base-300 shadow-lg rounded-lg py-2 z-50 min-w-48"
+      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+      @click.stop
+    >
+      <button 
+        class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
+        @click="navigateToFavorite(contextMenu.favorite)"
+      >
+        <i class="fas fa-folder-open w-4"></i>
+        Ouvrir le dossier
+      </button>
+      
+      <div class="divider my-1"></div>
+      
+      <button 
+        class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 text-error"
+        @click="removeFavoriteFromContext"
+      >
+        <i class="fas fa-star w-4"></i>
+        Retirer des favoris
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { favoritesService } from '@/services/favoritesService.js'
+import { useFavorites } from '@/composables/useFavorites.js'
 
 // Props
 const props = defineProps({
@@ -204,12 +231,30 @@ const emit = defineEmits([
   'error'
 ])
 
+// Composable pour les favoris
+const {
+  favorites,
+  loading: refreshing,
+  isFavorite,
+  addFavorite,
+  removeFavorite: removeFavoriteFromBackend,
+  loadFavorites: loadFavoritesFromBackend,
+  exportFavorites: exportFavoritesData,
+  getFavoritesStats
+} = useFavorites()
+
 // État réactif
-const favorites = ref([])
-const refreshing = ref(false)
 const showImportExport = ref(false)
 const showClearConfirm = ref(false)
 const importInput = ref(null)
+
+// Menu contextuel
+const contextMenu = ref({
+  show: false,
+  x: 0,
+  y: 0,
+  favorite: null
+})
 
 // Notification système
 const notification = ref({
@@ -219,26 +264,16 @@ const notification = ref({
 })
 
 // Computed
-const maxFavorites = computed(() => favoritesService.maxFavorites)
+const maxFavorites = computed(() => 50) // Limite par défaut
 
 // Méthodes
-const loadFavorites = () => {
+const refresh = async () => {
   try {
-    favorites.value = favoritesService.getFavorites()
+    await loadFavoritesFromBackend()
+    showNotification('Favoris actualisés', 'success')
   } catch (error) {
     console.error('Erreur lors du chargement des favoris:', error)
     showNotification('Erreur lors du chargement des favoris', 'error')
-  }
-}
-
-const refresh = async () => {
-  refreshing.value = true
-  try {
-    await new Promise(resolve => setTimeout(resolve, 300)) // Animation
-    loadFavorites()
-    showNotification('Favoris actualisés', 'success')
-  } finally {
-    refreshing.value = false
   }
 }
 
@@ -256,25 +291,21 @@ const navigateToFavorite = (favorite) => {
   }
 }
 
-const removeFavorite = (favorite) => {
+const removeFavoriteLocal = async (favorite) => {
   try {
-    const success = favoritesService.removeFavorite(favorite.path)
-    if (success) {
-      loadFavorites()
-      emit('favorite-removed', favorite)
-      showNotification(`${favorite.name} retiré des favoris`, 'success')
-    } else {
-      showNotification('Erreur lors de la suppression du favori', 'error')
-    }
+    await removeFavoriteFromBackend(favorite.item_path || favorite.path)
+    emit('favorite-removed', favorite)
+    showNotification(`${favorite.item_name || favorite.name} retiré des favoris`, 'success')
   } catch (error) {
     console.error('Erreur lors de la suppression du favori:', error)
     showNotification('Erreur lors de la suppression du favori', 'error')
+    emit('error', error)
   }
 }
 
 const exportFavorites = () => {
   try {
-    const jsonData = favoritesService.exportFavorites()
+    const jsonData = JSON.stringify(favorites.value, null, 2)
     const blob = new Blob([jsonData], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     
@@ -300,13 +331,8 @@ const importFavorites = (event) => {
   const reader = new FileReader()
   reader.onload = (e) => {
     try {
-      const success = favoritesService.importFavorites(e.target.result, true)
-      if (success) {
-        loadFavorites()
-        showNotification('Favoris importés avec succès', 'success')
-      } else {
-        showNotification('Erreur lors de l\'import des favoris', 'error')
-      }
+      // Import temporairement désactivé - nécessite implémentation backend
+      showNotification('Import temporairement indisponible', 'warning')
     } catch (error) {
       console.error('Erreur lors de l\'import:', error)
       showNotification('Format de fichier invalide', 'error')
@@ -324,11 +350,12 @@ const confirmClearAll = () => {
   showClearConfirm.value = true
 }
 
-const clearAllFavorites = () => {
+const clearAllFavorites = async () => {
   try {
-    const success = favoritesService.clearAllFavorites()
+    // Clear all temporairement désactivé - nécessite implémentation backend
+    const success = false
     if (success) {
-      loadFavorites()
+      await loadFavoritesFromBackend()
       showNotification('Tous les favoris ont été supprimés', 'success')
     } else {
       showNotification('Erreur lors de la suppression', 'error')
@@ -358,13 +385,13 @@ const showNotification = (message, type = 'info') => {
 let unsubscribeFavoritesChanged = null
 
 // Méthodes publiques exposées
-const addCurrentPathToFavorites = (name = null) => {
+const addCurrentPathToFavorites = async (name = null) => {
   try {
     const folderName = name || props.currentPath.split('/').pop() || 'Racine'
-    const success = favoritesService.addFavorite(props.currentPath, folderName)
+    const success = await addFavorite(props.currentPath, folderName, 'folder')
     
     if (success) {
-      loadFavorites()
+      // Les favoris se rechargent automatiquement via le composable
       emit('favorite-added', {
         path: props.currentPath,
         name: folderName
@@ -383,7 +410,34 @@ const addCurrentPathToFavorites = (name = null) => {
 }
 
 const isCurrentPathFavorite = () => {
-  return favoritesService.isFavorite(props.currentPath)
+  return isFavorite(props.currentPath)
+}
+
+// Méthodes pour le menu contextuel
+const showFavoriteContextMenu = (event, favorite) => {
+  event.preventDefault()
+  contextMenu.value = {
+    show: true,
+    x: event.clientX,
+    y: event.clientY,
+    favorite
+  }
+  
+  // Fermer le menu quand on clique ailleurs
+  const hideMenu = () => {
+    contextMenu.value.show = false
+    document.removeEventListener('click', hideMenu)
+  }
+  setTimeout(() => {
+    document.addEventListener('click', hideMenu)
+  }, 0)
+}
+
+const removeFavoriteFromContext = async () => {
+  if (contextMenu.value.favorite) {
+    await removeFavoriteLocal(contextMenu.value.favorite)
+  }
+  contextMenu.value.show = false
 }
 
 // Exposer les méthodes pour utilisation par le parent
@@ -395,19 +449,8 @@ defineExpose({
 
 // Lifecycle hooks
 onMounted(() => {
-  loadFavorites()
-  
-  // Écouter les changements de favoris depuis d'autres composants
-  unsubscribeFavoritesChanged = favoritesService.onFavoritesChanged((detail) => {
-    loadFavorites()
-    
-    // Émettre des événements selon l'action
-    if (detail.action === 'added') {
-      emit('favorite-added', detail.data)
-    } else if (detail.action === 'removed') {
-      emit('favorite-removed', detail.data)
-    }
-  })
+  // Les favoris se chargent automatiquement via le composable useFavorites
+  // qui se synchronise automatiquement avec le backend
 })
 
 onUnmounted(() => {

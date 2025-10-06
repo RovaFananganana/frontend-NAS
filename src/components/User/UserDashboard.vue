@@ -5,11 +5,13 @@
     <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg">
       <div class="hero-content text-center">
         <div class="max-w-md">
-          <h1 class="text-3xl font-bold">Welcome to your NAS</h1>
-          <p class="py-4">Access your files, monitor storage, and sync with Synology Drive</p>
+          <h1 class="text-3xl font-bold">
+            Bienvenue {{ store.getters.username || 'Utilisateur' }}
+          </h1>
+          <p class="py-4">Accédez à vos fichiers, surveillez votre stockage et synchronisez avec Synology Drive</p>
           <button class="btn btn-accent" @click="navigateToFiles">
             <i class="fas fa-folder-open mr-2"></i>
-            Browse Files
+            Parcourir les fichiers
           </button>
         </div>
       </div>
@@ -272,25 +274,51 @@ const uploadFiles = async () => {
 
 const loadDashboardData = async () => {
   try {
-    // Load user storage info
-    // This would typically come from a user-specific API endpoint
-    // For now, we'll use mock data
-    storageUsed.value = 1024 * 1024 * 150 // 150MB
-    storageQuota.value = 1024 * 1024 * 1024 * 2 // 2GB
-    fileCount.value = 42
-    lastActivity.value = new Date()
+    // Load user storage info from store and API
+    const user = store.state.user
+    if (user) {
+      storageQuota.value = (user.quota_mb || 2048) * 1024 * 1024 // Convert MB to bytes
+      
+      // Try to get actual storage usage from API
+      try {
+        const storageInfo = await store.dispatch('fetchStorageInfo')
+        if (storageInfo && storageInfo.includes('/')) {
+          const [used, total] = storageInfo.split('/').map(s => s.trim().replace(' MB', ''))
+          storageUsed.value = parseInt(used) * 1024 * 1024 // Convert MB to bytes
+        }
+      } catch (error) {
+        console.warn('Could not fetch storage info:', error)
+        // Fallback to estimated usage
+        storageUsed.value = Math.floor(storageQuota.value * 0.15) // Estimate 15% usage
+      }
+    }
     
-    // Load recent files from root directory
+    // Load recent files from root directory and count them
     try {
       const response = await nasAPI.browse('/')
       if (response.success) {
-        recentFiles.value = response.items
-          .filter(item => !item.is_directory)
-          .sort((a, b) => new Date(b.modified) - new Date(a.modified))
+        const allFiles = response.items.filter(item => !item.is_directory)
+        fileCount.value = allFiles.length
+        
+        recentFiles.value = allFiles
+          .sort((a, b) => {
+            const dateA = new Date(a.modified_time || a.modified || 0)
+            const dateB = new Date(b.modified_time || b.modified || 0)
+            return dateB - dateA
+          })
           .slice(0, 10)
+          
+        // Set last activity to the most recent file modification
+        if (recentFiles.value.length > 0) {
+          lastActivity.value = new Date(recentFiles.value[0].modified_time || recentFiles.value[0].modified)
+        }
       }
     } catch (error) {
       console.error('Error loading recent files:', error)
+      // Set defaults if API fails
+      fileCount.value = 0
+      recentFiles.value = []
+      lastActivity.value = new Date()
     }
     
   } catch (error) {

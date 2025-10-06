@@ -1,26 +1,13 @@
 // services/auth.js
 import { authAPI } from './api'
+import TokenService from './tokenService'
 
-const TOKEN_KEY = 'auth_token'
 const USER_KEY = 'user_data'
 
-// Gestion du token
-export const getToken = () => {
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY)
-}
-
-export const setToken = (token, rememberMe = true) => {
-  if (rememberMe) {
-    localStorage.setItem(TOKEN_KEY, token)
-  } else {
-    sessionStorage.setItem(TOKEN_KEY, token)
-  }
-}
-
-export const removeToken = () => {
-  localStorage.removeItem(TOKEN_KEY)
-  sessionStorage.removeItem(TOKEN_KEY)
-}
+// Gestion du token (délégué au TokenService)
+export const getToken = () => TokenService.getToken()
+export const setToken = (token, rememberMe = true) => TokenService.setToken(token, rememberMe)
+export const removeToken = () => TokenService.removeToken()
 
 // Gestion des données utilisateur
 export const getUser = () => {
@@ -75,7 +62,7 @@ export const getCurrentUser = async () => {
     const user = response.data
 
     // récupérer rememberMe en fonction de là où est stocké le token
-    const rememberMe = !!localStorage.getItem(TOKEN_KEY)
+    const rememberMe = !!localStorage.getItem('auth_token')
     setUser(user, rememberMe)
 
     return user
