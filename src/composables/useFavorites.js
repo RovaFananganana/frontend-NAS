@@ -14,10 +14,11 @@ export function useFavorites() {
   // Configuration API
   const baseURL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001') + '/favorites'
   
-  // État local
+  // État local - lié à l'utilisateur connecté
   const favorites = ref([])
   const loading = ref(false)
   const error = ref(null)
+  const currentUserId = ref(null)
   
   // État de synchronisation
   const lastSyncTime = ref(null)
@@ -31,6 +32,21 @@ export function useFavorites() {
   const favoriteCount = computed(() => favorites.value.length)
   
   const isAuthenticated = computed(() => store.getters.isAuthenticated)
+  const userId = computed(() => store.getters.userId || store.getters.username)
+  
+  /**
+   * Vide le cache si l'utilisateur a changé
+   */
+  const clearCacheIfUserChanged = () => {
+    const newUserId = userId.value
+    if (currentUserId.value !== null && currentUserId.value !== newUserId) {
+      console.log(`🔄 User changed from ${currentUserId.value} to ${newUserId}, clearing favorites cache`)
+      favorites.value = []
+      error.value = null
+      lastSyncTime.value = null
+    }
+    currentUserId.value = newUserId
+  }
   
   /**
    * Vérifie si un élément est dans les favoris
@@ -68,8 +84,12 @@ export function useFavorites() {
   const loadFavorites = async () => {
     if (!isAuthenticated.value) {
       favorites.value = []
+      currentUserId.value = null
       return false
     }
+    
+    // Vérifier si l'utilisateur a changé
+    clearCacheIfUserChanged()
     
     loading.value = true
     error.value = null
@@ -144,6 +164,9 @@ export function useFavorites() {
     if (!isAuthenticated.value) {
       throw new Error('Utilisateur non authentifié')
     }
+    
+    // Vérifier si l'utilisateur a changé
+    clearCacheIfUserChanged()
     
     if (!path || !name) {
       throw new Error('Chemin et nom requis')
@@ -501,17 +524,34 @@ export function useFavorites() {
     (state) => state.isAuthenticated,
     (newValue) => {
       if (newValue) {
+        clearCacheIfUserChanged()
         loadFavorites()
         startAutoSync()
       } else {
         favorites.value = []
+        currentUserId.value = null
         stopAutoSync()
+      }
+    }
+  )
+  
+  // Écouter les changements d'utilisateur
+  const unwatchUser = store.watch(
+    (state) => state.user?.id || state.user?.username,
+    (newUserId) => {
+      if (newUserId && newUserId !== currentUserId.value) {
+        console.log(`🔄 User ID changed to ${newUserId}, reloading favorites`)
+        clearCacheIfUserChanged()
+        if (isAuthenticated.value) {
+          loadFavorites()
+        }
       }
     }
   )
   
   onUnmounted(() => {
     unwatchAuth()
+    unwatchUser()
   })
   
   return {
@@ -545,7 +585,10 @@ export function useFavorites() {
     
     // Synchronisation automatique
     startAutoSync,
-    stopAutoSync
+    stopAutoSync,
+    
+    // Gestion utilisateur
+    clearCacheIfUserChanged
   }
 }
 

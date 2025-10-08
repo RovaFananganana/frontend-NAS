@@ -36,7 +36,7 @@
         </div>
         <ul class="menu p-0 space-y-1">
           <li class="ml-4" v-for="tab in userTabs" :key="tab.key">
-            <a @click="selectTab(tab.key)" :class="{ 'active bg-primary text-primary-content': activeTab === tab.key }"
+            <a @click="selectTab(tab.key)" :class="{ 'active !bg-primary !text-primary-content': isTabSelected(tab.key) }"
               class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-base-300 transition-colors cursor-pointer">
               <i :class="tab.icon" class="w-5"></i>
               <span>{{ tab.label }}</span>
@@ -51,6 +51,7 @@
           </div>
           <div class="favorites-container">
             <FavoritesPanel ref="favoritesPanel" :current-path="currentPath" :compact="true"
+              :is-favorite-selected="isFavoriteSelected"
               @navigate="handleFavoriteNavigation" @favorite-added="onFavoriteAdded"
               @favorite-removed="onFavoriteRemoved" @error="onFavoritesError" />
           </div>
@@ -63,16 +64,6 @@
           Mon compte
         </div>
         <ul class="menu p-0 space-y-1">
-          <!-- Dashboard utilisateur -->
-          <li class="ml-4" v-if="!isAdmin">
-            <a @click="selectTab('dashboard')"
-              :class="{ 'active bg-primary text-primary-content': activeTab === 'dashboard' }"
-              class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-base-300 transition-colors cursor-pointer">
-              <i class="fas fa-tachometer-alt w-5"></i>
-              <span>Tableau de bord</span>
-            </a>
-          </li>
-
           <!-- Mon profil -->
           <li class="ml-4">
             <a @click="openProfileModal" :class="{ 'active bg-primary text-primary-content': activeTab === 'profile' }"
@@ -192,10 +183,30 @@ const showProfileModal = ref(false)
 const currentTheme = ref('light')
 const storageUsage = ref('...')
 
+// État unifié de sélection
+const selectedItem = ref({ type: 'tab', value: props.activeTab })
+
+// Synchroniser avec les changements de props.activeTab
+import { watch } from 'vue'
+watch(() => props.activeTab, (newTab) => {
+  if (selectedItem.value.type === 'tab') {
+    selectedItem.value.value = newTab
+  }
+})
+
 // Computed properties
 const isAdmin = computed(() => store.getters.isAdmin)
 const username = computed(() => store.getters.username)
 const userRoleLabel = computed(() => isAdmin.value ? 'Administrateur' : 'Utilisateur')
+
+// Fonctions pour vérifier la sélection
+const isTabSelected = (tabKey) => {
+  return selectedItem.value.type === 'tab' && selectedItem.value.value === tabKey
+}
+
+const isFavoriteSelected = (favoritePath) => {
+  return selectedItem.value.type === 'favorite' && selectedItem.value.value === favoritePath
+}
 
 // Themes
 import { availableThemes, applyTheme, getCurrentTheme } from '@/utils/themeUtils.js'
@@ -217,7 +228,10 @@ const userTabs = [
 ]
 
 // Methods
-const selectTab = (tabKey) => emit('tab-changed', tabKey)
+const selectTab = (tabKey) => {
+  selectedItem.value = { type: 'tab', value: tabKey }
+  emit('tab-changed', tabKey)
+}
 
 const openProfileModal = () => {
   showProfileModal.value = true
@@ -245,6 +259,7 @@ const handleLogout = () => {
 
 // Favorites methods
 const handleFavoriteNavigation = (event) => {
+  selectedItem.value = { type: 'favorite', value: event.path }
   emit('navigate-to-favorite', event)
 }
 

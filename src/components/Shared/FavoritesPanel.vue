@@ -55,6 +55,10 @@
         'empty-state text-center text-base-content/60',
         compact ? 'p-2' : 'p-4'
       ]">
+        <!-- Debug info -->
+        <div v-if="compact" class="text-xs text-red-500 mb-2">
+          Debug: {{ favorites?.length || 0 }} favoris
+        </div>
         <i :class="[
           'fas fa-star mb-3 opacity-30',
           compact ? 'text-2xl' : 'text-4xl'
@@ -70,37 +74,29 @@
         'favorites-list space-y-1',
         compact ? 'p-0' : 'p-2'
       ]" role="list">
-        <li v-for="favorite in (favorites || [])" :key="favorite.path" class="favorite-item group" role="listitem"
+        <li v-for="favorite in (favorites || [])" :key="favorite.item_path" class="favorite-item group ml-4" role="listitem"
           @contextmenu="showFavoriteContextMenu($event, favorite)">
-          <div :class="[
-            'flex items-center rounded-lg transition-colors duration-150',
-            compact ? 'hover:bg-base-300' : 'bg-base-100 hover:bg-base-200'
-          ]">
-            <!-- Bouton de navigation -->
+          <!-- Style harmonisé avec les éléments de navigation de la sidebar -->
+          <div class="flex items-center">
             <button @click="navigateToFavorite(favorite)" :class="[
-              'favorite-button flex-1 flex items-center text-left rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset',
-              compact ? 'gap-2 p-2' : 'gap-3 p-3'
-            ]" :title="`Naviguer vers ${favorite.path}`"
-              :aria-label="`Naviguer vers le dossier favori ${favorite.name}`">
-              <i class="fas fa-folder text-primary flex-shrink-0" aria-hidden="true"></i>
-              <div class="flex-1 min-w-0">
-                <div :class="[
-                  'font-medium text-base-content truncate',
-                  compact ? 'text-xs' : 'text-sm'
-                ]">
-                  {{ favorite.name }}
-                </div>
-                <div v-if="!compact" class="text-xs text-base-content/60 truncate">
-                  {{ favorite.path }}
-                </div>
-              </div>
+              'favorite-button flex-1 flex items-center text-left rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset',
+              compact ? 'gap-2 px-3 py-2' : 'gap-3 px-3 py-2',
+              // Style actif unifié avec les éléments de navigation
+              props.isFavoriteSelected(favorite.item_path) ? '!bg-primary !text-primary-content' : 'hover:bg-base-300'
+            ]" :title="`Naviguer vers ${favorite.item_path}`"
+              :aria-label="`Naviguer vers le dossier favori ${favorite.item_name}`">
+              <i class="fas fa-folder w-5" aria-hidden="true"></i>
+              <span :class="[
+                'truncate',
+                compact ? 'text-xs' : 'text-sm'
+              ]">{{ favorite.item_name }}</span>
             </button>
 
-            <!-- Bouton de suppression -->
+            <!-- Bouton de suppression (visible au hover) -->
             <button @click="removeFavoriteLocal(favorite)" :class="[
-              'remove-favorite text-base-content/40 hover:text-error hover:bg-error/10 rounded-r-lg opacity-0 group-hover:opacity-100 transition-all duration-150 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-error focus:ring-inset',
-              compact ? 'p-1' : 'p-2'
-            ]" :title="`Retirer ${favorite.name} des favoris`" :aria-label="`Retirer ${favorite.name} des favoris`">
+              'remove-favorite text-base-content/40 hover:text-error opacity-0 group-hover:opacity-100 transition-all duration-150 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-error focus:ring-inset rounded',
+              compact ? 'p-1 ml-1' : 'p-2 ml-2'
+            ]" :title="`Retirer ${favorite.item_name} des favoris`" :aria-label="`Retirer ${favorite.item_name} des favoris`">
               <i class="fas fa-times text-xs" aria-hidden="true"></i>
             </button>
           </div>
@@ -181,6 +177,10 @@ const props = defineProps({
   compact: {
     type: Boolean,
     default: false
+  },
+  isFavoriteSelected: {
+    type: Function,
+    default: () => () => false
   }
 })
 
@@ -250,12 +250,13 @@ const refresh = async () => {
 
 const navigateToFavorite = (favorite) => {
   try {
+    console.log('🔄 Navigating to favorite:', favorite)
     emit('navigate', {
-      path: favorite.path,
+      path: favorite.item_path,
       source: 'favorite',
       favorite: favorite
     })
-    showNotification(`Navigation vers ${favorite.name}`, 'info')
+    showNotification(`Navigation vers ${favorite.item_name}`, 'info')
   } catch (error) {
     console.error('Erreur lors de la navigation:', error)
     showNotification('Erreur lors de la navigation', 'error')
@@ -435,6 +436,7 @@ onMounted(async () => {
     try {
       await loadFavoritesFromBackend()
       console.log('✅ Favorites loaded in FavoritesPanel:', favorites.value?.length || 0)
+      console.log('🔍 Favorites data:', favorites.value)
     } catch (error) {
       console.error('❌ Error loading favorites in FavoritesPanel:', error)
     }
