@@ -189,6 +189,8 @@ const selectedItem = ref({ type: 'tab', value: props.activeTab })
 // Synchroniser avec les changements de props.activeTab
 import { watch } from 'vue'
 watch(() => props.activeTab, (newTab) => {
+  // Ne synchroniser que si on n'a pas un favori sélectionné
+  // et que le changement d'onglet ne vient pas d'un clic sur favori
   if (selectedItem.value.type === 'tab') {
     selectedItem.value.value = newTab
   }
@@ -259,8 +261,11 @@ const handleLogout = () => {
 
 // Favorites methods
 const handleFavoriteNavigation = (event) => {
+  console.log('🔄 Sidebar: Handling favorite navigation to:', event.path)
   selectedItem.value = { type: 'favorite', value: event.path }
-  emit('navigate-to-favorite', event)
+  // Émettre l'événement avec une indication que c'est un favori
+  emit('navigate-to-favorite', { ...event, fromFavorite: true })
+  console.log('✅ Sidebar: Emitted navigate-to-favorite event')
 }
 
 const onFavoriteAdded = (favorite) => {

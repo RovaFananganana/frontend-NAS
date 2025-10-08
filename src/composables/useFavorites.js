@@ -49,6 +49,45 @@ export function useFavorites() {
   }
   
   /**
+   * Nettoie les favoris indésirables du localStorage
+   * Supprime les favoris qui s'ajoutent automatiquement (AIMtest, echange IL, etc.)
+   */
+  const cleanupLocalStorageFavorites = () => {
+    try {
+      const unwantedPaths = [
+        '/AIMtest',
+        '/echange IL', 
+        '/administration',
+        '/finance',
+        '/TWR'
+      ]
+      
+      const localFavorites = favoritesService.getFavorites()
+      const initialCount = localFavorites.length
+      
+      // Filtrer les favoris indésirables
+      const cleanedFavorites = localFavorites.filter(fav => 
+        !unwantedPaths.some(unwantedPath => 
+          fav.path === unwantedPath || fav.path.startsWith(unwantedPath + '/')
+        )
+      )
+      
+      if (cleanedFavorites.length !== initialCount) {
+        // Sauvegarder les favoris nettoyés
+        localStorage.setItem('file-favorites', JSON.stringify(cleanedFavorites))
+        console.log(`🧹 Nettoyage localStorage: ${initialCount - cleanedFavorites.length} favoris indésirables supprimés`)
+        
+        // Émettre un événement pour notifier les composants
+        window.dispatchEvent(new CustomEvent('favorites-changed', {
+          detail: { action: 'cleaned', count: initialCount - cleanedFavorites.length }
+        }))
+      }
+    } catch (err) {
+      console.warn('Erreur lors du nettoyage des favoris localStorage:', err)
+    }
+  }
+  
+  /**
    * Vérifie si un élément est dans les favoris
    * @param {string} path - Chemin de l'élément
    * @returns {boolean}
@@ -87,6 +126,9 @@ export function useFavorites() {
       currentUserId.value = null
       return false
     }
+    
+    // Nettoyer les favoris indésirables du localStorage avant de charger
+    cleanupLocalStorageFavorites()
     
     // Vérifier si l'utilisateur a changé
     clearCacheIfUserChanged()
@@ -403,6 +445,14 @@ export function useFavorites() {
     try {
       const localFavorites = favoritesService.getFavorites()
       
+      // ⚠️ DÉSACTIVÉ: Cette fonction causait l'ajout automatique de favoris indésirables
+      // Les favoris du localStorage (AIMtest, echange IL, administration, finance, TWR)
+      // étaient automatiquement ajoutés au backend à chaque connexion
+      console.log(`🚫 Synchronisation localStorage->Backend désactivée (${localFavorites.length} favoris locaux ignorés)`)
+      
+      // Si vous voulez réactiver cette fonctionnalité, décommentez le code ci-dessous
+      // et assurez-vous que le localStorage ne contient que des favoris valides
+      /*
       for (const localFav of localFavorites) {
         // Check if this favorite exists in backend
         const existsInBackend = favorites.value.some(backendFav => 
@@ -418,6 +468,7 @@ export function useFavorites() {
           }
         }
       }
+      */
     } catch (err) {
       console.warn('Failed to sync local favorites to backend:', err)
     }
@@ -588,7 +639,10 @@ export function useFavorites() {
     stopAutoSync,
     
     // Gestion utilisateur
-    clearCacheIfUserChanged
+    clearCacheIfUserChanged,
+    
+    // Nettoyage
+    cleanupLocalStorageFavorites
   }
 }
 

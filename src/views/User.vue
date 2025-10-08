@@ -25,6 +25,7 @@
           :is="currentComponent" 
           :user-role="'user'" 
           :external-path="activeTab === 'files' ? currentPath : null"
+          :key="activeTab === 'files' ? `files-${componentKey}` : activeTab"
           @navigate="handleTabChange"
           @path-changed="handlePathChanged"
         />
@@ -34,7 +35,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 
 import Navbar from '../components/Shared/Navbar.vue'
 import Sidebar from '../components/Shared/Sidebar.vue'
@@ -57,6 +58,9 @@ const tabs = [
 const activeTab = ref('files') // Commencer directement sur les fichiers au lieu du dashboard
 const currentPath = ref('/')
 
+// Clé pour forcer le re-render du composant FileExplorer
+const componentKey = ref(0)
+
 // Computed properties
 const currentComponent = computed(() => {
   const tab = tabs.find(t => t.key === activeTab.value)
@@ -70,20 +74,38 @@ const currentTabLabel = computed(() => {
 
 // Methods
 const handleTabChange = (tabKey) => {
+  console.log('🔄 User.vue: Tab changed to:', tabKey)
   activeTab.value = tabKey
+  
+  // Si on clique sur "Mes fichiers", remettre le chemin à la racine
+  if (tabKey === 'files') {
+    console.log('✅ User.vue: Resetting path to root for "Mes fichiers"')
+    currentPath.value = '/'
+    // Forcer le re-render pour s'assurer que le changement est pris en compte
+    componentKey.value++
+  }
 }
 
 const handlePathChanged = (event) => {
+  console.log('🔄 User.vue: Path changed from', event.oldPath, 'to', event.newPath)
   currentPath.value = event.newPath
 }
 
 const handleFavoriteNavigation = (event) => {
-  // Switch to files tab and navigate to the favorite path
-  activeTab.value = 'files'
-  currentPath.value = event.path
+  console.log('🔄 User.vue: Handling favorite navigation to:', event.path)
   
-  // If the FileExplorer component is available, navigate to the path
-  // This will be handled by the FileExplorer component when it receives the path change
+  // Les favoris ne fonctionnent que dans le contexte FileExplorer
+  // On doit basculer vers l'onglet "files" et mettre à jour le chemin
+  activeTab.value = 'files'
+  
+  // Utiliser nextTick pour s'assurer que le composant FileExplorer est monté
+  // avant de changer le chemin
+  nextTick(() => {
+    currentPath.value = event.path
+    // Forcer le re-render du composant pour s'assurer que le changement est pris en compte
+    componentKey.value++
+    console.log('✅ User.vue: Path updated to:', event.path, 'componentKey:', componentKey.value)
+  })
 }
 </script>
 

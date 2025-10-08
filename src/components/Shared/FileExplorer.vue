@@ -419,12 +419,7 @@ const selectedCount = computed(() => getSelectedCount())
 const canNavigateBack = computed(() => historyIndex.value > 0)
 const canNavigateForward = computed(() => historyIndex.value < navigationHistory.value.length - 1)
 
-// Watcher pour les changements de chemin externe
-watch(() => props.externalPath, (newPath) => {
-  if (newPath && newPath !== currentPath.value) {
-    handlePathSelected(newPath)
-  }
-})
+
 
 // Méthodes de chargement des données avec vrais appels API
 const loadFiles = async (path = currentPath.value) => {
@@ -602,6 +597,16 @@ const handlePathSelected = async (path) => {
     })
   }
 }
+
+// Watcher pour les changements de chemin externe (défini après handlePathSelected)
+watch(() => props.externalPath, (newPath, oldPath) => {
+  console.log('🔄 FileExplorer: External path changed from', oldPath, 'to', newPath)
+  
+  if (newPath && newPath !== currentPath.value) {
+    console.log('✅ FileExplorer: Navigating to external path:', newPath)
+    handlePathSelected(newPath)
+  }
+}, { immediate: true })
 
 const handleBreadcrumbNavigation = async (path) => {
   console.log(`FileExplorer: Breadcrumb navigation to: ${path}`)
