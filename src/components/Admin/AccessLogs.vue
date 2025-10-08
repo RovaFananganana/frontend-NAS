@@ -53,14 +53,14 @@
           </div>
 
           <!-- User Filter -->
-          <div class="form-control">
+          <div class="form-control relative z-20">
             <label class="label">
-              <span class="label-text">Utilisateur</span>
+              <span class="label-text">Utilisateur ({{ users.length }} chargés)</span>
             </label>
-            <select v-model="filters.userId" class="select select-bordered select-sm" @change="applyFilters">
+            <select v-model="filters.userId" class="select select-bordered select-sm w-full" @change="applyFilters" style="z-index: 20;">
               <option value="">Tous les utilisateurs</option>
               <option v-for="user in users" :key="user.id" :value="user.id">
-                {{ user.user }}
+                {{ user.username || user.user || `User ${user.id}` }}
               </option>
             </select>
           </div>
@@ -283,7 +283,14 @@ const filteredLogs = computed(() => {
       : true
 
     const matchesUser = filters.value.userId
-      ? log.userId == filters.value.userId
+      ? (() => {
+          // Trouver le nom d'utilisateur correspondant à l'ID sélectionné
+          const selectedUser = users.value.find(u => u.id == filters.value.userId)
+          const selectedUsername = selectedUser ? (selectedUser.username || selectedUser.user) : null
+          
+          // Comparer avec le champ 'user' du log
+          return selectedUsername && log.user === selectedUsername
+        })()
       : true
 
     const matchesPeriod = (() => {
@@ -381,7 +388,8 @@ const loadLogs = async () => {
     const data = response.data
 
     logs.value = data.logs || data || []
-    totalLogs.value = data.total || logs.value.length
+    // totalLogs est un computed, pas besoin de l'assigner
+    console.log('📊 Logs loaded:', logs.value.length)
   } catch (error) {
     console.error('Error loading logs:', error)
     store.dispatch('showError', 'Erreur lors du chargement des journaux')
@@ -392,10 +400,12 @@ const loadLogs = async () => {
 
 const loadUsers = async () => {
   try {
+    console.log('🔄 Loading users for AccessLogs filter...')
     const response = await adminAPI.getUsers()
     users.value = response.data || []
+    console.log('✅ Users loaded:', users.value.length, users.value)
   } catch (error) {
-    console.error('Error loading users:', error)
+    console.error('❌ Error loading users:', error)
   }
 }
 
@@ -417,6 +427,25 @@ const debouncedFilter = () => {
 }
 
 const applyFilters = () => {
+  console.log('🔍 Applying filters:', filters.value)
+  console.log('📊 Total logs before filter:', logs.value.length)
+  
+  // Debug de la correspondance utilisateur
+  if (filters.value.userId) {
+    const selectedUser = users.value.find(u => u.id == filters.value.userId)
+    const selectedUsername = selectedUser ? (selectedUser.username || selectedUser.user) : null
+    console.log('👤 Selected user ID:', filters.value.userId)
+    console.log('👤 Selected username:', selectedUsername)
+    console.log('👤 Available usernames in logs:', [...new Set(logs.value.map(log => log.user))])
+  }
+  
+  console.log('📊 Filtered logs after filter:', filteredLogs.value.length)
+  
+  // Debug du premier log pour voir la structure
+  if (logs.value.length > 0) {
+    console.log('🔍 First log structure:', logs.value[0])
+  }
+  
   currentPage.value = 1
 }
 
@@ -450,4 +479,21 @@ onMounted(async () => {
   border-top-right-radius: 0.5rem;
   border-bottom-right-radius: 0.5rem;
 }
-</style>
+</style>/* Am
+élioration du select utilisateur */
+.form-control select {
+  position: relative;
+  z-index: 20 !important;
+}
+
+/* Force l'affichage des options du select */
+.select option {
+  background-color: hsl(var(--b1)) !important;
+  color: hsl(var(--bc)) !important;
+  padding: 0.5rem;
+}
+
+/* Assurer que le select est au-dessus des autres éléments */
+.form-control.relative {
+  z-index: 20;
+}
