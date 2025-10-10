@@ -101,6 +101,66 @@
       Envoyer vers
     </button>
 
+    <div v-if="hasViewOrCreateActions" class="divider my-1"></div>
+
+    <!-- Affichage (toujours disponible) -->
+    <div class="relative submenu-container" @mouseenter="handleSubmenuEnter" @mouseleave="handleSubmenuLeave">
+      <button 
+        class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 justify-between"
+        @click="toggleViewModeSubmenu"
+      >
+        <div class="flex items-center gap-3">
+          <i class="fas fa-eye w-4"></i>
+          Affichage
+        </div>
+        <i class="fas fa-chevron-right text-xs"></i>
+      </button>
+      
+      <!-- Sous-menu des modes d'affichage -->
+      <div 
+        v-if="showViewModeSubmenu"
+        class="absolute left-full top-0 ml-1 bg-base-100 border border-base-300 shadow-xl rounded-box py-2 z-[60] min-w-40 submenu-content animate-in slide-in-from-left-2 duration-200"
+        @mouseenter="handleSubmenuContentEnter"
+        @mouseleave="handleSubmenuContentLeave"
+      >
+        <button 
+          class="btn btn-ghost btn-sm w-full justify-start gap-3 transition-all duration-200 ease-in-out"
+          :class="{ 
+            'btn-primary': currentViewMode === 'detailed-list',
+            'hover:translate-x-1': currentViewMode !== 'detailed-list'
+          }"
+          @click.stop="changeViewMode('detailed-list')"
+        >
+          <i class="fas fa-list w-4"></i>
+          Liste
+        </button>
+        
+        <button 
+          class="btn btn-ghost btn-sm w-full justify-start gap-3 transition-all duration-200 ease-in-out"
+          :class="{ 
+            'btn-primary': currentViewMode === 'tree',
+            'hover:translate-x-1': currentViewMode !== 'tree'
+          }"
+          @click.stop="changeViewMode('tree')"
+        >
+          <i class="fas fa-sitemap w-4"></i>
+          Arbre
+        </button>
+        
+        <button 
+          class="btn btn-ghost btn-sm w-full justify-start gap-3 transition-all duration-200 ease-in-out"
+          :class="{ 
+            'btn-primary': currentViewMode === 'mosaic',
+            'hover:translate-x-1': currentViewMode !== 'mosaic'
+          }"
+          @click.stop="changeViewMode('mosaic')"
+        >
+          <i class="fas fa-th w-4"></i>
+          Mosaïque
+        </button>
+      </div>
+    </div>
+
     <!-- Nouveau dossier (sur espace vide seulement) -->
     <button 
       v-if="!item && permissions.can_write"
@@ -155,7 +215,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useStore } from 'vuex'
 
 const props = defineProps({
@@ -196,6 +256,10 @@ const props = defineProps({
   isFavorite: {
     type: Boolean,
     default: false
+  },
+  currentViewMode: {
+    type: String,
+    default: 'DETAILED_LIST'
   }
 })
 
@@ -212,10 +276,15 @@ const emit = defineEmits([
   'create-file',
   'delete',
   'properties',
-  'toggle-favorite'
+  'toggle-favorite',
+  'view-mode-changed'
 ])
 
 const store = useStore()
+
+// État local pour le sous-menu
+const showViewModeSubmenu = ref(false)
+const submenuTimer = ref(null)
 
 const isAdmin = computed(() => store.getters.isAdmin)
 
@@ -231,6 +300,10 @@ const hasModifyActions = computed(() => {
          props.isAdmin
 })
 
+const hasViewOrCreateActions = computed(() => {
+  return true // Toujours afficher la section Affichage
+})
+
 const getPasteTooltip = () => {
   if (!props.clipboardInfo) return ''
   
@@ -239,4 +312,81 @@ const getPasteTooltip = () => {
   
   return `${operationText} ${count} élément${count > 1 ? 's' : ''}`
 }
+
+// Méthodes pour le sous-menu d'affichage
+const toggleViewModeSubmenu = () => {
+  showViewModeSubmenu.value = !showViewModeSubmenu.value
+}
+
+const changeViewMode = (mode) => {
+  emit('view-mode-changed', mode)
+  showViewModeSubmenu.value = false
+  
+  // Nettoyer le timer
+  if (submenuTimer.value) {
+    clearTimeout(submenuTimer.value)
+    submenuTimer.value = null
+  }
+}
+
+// Gestion des événements de souris pour le sous-menu
+const handleSubmenuEnter = () => {
+  if (submenuTimer.value) {
+    clearTimeout(submenuTimer.value)
+    submenuTimer.value = null
+  }
+  showViewModeSubmenu.value = true
+}
+
+const handleSubmenuLeave = () => {
+  // Délai pour permettre de naviguer vers le sous-menu
+  submenuTimer.value = setTimeout(() => {
+    showViewModeSubmenu.value = false
+  }, 500)
+}
+
+const handleSubmenuContentEnter = () => {
+  if (submenuTimer.value) {
+    clearTimeout(submenuTimer.value)
+    submenuTimer.value = null
+  }
+  showViewModeSubmenu.value = true
+}
+
+const handleSubmenuContentLeave = () => {
+  // Délai court quand on quitte le contenu du sous-menu
+  submenuTimer.value = setTimeout(() => {
+    showViewModeSubmenu.value = false
+  }, 150)
+}
 </script>
+
+<style scoped>
+/* Zone de transition pour éviter la fermeture accidentelle du sous-menu */
+.submenu-container::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  background: transparent;
+  z-index: 59;
+}
+
+/* Animation d'entrée personnalisée si les classes Tailwind ne fonctionnent pas */
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.submenu-content {
+  animation: slideInFromLeft 0.2s ease-out;
+}
+</style>

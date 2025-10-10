@@ -1,15 +1,13 @@
 <template>
   <div id="app">
     <!-- Notification globale -->
-    <Notification 
-      v-if="notification.show" 
-      :message="notification.message" 
-      :type="notification.type" 
-      @close="hideNotification" 
-    />
-    
+    <Notification v-if="notification.show" :message="notification.message" :type="notification.type"
+      @close="hideNotification" />
+
     <!-- Route principale -->
     <router-view />
+
+
   </div>
 </template>
 
@@ -105,6 +103,7 @@ export default {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

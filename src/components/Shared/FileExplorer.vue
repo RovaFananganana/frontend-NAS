@@ -57,9 +57,31 @@
           <BreadcrumbNavigation :current-path="currentPath" @navigate="handleBreadcrumbNavigation" />
         </div>
 
-        <!-- View Mode Selector à droite -->
-        <div class="ml-4">
-          <ViewModeSelector :show-shortcuts="!isMobile" @mode-changed="handleModeChange" />
+        <!-- Barre de recherche -->
+        <div class="ml-4 flex-1 max-w-md">
+          <div class="form-control">
+            <div class="input-group">
+              <input 
+                v-model="searchQuery" 
+                type="text" 
+                placeholder="Rechercher fichiers et dossiers..." 
+                class="input input-bordered input-sm w-full"
+                @input="handleSearchInput"
+                @keydown.escape="clearSearch"
+              />
+              <button 
+                v-if="searchQuery"
+                @click="clearSearch"
+                class="btn btn-sm btn-ghost"
+                title="Effacer la recherche"
+              >
+                <i class="fas fa-times"></i>
+              </button>
+              <button class="btn btn-sm btn-ghost" title="Rechercher">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -143,10 +165,11 @@
       count: operationCount,
       description: getOperationDescription()
     }" :show-permission-errors="showPermissionErrors" :is-favorite="isItemFavorite(contextMenu.item)"
+    :current-view-mode="currentMode"
     @open="openContextItem" @download="downloadContextFile" @rename="openRenameModal" @copy="copyContextItem"
     @cut="cutContextItem" @paste="pasteItems" @permissions="openPermissions" @move="openMoveModal"
     @create-folder="openCreateFolderModal" @create-file="openCreateFileModal" @delete="confirmDelete"
-    @properties="showProperties" @toggle-favorite="handleToggleFavorite" />
+    @properties="showProperties" @toggle-favorite="handleToggleFavorite" @view-mode-changed="handleViewModeChange" />
 
   <!-- Modals -->
   <PermissionModal v-if="showPermissionModal && selectedItemForPermissions" :item="selectedItemForPermissions"
@@ -202,7 +225,6 @@ import { nasAPI } from '@/services/nasAPI.js'
 import { VIEW_MODES } from '@/types/viewMode.js'
 
 // Composants
-import ViewModeSelector from './ViewModeSelector.vue'
 import BreadcrumbNavigation from './BreadcrumbNavigation.vue'
 import NasFolderTree from './NasFolderTree.vue'
 import DetailedListView from './DetailedListView.vue'
@@ -275,7 +297,8 @@ const {
   removeSelectedFile,
   toggleSelectedFile,
   selectAll,
-  isSelected
+  isSelected,
+  setCurrentMode
 } = useViewMode()
 
 const {
@@ -312,10 +335,15 @@ const {
 // État local
 const currentPath = ref(props.initialPath)
 const files = ref([])
+const allFiles = ref([]) // Tous les fichiers (non filtrés)
 const loading = ref(false)
 const error = ref('')
 const showShortcutsHelp = ref(false)
 const currentSelectionMode = ref('single')
+
+// État de la recherche
+const searchQuery = ref('')
+const searchDebounceTimer = ref(null)
 
 // Navigation history state
 const navigationHistory = ref([props.initialPath])
@@ -438,8 +466,11 @@ const loadFiles = async (path = currentPath.value) => {
       throw new Error(response.error || 'Échec du chargement des fichiers')
     }
 
-    files.value = response.items || []
-    console.log(`FileExplorer: Loaded ${files.value.length} items`)
+    allFiles.value = response.items || []
+    console.log(`FileExplorer: Loaded ${allFiles.value.length} items`)
+    
+    // Appliquer le filtre de recherche
+    applySearchFilter()
 
     // Nettoyer la sélection si on change de dossier
     if (path !== currentPath.value) {
@@ -456,6 +487,7 @@ const loadFiles = async (path = currentPath.value) => {
   } catch (err) {
     console.error('FileExplorer: Error loading files:', err)
     error.value = err.message || 'Erreur lors du chargement des fichiers'
+    allFiles.value = []
     files.value = []
 
     // Émettre l'erreur pour permettre la gestion parent
@@ -609,31 +641,43 @@ watch(() => props.externalPath, (newPath, oldPath) => {
 }, { immediate: true })
 
 const handleBreadcrumbNavigation = async (path) => {
-  console.log(`FileExplorer: Breadcrumb navigation to: ${path}`)
-
   // Normaliser le chemin
   const normalizedPath = nasAPI.normalizePath(path)
 
   if (normalizedPath !== currentPath.value) {
     const oldPath = currentPath.value
 
-    // Add to navigation history
-    addToNavigationHistory(normalizedPath)
+    try {
+      // Add to navigation history
+      addToNavigationHistory(normalizedPath)
 
-    await loadFiles(normalizedPath)
+      // Charger les fichiers
+      await loadFiles(normalizedPath)
 
-    emit('path-changed', {
-      oldPath: oldPath,
-      newPath: normalizedPath,
-      source: 'breadcrumb',
-      timestamp: Date.now()
-    })
+      emit('path-changed', {
+        oldPath: oldPath,
+        newPath: normalizedPath,
+        source: 'breadcrumb',
+        timestamp: Date.now()
+      })
 
-    emit('navigate', {
-      path: normalizedPath,
-      source: 'breadcrumb',
-      timestamp: Date.now()
-    })
+      emit('navigate', {
+        path: normalizedPath,
+        source: 'breadcrumb',
+        timestamp: Date.now()
+      })
+    } catch (error) {
+      console.error('FileExplorer: Error during breadcrumb navigation:', error)
+      
+      // Émettre une notification d'erreur
+      emit('error', {
+        error: error,
+        path: normalizedPath,
+        source: 'breadcrumb',
+        message: `Impossible d'accéder au dossier: ${path}`,
+        timestamp: Date.now()
+      })
+    }
   }
 }
 
@@ -1096,6 +1140,33 @@ const isItemFavorite = (item) => {
   return isFavorite(item.path)
 }
 
+const handleViewModeChange = (newMode) => {
+  console.log('🔄 FileExplorer: View mode changed from context menu to:', newMode)
+  
+  const oldMode = currentMode.value
+  
+  // Changer le mode via le composable
+  setCurrentMode(newMode)
+  
+  // Fermer le menu contextuel
+  contextMenu.value.show = false
+  
+  // Émettre l'événement pour informer les composants parents
+  const event = {
+    oldMode,
+    newMode,
+    source: 'context-menu'
+  }
+  
+  emit('mode-changed', {
+    ...event,
+    currentPath: currentPath.value,
+    fileCount: fileCount.value
+  })
+  
+  console.log('✅ FileExplorer: View mode changed successfully')
+}
+
 const showNotification = (message, type = 'info') => {
   notification.value = {
     show: true,
@@ -1197,6 +1268,38 @@ const handleUploadError = (error) => {
   showNotification(`Erreur d'upload: ${error.message}`, 'error')
 }
 
+// Méthodes de recherche
+const applySearchFilter = () => {
+  if (!searchQuery.value.trim()) {
+    // Pas de recherche, afficher tous les fichiers
+    files.value = allFiles.value
+  } else {
+    // Filtrer les fichiers par nom
+    const query = searchQuery.value.toLowerCase().trim()
+    files.value = allFiles.value.filter(file => 
+      file.name.toLowerCase().includes(query)
+    )
+  }
+  
+  console.log(`🔍 Search filter applied: "${searchQuery.value}" -> ${files.value.length}/${allFiles.value.length} files`)
+}
+
+const handleSearchInput = () => {
+  // Debounce la recherche pour éviter trop d'appels
+  if (searchDebounceTimer.value) {
+    clearTimeout(searchDebounceTimer.value)
+  }
+  
+  searchDebounceTimer.value = setTimeout(() => {
+    applySearchFilter()
+  }, 300) // 300ms de délai
+}
+
+const clearSearch = () => {
+  searchQuery.value = ''
+  applySearchFilter()
+}
+
 // Lifecycle hooks
 onMounted(async () => {
   if (props.autoLoad) {
@@ -1219,6 +1322,28 @@ onUnmounted(() => {
 <style scoped>
 .file-explorer-content {
   min-height: 400px;
+}
+
+/* Styles pour la barre de recherche */
+.input-group {
+  display: flex;
+  align-items: center;
+}
+
+.input-group .input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.input-group .btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: none;
+}
+
+.input-group .btn:not(:last-child) {
+  border-right: none;
+  border-radius: 0;
 }
 
 /* Animation pour les notifications */

@@ -26,8 +26,8 @@
           :user-role="'user'" 
           :external-path="activeTab === 'files' ? currentPath : null"
           :key="activeTab === 'files' ? `files-${componentKey}` : activeTab"
-          @navigate="handleTabChange"
           @path-changed="handlePathChanged"
+          @error="handleFileExplorerError"
         />
       </div>
     </div>
@@ -74,12 +74,15 @@ const currentTabLabel = computed(() => {
 
 // Methods
 const handleTabChange = (tabKey) => {
-  console.log('🔄 User.vue: Tab changed to:', tabKey)
+  // Vérifier si tabKey est une string (clic sur onglet) ou un objet (événement de navigation)
+  if (typeof tabKey === 'object') {
+    return
+  }
+  
   activeTab.value = tabKey
   
   // Si on clique sur "Mes fichiers", remettre le chemin à la racine
   if (tabKey === 'files') {
-    console.log('✅ User.vue: Resetting path to root for "Mes fichiers"')
     currentPath.value = '/'
     // Forcer le re-render pour s'assurer que le changement est pris en compte
     componentKey.value++
@@ -87,13 +90,10 @@ const handleTabChange = (tabKey) => {
 }
 
 const handlePathChanged = (event) => {
-  console.log('🔄 User.vue: Path changed from', event.oldPath, 'to', event.newPath)
   currentPath.value = event.newPath
 }
 
 const handleFavoriteNavigation = (event) => {
-  console.log('🔄 User.vue: Handling favorite navigation to:', event.path)
-  
   // Les favoris ne fonctionnent que dans le contexte FileExplorer
   // On doit basculer vers l'onglet "files" et mettre à jour le chemin
   activeTab.value = 'files'
@@ -104,8 +104,21 @@ const handleFavoriteNavigation = (event) => {
     currentPath.value = event.path
     // Forcer le re-render du composant pour s'assurer que le changement est pris en compte
     componentKey.value++
-    console.log('✅ User.vue: Path updated to:', event.path, 'componentKey:', componentKey.value)
   })
+}
+
+const handleFileExplorerError = (errorEvent) => {
+  // Si c'est une erreur de navigation (breadcrumb, etc.), ne pas rediriger vers la racine
+  // Laisser l'utilisateur où il était
+  if (errorEvent.source === 'breadcrumb') {
+    return
+  }
+  
+  // Pour d'autres types d'erreurs, on peut décider de rediriger vers la racine
+  if (errorEvent.path !== '/') {
+    currentPath.value = '/'
+    componentKey.value++
+  }
 }
 </script>
 
