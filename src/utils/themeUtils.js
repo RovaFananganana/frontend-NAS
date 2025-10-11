@@ -33,7 +33,7 @@ export function applyTheme(theme) {
   // Émettre un événement pour les composants
   window.dispatchEvent(new CustomEvent('theme-changed', { detail: theme }))
 
-  console.log(`Theme "${theme}" appliqué avec succès`)
+
 }
 
 /**
@@ -67,24 +67,8 @@ export function initializeTheme() {
   }
 
   applyTheme(savedTheme)
-  console.log(`Thème initialisé: ${savedTheme}`)
-  console.log('Variables CSS actuelles:', getCurrentThemeVariables())
 
-  // Vérification des thèmes disponibles sans toucher au DOM
-  setTimeout(() => {
-    const themeSupport = checkThemeSupport()
-    console.log('Theme support check completed:', themeSupport)
 
-    const supportedThemes = Object.entries(themeSupport)
-      .filter(([_, support]) => support.supported)
-      .map(([theme, _]) => theme)
-
-    if (supportedThemes.length === 0) {
-      console.error('Aucun thème DaisyUI détecté! Vérifiez la configuration Tailwind.')
-    } else {
-      console.log('Thèmes supportés:', supportedThemes)
-    }
-  }, 500)
 
   return savedTheme
 }
@@ -199,6 +183,4 @@ export function forceThemeRefresh() {
   document.documentElement.offsetHeight
   document.documentElement.setAttribute('data-theme', currentTheme)
   document.documentElement.offsetHeight
-  console.log('Theme refresh forcé pour:', currentTheme)
-  setTimeout(() => console.log('Variables après refresh:', getCurrentThemeVariables()), 100)
 }

@@ -167,6 +167,23 @@ class NASAPIService {
   }
 
   /**
+   * Search for files and folders recursively
+   */
+  async search(query, path = '/', options = {}) {
+    const params = new URLSearchParams({
+      query: query,
+      path: path,
+      recursive: options.recursive !== false ? 'true' : 'false',
+      include_files: options.includeFiles !== false ? 'true' : 'false',
+      include_folders: options.includeFolders !== false ? 'true' : 'false',
+      case_sensitive: options.caseSensitive === true ? 'true' : 'false',
+      max_results: options.maxResults || '100'
+    })
+    
+    return await this.request(`/search?${params.toString()}`)
+  }
+
+  /**
    * Create a new folder
    */
   async createFolder(parentPath, folderName) {

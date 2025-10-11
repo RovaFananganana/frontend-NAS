@@ -23,11 +23,8 @@
       <div class="flex-shrink-0 relative">
         <i :class="[
           fileIcon, 
-          'w-4 h-4 text-base-content/70',
-          {
-            'text-blue-600': file.is_directory,
-            'text-base-content/60': !file.is_directory
-          }
+          'w-4 h-4',
+          fileIconColor
         ]"></i>
         
         <!-- Indicateur favori -->
@@ -37,10 +34,17 @@
            aria-label="Élément favori"></i>
       </div>
       
-      <!-- Nom du fichier seulement -->
-      <span class="text-sm font-medium truncate min-w-0 flex-1">
-        {{ cleanFileName }}
-      </span>
+      <!-- Nom du fichier avec chemin relatif pour les résultats de recherche -->
+      <div class="min-w-0 flex-1">
+        <span class="text-sm font-medium truncate block">
+          {{ cleanFileName }}
+        </span>
+        <!-- Afficher le chemin relatif pour les résultats de recherche -->
+        <span v-if="file.source && (file.source === 'local' || file.source === 'remote')" 
+              class="text-xs text-base-content/50 truncate block">
+          {{ file.relative_path || file.path }}
+        </span>
+      </div>
     </td>
     
     <!-- Colonne Taille -->
@@ -97,8 +101,14 @@ const props = defineProps({
 // Émissions
 const emit = defineEmits(['click', 'double-click', 'context-menu'])
 
-// Computed pour l'icône du fichier (16px comme requis)
+// Computed optimisé pour l'icône du fichier (16px comme requis)
 const fileIcon = computed(() => {
+  // Utiliser les informations d'icône pré-calculées si disponibles (pour les résultats de recherche)
+  if (props.file.icon_info && props.file.icon_info.icon) {
+    return props.file.icon_info.icon
+  }
+
+  // Fallback pour les fichiers normaux
   if (props.file.is_directory) {
     return 'fas fa-folder'
   }
@@ -170,6 +180,17 @@ const fileIcon = computed(() => {
   }
 
   return iconMap[ext] || 'fas fa-file'
+})
+
+// Computed optimisé pour la couleur de l'icône
+const fileIconColor = computed(() => {
+  // Utiliser les informations de couleur pré-calculées si disponibles
+  if (props.file.icon_info && props.file.icon_info.color) {
+    return props.file.icon_info.color
+  }
+
+  // Fallback pour les fichiers normaux
+  return props.file.is_directory ? 'text-blue-500' : 'text-base-content/70'
 })
 
 // Computed pour le type de fichier
@@ -277,17 +298,6 @@ const formattedDate = computed(() => {
 // Computed pour nettoyer le nom du fichier
 const cleanFileName = computed(() => {
   let name = props.file.name || ''
-  
-  // Debug complet pour voir toutes les données
-  console.log('FileListItem - Debug complet:', {
-    name: name,
-    size: props.file.size,
-    modified_time: props.file.modified_time,
-    is_directory: props.file.is_directory,
-    fullFile: props.file,
-    formattedSize: formatBytes(props.file.size || 0),
-    formattedDate: formatDate(props.file.modified_time)
-  })
   
   // Nettoyer les suffixes ajoutés automatiquement
   name = name.replace(/ - dossier$/i, '')

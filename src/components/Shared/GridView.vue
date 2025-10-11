@@ -133,12 +133,12 @@
                 ]"
               ></i>
               
-              <!-- File icon -->
+              <!-- File icon optimized for search results -->
               <i 
                 v-else
                 :class="[
                   getFileIcon(file),
-                  'text-base-content/60',
+                  getFileIconColor(file),
                   {
                     'text-3xl': gridSize === 'small',
                     'text-4xl': gridSize === 'medium',
@@ -294,8 +294,14 @@ const sortedFiles = computed(() => {
 
 const selectedCount = computed(() => getSelectedCount())
 
-// Utility functions
+// Utility functions optimized for performance
 const getFileIcon = (file) => {
+  // Utiliser les informations d'icône pré-calculées si disponibles (pour les résultats de recherche)
+  if (file.icon_info && file.icon_info.icon) {
+    return file.icon_info.icon
+  }
+
+  // Fallback pour les fichiers normaux
   if (file.is_directory) {
     return 'fas fa-folder'
   }
@@ -338,6 +344,21 @@ const getFileIcon = (file) => {
   }
 
   return iconMap[ext] || 'fas fa-file'
+}
+
+// Fonction optimisée pour obtenir la couleur de l'icône
+const getFileIconColor = (file) => {
+  // Utiliser les informations de couleur pré-calculées si disponibles
+  if (file.icon_info && file.icon_info.color) {
+    return file.icon_info.color
+  }
+
+  // Fallback pour les fichiers normaux
+  if (file.is_directory) {
+    return 'text-blue-500'
+  }
+
+  return 'text-gray-500'
 }
 
 const formatFileSize = (file) => {

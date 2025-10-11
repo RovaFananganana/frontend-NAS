@@ -45,6 +45,11 @@ export function useKeyboardShortcuts(shortcuts = {}, options = {}) {
     if (key === 'Enter') key = 'Enter'
     if (key === 'Tab') key = 'Tab'
     
+    // Vérifier que key est une string
+    if (typeof key !== 'string') {
+      return null
+    }
+    
     // Gérer les touches de fonction
     if (key.startsWith('F') && key.length <= 3) {
       // F1, F2, etc.

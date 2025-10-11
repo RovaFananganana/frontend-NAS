@@ -61,24 +61,13 @@
         <div class="ml-4 flex-1 max-w-md">
           <div class="form-control">
             <div class="input-group">
-              <input 
-                v-model="searchQuery" 
-                type="text" 
-                placeholder="Rechercher fichiers et dossiers..." 
-                class="input input-bordered input-sm w-full"
-                @input="handleSearchInput"
-                @keydown.escape="clearSearch"
-              />
-              <button 
-                v-if="searchQuery"
-                @click="clearSearch"
-                class="btn btn-sm btn-ghost"
-                title="Effacer la recherche"
-              >
+              <!-- <span class="btn btn-sm btn-ghost pointer-events-none">
+                <!-- <i class="fas fa-search"></i> -->
+              <!-- </span> -->
+              <input v-model="searchQuery" type="text" placeholder="Rechercher..."
+                class="input input-bordered input-sm w-full" @input="handleSearchInput" @keydown.escape="clearSearch" />
+              <button v-if="searchQuery" @click="clearSearch" class="btn btn-sm btn-ghost" title="Effacer">
                 <i class="fas fa-times"></i>
-              </button>
-              <button class="btn btn-sm btn-ghost" title="Rechercher">
-                <i class="fas fa-search"></i>
               </button>
             </div>
           </div>
@@ -110,8 +99,23 @@
         </button>
       </div>
 
+      <!-- État de la recherche -->
+      <div v-if="isSearchActive" class="search-status mb-4" role="status" aria-live="polite">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <div v-if="isSearching" class="loading loading-spinner loading-sm" aria-hidden="true"></div>
+            <i v-else-if="hasResults" class="fas fa-search text-primary" aria-hidden="true"></i>
+            <i v-else class="fas fa-search text-base-content/50" aria-hidden="true"></i>
+            <span class="text-sm">{{ searchStatusMessage }}</span>
+          </div>
+          <div v-if="searchStats.searchTime > 0" class="text-xs text-base-content/50">
+            {{ searchStats.searchTime }}ms
+          </div>
+        </div>
+      </div>
+
       <!-- Composant de vue dynamique -->
-      <component v-else :is="currentViewComponent" :current-path="currentPath" :files="files" :loading="loading"
+      <component v-if="!loading && !error" :is="currentViewComponent" :current-path="currentPath" :files="files" :loading="loading"
         :error="error" :focused-index="focusedIndex" :user-role="userRole" :file-operations-state="{
           hasOperation,
           isCopyOperation,
@@ -128,15 +132,27 @@
     <div v-if="!loading && !error"
       class="file-explorer-status mt-4 flex justify-between items-center text-sm text-base-content/60">
       <div class="flex items-center space-x-4">
-        <span>
+        <span v-if="isSearchActive">
+          {{ searchStatusMessage }}
+          <span v-if="searchStats.truncated" class="text-warning ml-1">
+            (résultats limités)
+          </span>
+        </span>
+        <span v-else>
           {{ fileCount }} {{ fileCount === 1 ? 'élément' : 'éléments' }}
         </span>
         <span v-if="selectedCount > 0">
           {{ selectedCount }} sélectionné{{ selectedCount > 1 ? 's' : '' }}
         </span>
-        <span v-if="currentPath !== '/'" class="flex items-center">
+        <span v-if="currentPath !== '/' && !isSearchActive" class="flex items-center">
           <i class="fas fa-folder-open mr-1"></i>
           {{ currentPath }}
+        </span>
+        <span v-if="isSearchActive && searchStats.localResults > 0" class="text-xs text-info">
+          {{ searchStats.localResults }} local{{ searchStats.localResults > 1 ? 'aux' : '' }}
+        </span>
+        <span v-if="isSearchActive && searchStats.remoteResults > 0" class="text-xs text-success">
+          {{ searchStats.remoteResults }} distant{{ searchStats.remoteResults > 1 ? 's' : '' }}
         </span>
       </div>
 
@@ -165,11 +181,11 @@
       count: operationCount,
       description: getOperationDescription()
     }" :show-permission-errors="showPermissionErrors" :is-favorite="isItemFavorite(contextMenu.item)"
-    :current-view-mode="currentMode"
-    @open="openContextItem" @download="downloadContextFile" @rename="openRenameModal" @copy="copyContextItem"
-    @cut="cutContextItem" @paste="pasteItems" @permissions="openPermissions" @move="openMoveModal"
-    @create-folder="openCreateFolderModal" @create-file="openCreateFileModal" @delete="confirmDelete"
-    @properties="showProperties" @toggle-favorite="handleToggleFavorite" @view-mode-changed="handleViewModeChange" />
+    :current-view-mode="currentMode" @open="openContextItem" @download="downloadContextFile" @rename="openRenameModal"
+    @copy="copyContextItem" @cut="cutContextItem" @paste="pasteItems" @permissions="openPermissions"
+    @move="openMoveModal" @create-folder="openCreateFolderModal" @create-file="openCreateFileModal"
+    @delete="confirmDelete" @properties="showProperties" @toggle-favorite="handleToggleFavorite"
+    @view-mode-changed="handleViewModeChange" />
 
   <!-- Modals -->
   <PermissionModal v-if="showPermissionModal && selectedItemForPermissions" :item="selectedItemForPermissions"
@@ -221,6 +237,7 @@ import { usePermissions } from '@/composables/usePermissions.js'
 import { useNotifications } from '@/composables/useNotifications.js'
 import { useFileOperations } from '@/composables/useFileOperations.js'
 import { useFavorites } from '@/composables/useFavorites.js'
+import { useFileSearch } from '@/composables/useFileSearch.js'
 import { nasAPI } from '@/services/nasAPI.js'
 import { VIEW_MODES } from '@/types/viewMode.js'
 
@@ -341,9 +358,20 @@ const error = ref('')
 const showShortcutsHelp = ref(false)
 const currentSelectionMode = ref('single')
 
-// État de la recherche
-const searchQuery = ref('')
-const searchDebounceTimer = ref(null)
+// Composable de recherche rapide
+const {
+  searchQuery,
+  searchResults,
+  isSearching,
+  searchError,
+  searchStats,
+  isSearchActive,
+  hasResults,
+  searchStatusMessage,
+  performSearch,
+  clearSearch: clearFileSearch,
+  cleanup: cleanupSearch
+} = useFileSearch()
 
 // Navigation history state
 const navigationHistory = ref([props.initialPath])
@@ -467,10 +495,12 @@ const loadFiles = async (path = currentPath.value) => {
     }
 
     allFiles.value = response.items || []
-    console.log(`FileExplorer: Loaded ${allFiles.value.length} items`)
-    
-    // Appliquer le filtre de recherche
-    applySearchFilter()
+    console.log(`FileExplorer: Loaded ${allFiles.value.length} items:`, allFiles.value.map(f => ({ name: f.name, path: f.path })))
+
+    // Si une recherche est active, relancer la recherche avec les nouveaux fichiers
+    if (isSearchActive.value) {
+      await performSearch(searchQuery.value, currentPath.value, allFiles.value)
+    }
 
     // Nettoyer la sélection si on change de dossier
     if (path !== currentPath.value) {
@@ -617,6 +647,11 @@ const handlePathSelected = async (path) => {
   if (normalizedPath !== currentPath.value) {
     const oldPath = currentPath.value
 
+    // Clear search when navigating to a new path from search results
+    if (isSearchActive.value) {
+      clearFileSearch()
+    }
+
     // Add to navigation history
     addToNavigationHistory(normalizedPath)
 
@@ -633,7 +668,7 @@ const handlePathSelected = async (path) => {
 // Watcher pour les changements de chemin externe (défini après handlePathSelected)
 watch(() => props.externalPath, (newPath, oldPath) => {
   console.log('🔄 FileExplorer: External path changed from', oldPath, 'to', newPath)
-  
+
   if (newPath && newPath !== currentPath.value) {
     console.log('✅ FileExplorer: Navigating to external path:', newPath)
     handlePathSelected(newPath)
@@ -668,7 +703,7 @@ const handleBreadcrumbNavigation = async (path) => {
       })
     } catch (error) {
       console.error('FileExplorer: Error during breadcrumb navigation:', error)
-      
+
       // Émettre une notification d'erreur
       emit('error', {
         error: error,
@@ -743,12 +778,18 @@ const handleSortChanged = (event) => {
 
 // Gestionnaires pour les gestes mobiles
 const handleNavigateBack = () => {
-  // Try to use history first, fallback to parent directory
-  if (canNavigateBack.value) {
-    navigateHistoryBack()
-  } else if (currentPath.value !== '/') {
-    const parentPath = currentPath.value.split('/').slice(0, -1).join('/') || '/'
-    handlePathSelected(parentPath)
+  console.log('🔙 handleNavigateBack called, currentPath:', currentPath.value)
+  
+  // Always navigate to parent directory when back button is clicked
+  if (currentPath.value !== '/') {
+    const pathSegments = currentPath.value.split('/').filter(segment => segment !== '')
+    const parentPath = pathSegments.length > 0 ? '/' + pathSegments.slice(0, -1).join('/') : '/'
+    const normalizedParentPath = parentPath === '//' ? '/' : parentPath
+    
+    console.log('🔙 Navigating to parent:', normalizedParentPath)
+    handlePathSelected(normalizedParentPath)
+  } else {
+    console.log('🔙 Already at root, cannot go back')
   }
 }
 
@@ -1142,28 +1183,28 @@ const isItemFavorite = (item) => {
 
 const handleViewModeChange = (newMode) => {
   console.log('🔄 FileExplorer: View mode changed from context menu to:', newMode)
-  
+
   const oldMode = currentMode.value
-  
+
   // Changer le mode via le composable
   setCurrentMode(newMode)
-  
+
   // Fermer le menu contextuel
   contextMenu.value.show = false
-  
+
   // Émettre l'événement pour informer les composants parents
   const event = {
     oldMode,
     newMode,
     source: 'context-menu'
   }
-  
+
   emit('mode-changed', {
     ...event,
     currentPath: currentPath.value,
     fileCount: fileCount.value
   })
-  
+
   console.log('✅ FileExplorer: View mode changed successfully')
 }
 
@@ -1268,36 +1309,106 @@ const handleUploadError = (error) => {
   showNotification(`Erreur d'upload: ${error.message}`, 'error')
 }
 
-// Méthodes de recherche
-const applySearchFilter = () => {
-  if (!searchQuery.value.trim()) {
-    // Pas de recherche, afficher tous les fichiers
-    files.value = allFiles.value
-  } else {
-    // Filtrer les fichiers par nom
-    const query = searchQuery.value.toLowerCase().trim()
-    files.value = allFiles.value.filter(file => 
-      file.name.toLowerCase().includes(query)
-    )
+// Version simple de la recherche sans le composable complexe
+const simpleSearchResults = ref([])
+const isSimpleSearchActive = computed(() => searchQuery.value.length >= 2)
+
+// Computed pour afficher les fichiers (version simple qui fonctionne)
+const displayedFiles = computed(() => {
+  if (isSimpleSearchActive.value) {
+    console.log('🔍 Showing search results:', simpleSearchResults.value.length, 'results')
+    return simpleSearchResults.value
   }
-  
-  console.log(`🔍 Search filter applied: "${searchQuery.value}" -> ${files.value.length}/${allFiles.value.length} files`)
+  console.log('📁 Showing all files:', allFiles.value?.length || 0, 'files')
+  return allFiles.value || []
+})
+
+// Watcher pour mettre à jour les fichiers affichés (simplifié)
+watch(displayedFiles, (newFiles) => {
+  console.log('📋 Updating displayed files:', newFiles.length, 'files')
+  files.value = newFiles || []
+}, { immediate: true })
+
+// Méthodes de recherche simplifiées
+const handleSearchInput = async () => {
+  console.log('🔍 Search input changed:', searchQuery.value)
+  await performSimpleSearch(searchQuery.value)
 }
 
-const handleSearchInput = () => {
-  // Debounce la recherche pour éviter trop d'appels
-  if (searchDebounceTimer.value) {
-    clearTimeout(searchDebounceTimer.value)
+const performSimpleSearch = async (query) => {
+  console.log('🔍 Simple search for:', query, 'in', allFiles.value?.length || 0, 'local files')
+  
+  if (!query || query.length < 2) {
+    simpleSearchResults.value = []
+    return
   }
   
-  searchDebounceTimer.value = setTimeout(() => {
-    applySearchFilter()
-  }, 300) // 300ms de délai
+  const searchTerm = query.toLowerCase().trim()
+  
+  // 1. Recherche locale (répertoire courant)
+  const localResults = (allFiles.value || []).filter(file => {
+    const nameMatch = file.name.toLowerCase().includes(searchTerm)
+    if (nameMatch) {
+      console.log('✅ Local match found:', file.name)
+    }
+    return nameMatch
+  })
+  
+  console.log('📍 Local search found:', localResults.length, 'results')
+  
+  // Afficher immédiatement les résultats locaux
+  simpleSearchResults.value = localResults
+  
+  // 2. Recherche récursive simplifiée - chercher dans les dossiers du niveau actuel
+  try {
+    console.log('🔍 Starting simplified recursive search...')
+    const folders = (allFiles.value || []).filter(file => file.is_directory)
+    console.log('📁 Found', folders.length, 'folders to search in')
+    
+    const allResults = [...localResults]
+    const seenPaths = new Set(localResults.map(f => f.path))
+    
+    // Chercher dans chaque dossier (limité aux premiers niveaux pour éviter la lenteur)
+    for (const folder of folders.slice(0, 5)) { // Limiter à 5 dossiers pour les performances
+      try {
+        console.log('🔍 Searching in folder:', folder.name)
+        const folderResponse = await nasAPI.browse(folder.path)
+        
+        if (folderResponse.success && folderResponse.items) {
+          const folderMatches = folderResponse.items.filter(item => 
+            item.name.toLowerCase().includes(searchTerm)
+          )
+          
+          folderMatches.forEach(match => {
+            if (!seenPaths.has(match.path)) {
+              allResults.push({
+                ...match,
+                source: 'folder_search',
+                parent_folder: folder.name
+              })
+              seenPaths.add(match.path)
+              console.log('✅ Found in', folder.name + ':', match.name)
+            }
+          })
+        }
+      } catch (error) {
+        console.warn('Error searching in folder', folder.name, ':', error.message)
+      }
+    }
+    
+    simpleSearchResults.value = allResults
+    console.log('🎯 Total search results:', allResults.length, '(local + folder search)')
+    
+  } catch (error) {
+    console.warn('Simplified recursive search error:', error.message)
+    // Garder les résultats locaux en cas d'erreur
+  }
 }
 
 const clearSearch = () => {
+  console.log('🧹 Clearing simple search')
   searchQuery.value = ''
-  applySearchFilter()
+  simpleSearchResults.value = []
 }
 
 // Lifecycle hooks
@@ -1316,6 +1427,9 @@ onMounted(async () => {
 onUnmounted(() => {
   // Deactivate keyboard navigation
   deactivateNavigation()
+  
+  // Cleanup search
+  cleanupSearch()
 })
 </script>
 
@@ -1344,6 +1458,14 @@ onUnmounted(() => {
 .input-group .btn:not(:last-child) {
   border-right: none;
   border-radius: 0;
+}
+
+/* Styles pour l'état de recherche */
+.search-status {
+  padding: 0.75rem 1rem;
+  background: rgba(var(--b2), 0.5);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(var(--bc), 0.1);
 }
 
 /* Animation pour les notifications */
