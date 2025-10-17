@@ -12,8 +12,7 @@
         </button>
       </div>
     </div>
-    <!-- Theme Test (temporary)>
- <ThemeTest />
+    <!-- Theme Test removed -->
 
 <!--Header -->
     <div class="flex items-center justify-between mb-6">
@@ -154,10 +153,7 @@
       </div>
     </div>
 
-    <!-- Debug Panel (temporary) -->
-    <div class="mb-6">
-      <AuthDebug />
-    </div>
+    <!-- Debug Panel removed -->
 
     <!-- Synology Drive Integration -->
     <div class="mb-6">
@@ -264,8 +260,8 @@ import { adminAPI } from '@/services/api'
 import { useStore } from 'vuex'
 import PerformanceDashboard from './PerformanceDashboard.vue'
 import SynologyDriveStatus from '../Shared/SynologyDriveStatus.vue'
-import AuthDebug from '../Debug/AuthDebug.vue'
-import ThemeTest from '../Debug/ThemeTest.vue'
+
+
 
 const store = useStore()
 

@@ -245,7 +245,7 @@ import TokenService from '@/services/tokenService.js'
 import httpClient from '@/services/httpClient.js'
 import { uploadService } from '@/services/uploadService.js'
 import { clipboardService } from '@/services/clipboardService.js'
-import { activityLogger } from '@/services/activityLogger.js'
+import { useActivityLogger } from '@/composables/useActivityLogger.js'
 import { VIEW_MODES } from '@/types/viewMode.js'
 
 // Composants
@@ -453,6 +453,9 @@ const {
 // Notification system
 const { showPermissionError, showError } = useNotifications()
 
+// Activity logging
+const activityLogger = useActivityLogger()
+
 // Permission state
 const contextMenuPermissions = ref({
   can_read: false,
@@ -652,6 +655,7 @@ const handlePathSelected = async (path) => {
   const normalizedPath = nasAPI.normalizePath(path)
 
   if (normalizedPath !== currentPath.value) {
+    // Folder access is already logged by nasAPI.browse()
     const oldPath = currentPath.value
 
     // Clear search when navigating to a new path from search results
@@ -930,8 +934,7 @@ const handleClipboardPaste = async (event) => {
     const result = await clipboardService.pasteFiles(currentPath.value)
     
     if (result.success) {
-      // Log activity
-      activityLogger.logPaste(result.files || [], currentPath.value, 'external')
+      // Activity is already logged by the paste operation
       
       console.log(result.message, 'success')
       
@@ -1104,12 +1107,24 @@ const downloadContextFile = async (item) => {
       console.log('🔄 Trying direct download URL:', downloadUrl)
       
       blob = await httpClient.downloadFile(downloadUrl)
+      
+      // Log download activity for fallback method
+      console.log('📝 Logging fallback download:', item.path)
+      activityLogger.logFileDownload(item.path, { 
+        size: blob.size,
+        mime_type: blob.type 
+      })
     }
 
     console.log('✅ Download completed, blob size:', blob.size)
 
-    if (!blob || blob.size === 0) {
-      throw new Error('Le fichier téléchargé est vide')
+    if (!blob) {
+      throw new Error('Erreur lors du téléchargement')
+    }
+    
+    // Allow 0kb files (empty files are valid)
+    if (blob.size === 0) {
+      console.log('⚠️ Downloading empty file (0kb):', item.name)
     }
 
     // Create download link with better browser compatibility
@@ -1141,8 +1156,7 @@ const downloadContextFile = async (item) => {
       console.log('🧹 Cleaned up download link')
     }, 1000)
 
-    // Log activity
-    activityLogger.logDownload(item.name, item.path)
+    // Activity logging is handled by nasAPI.downloadFile()
     
     emit('file-downloaded', { file: item, timestamp: Date.now() })
     emit('success', `Téléchargement de ${item.name} terminé`)
@@ -1191,8 +1205,8 @@ const copyContextItem = async (item) => {
   // Copy for internal NAS operations
   copy([item], currentPath.value)
   
-  // Log activity
-  activityLogger.logCopy([item], 'internal')
+  // Log copy activity
+  activityLogger.logCopy(item.path, item.path + '_copy', item.type === 'folder')
   
   // Also copy to system clipboard if supported
   if (clipboardService.getState().isSupported) {
@@ -1203,8 +1217,7 @@ const copyContextItem = async (item) => {
       if (result.success) {
         console.log(`✅ ${item.name} copied to both NAS clipboard and system clipboard`)
         console.log(`ℹ️ ${result.message}`)
-        // Log system clipboard copy
-        activityLogger.logCopy([item], 'system')
+        // System clipboard copy is already logged
       } else {
         console.warn(`⚠️ Failed to copy to system clipboard: ${result.error}`)
       }
@@ -1255,8 +1268,7 @@ const pasteItems = async () => {
     const result = await paste(currentPath.value)
 
     if (result.success) {
-      // Log activity
-      activityLogger.logPaste(operationItems.value, currentPath.value, 'internal')
+      // Activity is already logged by nasAPI.copyItem/moveItem
       
       // Refresh the file list to show changes
       await loadFiles(currentPath.value)
@@ -1452,9 +1464,8 @@ const onItemRenamed = async (renameData) => {
     // renameData is an object: {oldPath, newPath, newName}
     console.log('Item renamed:', renameData)
 
-    // Log activity
-    const oldName = renameData.oldPath.split('/').pop()
-    activityLogger.logRename(oldName, renameData.newName, renameData.newPath)
+    // Log rename activity
+    activityLogger.logRename(renameData.oldPath, renameData.newPath, renameData.isFolder)
 
     // Show success notification
     console.log(`Élément renommé en "${renameData.newName}"`, 'success')
@@ -1479,14 +1490,20 @@ const onItemRenamed = async (renameData) => {
   }
 }
 
-const onItemsMoved = () => {
+const onItemsMoved = (moveData) => {
+  // Log move activity for each moved item
+  if (moveData && moveData.items) {
+    for (const item of moveData.items) {
+      activityLogger.logMove(item.path, moveData.destination, item.type === 'folder')
+    }
+  }
+  
   loadFiles(currentPath.value)
 }
 
 const onItemsDeleted = async (items) => {
   try {
-    // Log activity
-    activityLogger.logDelete(items)
+    // Activity logging is handled by nasAPI.deleteItem()
     
     for (const item of items) {
       // Remove from selection if it was selected
@@ -1512,8 +1529,7 @@ const onItemsDeleted = async (items) => {
 }
 
 const onFolderCreated = (event) => {
-  // Log activity
-  activityLogger.logCreate(event?.folderName || 'nouveau dossier', 'folder', currentPath.value)
+  // Folder creation activity logging is handled by nasAPI.createFolder()
   
   // Show success notification
   console.log(`Dossier "${event?.folderName || 'nouveau dossier'}" créé avec succès`, 'success')
@@ -1522,8 +1538,7 @@ const onFolderCreated = (event) => {
 }
 
 const onFileCreated = (event) => {
-  // Log activity
-  activityLogger.logCreate(event.fileName, 'file', currentPath.value)
+  // File creation activity logging is handled by nasAPI.createFile()
   
   // Show success notification
   console.log(`Fichier "${event.fileName}" créé avec succès`, 'success')
@@ -1532,8 +1547,7 @@ const onFileCreated = (event) => {
 }
 
 const onFilesUploaded = (event) => {
-  // Log activity
-  activityLogger.logUpload(event.files || [], currentPath.value)
+  // Upload activity logging is handled by nasAPI.uploadFile()
   
   // Show success notification
   console.log(`${event.files?.length || 1} fichier(s) uploadé(s) avec succès`, 'success')
@@ -1542,16 +1556,32 @@ const onFilesUploaded = (event) => {
 }
 
 const handleUploadError = (error) => {
-  // Show error notification
-  console.log(`Erreur d'upload: ${error.message}`, 'error')
+  console.error('Upload error:', error)
+  
+  // Déterminer le type d'erreur et afficher le bon message
+  if (error.status === 403 || error.message.includes('Permission') || error.message.includes('refusée')) {
+    showPermissionError('upload')
+  } else if (error.status === 413 || error.message.includes('too large')) {
+    showError('Le fichier est trop volumineux')
+  } else if (error.status === 507 || error.message.includes('space')) {
+    showError('Espace de stockage insuffisant')
+  } else {
+    showError(`Erreur d'upload: ${error.message}`)
+  }
+  
+  // Émettre l'erreur pour le parent
+  emit('error', {
+    error: error,
+    action: 'upload',
+    timestamp: Date.now()
+  })
 }
 
 // Drag & Drop event handlers
 const handleFilesDrop = async (event) => {
   console.log('📁 Files dropped:', event.files.length, 'files to', event.targetPath)
   
-  // Log activity
-  activityLogger.logDragDrop(event.files, event.targetPath)
+  // Drag and drop activity logging is handled by the upload process
   
   try {
     // Start batch upload
@@ -1588,6 +1618,18 @@ const handleDragLeave = () => {
   console.log('🚪 Drag leave detected')
   // Could remove visual feedback here if needed
 }
+
+// Setup upload service event handling
+uploadService.onError((uploadItem, error) => {
+  console.log('📢 Upload service error received:', uploadItem.fileName, error)
+  handleUploadError(error)
+})
+
+uploadService.onSuccess((uploadItem) => {
+  console.log('📢 Upload service success received:', uploadItem.fileName)
+  // Refresh the file list to show the new file
+  loadFiles(currentPath.value)
+})
 
 // Batch upload functionality using upload service
 const startBatchUpload = async (files, targetPath) => {

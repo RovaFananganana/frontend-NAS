@@ -100,6 +100,8 @@ export const userAPI = {
   // Logs
   getLogs: (page = 1, perPage = 20) =>
     api.get("/users/my-logs", { params: { page, per_page: perPage } }),
+  logActivity: (activityData) =>
+    api.post("/users/log-activity", activityData),
 };
 
 // ========== ADMIN API ==========

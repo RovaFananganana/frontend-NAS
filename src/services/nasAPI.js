@@ -8,6 +8,157 @@
 import TokenService from './tokenService.js'
 import httpClient from './httpClient.js'
 
+// Simple activity logger for nasAPI (without Vue composable)
+const simpleActivityLogger = {
+  logs: [],
+  maxLogs: 100,
+  
+  log(operation, context) {
+    const logEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date().toISOString(),
+      operation,
+      ...context
+    }
+    
+    this.logs.unshift(logEntry)
+    if (this.logs.length > this.maxLogs) {
+      this.logs = this.logs.slice(0, this.maxLogs)
+    }
+    
+    if (import.meta.env.DEV) {
+      console.log(`📁 [NAS_ACTIVITY] ${operation}:`, context)
+    }
+    
+    // Send to backend for persistent storage
+    this.sendToBackend(operation, context)
+  },
+  
+  async sendToBackend(operation, context) {
+    try {
+      // Don't send if no token (user not authenticated)
+      if (!TokenService.hasToken()) {
+        return
+      }
+      
+      // Map frontend operations to backend actions
+      const actionMapping = {
+        'FOLDER_OPEN': 'ACCESS_FOLDER',
+        'FILE_READ': 'ACCESS_FILE',
+        'FILE_DOWNLOAD': 'DOWNLOAD_FILE',
+        'FILE_UPLOAD': 'UPLOAD_FILE',
+        'FILE_DELETE': 'DELETE_FILE',
+        'FOLDER_DELETE': 'DELETE_FOLDER',
+        'FILE_COPY': 'COPY_FILE',
+        'FOLDER_COPY': 'COPY_FOLDER',
+        'FILE_MOVE': 'MOVE_FILE',
+        'FOLDER_MOVE': 'MOVE_FOLDER',
+        'FILE_RENAME': 'RENAME_FILE',
+        'FOLDER_RENAME': 'RENAME_FOLDER',
+        'FILE_CREATE': 'CREATE_FILE',
+        'FOLDER_CREATE': 'CREATE_FOLDER'
+      }
+      
+      const action = actionMapping[operation] || operation
+      const target = context.path || context.source_path || 'unknown'
+      
+      // Import userAPI dynamically to avoid circular dependencies
+      const { userAPI } = await import('@/services/api')
+      
+      await userAPI.logActivity({
+        action: action,
+        target: target,
+        details: JSON.stringify(context)
+      })
+      
+    } catch (error) {
+      console.warn('Error sending activity log to backend:', error)
+    }
+  },
+  
+  logFolderOpen(path, timing = {}) {
+    this.log('FOLDER_OPEN', { path, type: 'folder', action: 'open', timing })
+  },
+  
+  logFileDownload(path, fileInfo = {}, timing = {}) {
+    this.log('FILE_DOWNLOAD', { path, type: 'file', action: 'download', file_info: fileInfo, timing })
+  },
+  
+  logFileUpload(path, fileInfo = {}, timing = {}) {
+    this.log('FILE_UPLOAD', { path, type: 'file', action: 'upload', file_info: fileInfo, timing })
+  },
+  
+  logDelete(path, isFolder = false, timing = {}) {
+    this.log(isFolder ? 'FOLDER_DELETE' : 'FILE_DELETE', { 
+      path, 
+      type: isFolder ? 'folder' : 'file', 
+      action: 'delete', 
+      timing 
+    })
+  },
+  
+  logCopy(sourcePath, destPath, isFolder = false, timing = {}) {
+    this.log(isFolder ? 'FOLDER_COPY' : 'FILE_COPY', { 
+      source_path: sourcePath,
+      destination_path: destPath,
+      type: isFolder ? 'folder' : 'file', 
+      action: 'copy', 
+      timing 
+    })
+  },
+  
+  logMove(sourcePath, destPath, isFolder = false, timing = {}) {
+    this.log(isFolder ? 'FOLDER_MOVE' : 'FILE_MOVE', { 
+      source_path: sourcePath,
+      destination_path: destPath,
+      type: isFolder ? 'folder' : 'file', 
+      action: 'move', 
+      timing 
+    })
+  },
+  
+  logRename(oldPath, newPath, isFolder = false, timing = {}) {
+    this.log(isFolder ? 'FOLDER_RENAME' : 'FILE_RENAME', { 
+      old_path: oldPath,
+      new_path: newPath,
+      type: isFolder ? 'folder' : 'file', 
+      action: 'rename', 
+      timing 
+    })
+  },
+  
+  logFolderCreate(path, timing = {}) {
+    this.log('FOLDER_CREATE', { path, type: 'folder', action: 'create', timing })
+  },
+  
+  logFileCreate(path, timing = {}) {
+    this.log('FILE_CREATE', { path, type: 'file', action: 'create', timing })
+  },
+  
+  logError(operation, path, error, context = {}) {
+    // Créer un message d'erreur détaillé
+    let errorDetails = error.message || 'Erreur inconnue'
+    
+    if (error.status === 403) {
+      errorDetails = 'Permission refusée'
+    } else if (error.status === 404) {
+      errorDetails = 'Fichier ou dossier introuvable'
+    } else if (error.status === 500) {
+      errorDetails = 'Erreur serveur interne'
+    }
+    
+    this.log('ERROR', { 
+      failed_operation: operation,
+      path,
+      error_message: errorDetails,
+      error_code: error.code,
+      error_status: error.status,
+      full_error: error.message,
+      ...context
+    })
+  }
+}
+
 class NASAPIError extends Error {
   constructor(message, status, code) {
     super(message)
@@ -160,11 +311,27 @@ class NASAPIService {
   // ==================== File Operations ====================
 
   /**
-   * Browse directory contents
+   * Browse directory contents with activity logging
    */
   async browse(path = '/') {
+    const startTime = performance.now()
     const encodedPath = encodeURIComponent(path)
-    return await this.request(`/browse?path=${encodedPath}`)
+    
+    try {
+      const result = await this.request(`/browse?path=${encodedPath}`)
+      
+      // Log folder open activity
+      simpleActivityLogger.logFolderOpen(path, {
+        duration_ms: performance.now() - startTime,
+        items_count: result.items?.length || 0
+      })
+      
+      return result
+    } catch (error) {
+      // Log error
+      simpleActivityLogger.logError('FOLDER_OPEN', path, error, { isFolder: true })
+      throw error
+    }
   }
 
   /**
@@ -185,35 +352,70 @@ class NASAPIService {
   }
 
   /**
-   * Create a new folder
+   * Create a new folder with activity logging
    */
   async createFolder(parentPath, folderName) {
-    return await this.request('/create-folder', {
-      method: 'POST',
-      body: JSON.stringify({
-        parent_path: parentPath,
-        name: folderName
+    const startTime = performance.now()
+    
+    try {
+      const result = await this.request('/create-folder', {
+        method: 'POST',
+        body: JSON.stringify({
+          parent_path: parentPath,
+          name: folderName
+        })
       })
-    })
+      
+      const duration = performance.now() - startTime
+      const folderPath = this.joinPaths(parentPath, folderName)
+      
+      // Log folder creation activity
+      simpleActivityLogger.logFolderCreate(folderPath, { duration_ms: duration })
+      
+      return result
+    } catch (error) {
+      // Log error
+      const folderPath = this.joinPaths(parentPath, folderName)
+      simpleActivityLogger.logError('FOLDER_CREATE', folderPath, error, { isFolder: true })
+      throw error
+    }
   }
 
   /**
-   * Create a new file
+   * Create a new file with activity logging
    */
   async createFile(parentPath, fileName) {
-    return await this.request('/create-file', {
-      method: 'POST',
-      body: JSON.stringify({
-        parent_path: parentPath,
-        name: fileName
+    const startTime = performance.now()
+    
+    try {
+      const result = await this.request('/create-file', {
+        method: 'POST',
+        body: JSON.stringify({
+          parent_path: parentPath,
+          name: fileName
+        })
       })
-    })
+      
+      const duration = performance.now() - startTime
+      const filePath = this.joinPaths(parentPath, fileName)
+      
+      // Log file creation activity
+      simpleActivityLogger.logFileCreate(filePath, { duration_ms: duration })
+      
+      return result
+    } catch (error) {
+      // Log error
+      const filePath = this.joinPaths(parentPath, fileName)
+      simpleActivityLogger.logError('FILE_CREATE', filePath, error, { isFolder: false })
+      throw error
+    }
   }
 
   /**
-   * Upload file
+   * Upload file with activity logging
    */
   async uploadFile(file, destinationPath, overwrite = false, onProgress = null) {
+    const startTime = performance.now()
     const formData = new FormData()
     formData.append('file', file)
     formData.append('path', destinationPath)
@@ -222,22 +424,47 @@ class NASAPIService {
     const xhr = new XMLHttpRequest()
     
     return new Promise((resolve, reject) => {
+      let uploadSpeed = 0
+      
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable && onProgress) {
           const percentComplete = (event.loaded / event.total) * 100
           onProgress(percentComplete)
+          
+          // Calculate upload speed
+          const duration = performance.now() - startTime
+          if (duration > 0) {
+            uploadSpeed = (event.loaded / 1024 / 1024) / (duration / 1000) // MB/s
+          }
         }
       })
 
-      xhr.addEventListener('load', () => {
+      xhr.addEventListener('load', async () => {
+        const duration = performance.now() - startTime
+        
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const response = JSON.parse(xhr.responseText)
+            
+            // Log upload activity
+            simpleActivityLogger.logFileUpload(destinationPath, {
+              size: file.size,
+              mime_type: file.type,
+              overwrite
+            }, {
+              duration_ms: duration,
+              upload_speed_mbps: uploadSpeed
+            })
+            
             resolve(response)
           } catch (e) {
             reject(new NASAPIError('Invalid response format', xhr.status))
           }
         } else {
+          // Log error
+          const error = new NASAPIError('Upload failed', xhr.status)
+          simpleActivityLogger.logError('FILE_UPLOAD', destinationPath, error, { isFolder: false })
+          
           try {
             const errorResponse = JSON.parse(xhr.responseText)
             reject(new NASAPIError(errorResponse.error || 'Upload failed', xhr.status))
@@ -248,10 +475,14 @@ class NASAPIService {
       })
 
       xhr.addEventListener('error', () => {
+        const error = new NASAPIError('Network error during upload', 0, 'NETWORK_ERROR')
+        simpleActivityLogger.logError('FILE_UPLOAD', destinationPath, error, { isFolder: false })
         reject(new NASAPIError('Network error during upload', 0, 'NETWORK_ERROR'))
       })
 
       xhr.addEventListener('timeout', () => {
+        const error = new NASAPIError('Upload timeout', 0, 'TIMEOUT')
+        simpleActivityLogger.logError('FILE_UPLOAD', destinationPath, error, { isFolder: false })
         reject(new NASAPIError('Upload timeout', 0, 'TIMEOUT'))
       })
 
@@ -263,18 +494,23 @@ class NASAPIService {
   }
 
   /**
-   * Download file with progress tracking using axios
+   * Download file with progress tracking and activity logging
    */
   async downloadFile(filePath, onProgress = null) {
+    const startTime = performance.now()
     // Better encoding for special characters and normalize path
     const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath
     const encodedPath = normalizedPath.split('/').map(segment => encodeURIComponent(segment)).join('/')
+    
+    let downloadSize = 0
+    let downloadSpeed = 0
     
     try {
       // Use httpClient's downloadFile method which handles axios blob downloads with progress
       const blob = await httpClient.downloadFile(
         `/nas/download/${encodedPath}`,
         onProgress ? (percentComplete, loaded, total) => {
+          downloadSize = total
           onProgress(percentComplete, loaded, total)
         } : null,
         {
@@ -285,9 +521,26 @@ class NASAPIService {
         }
       )
       
+      const duration = performance.now() - startTime
+      if (duration > 0 && downloadSize > 0) {
+        downloadSpeed = (downloadSize / 1024 / 1024) / (duration / 1000) // MB/s
+      }
+      
+      // Log download activity
+      simpleActivityLogger.logFileDownload(filePath, {
+        size: downloadSize,
+        mime_type: blob.type
+      }, {
+        duration_ms: duration,
+        download_speed_mbps: downloadSpeed
+      })
+      
       return blob
       
     } catch (error) {
+      // Log error
+      simpleActivityLogger.logError('FILE_DOWNLOAD', filePath, error, { isFolder: false })
+      
       // Transform httpClient errors to NASAPIError for consistency
       if (error.name === 'HTTPClientError') {
         throw new NASAPIError(
@@ -302,52 +555,117 @@ class NASAPIService {
   }
 
   /**
-   * Delete file or folder
+   * Delete file or folder with activity logging
    */
   async deleteItem(path) {
-    return await this.request('/delete', {
-      method: 'DELETE',
-      body: JSON.stringify({ path })
-    })
+    const startTime = performance.now()
+    
+    try {
+      const result = await this.request('/delete', {
+        method: 'DELETE',
+        body: JSON.stringify({ path })
+      })
+      
+      const duration = performance.now() - startTime
+      
+      // Log delete activity
+      const isFolder = result.type === 'folder' || path.endsWith('/')
+      simpleActivityLogger.logDelete(path, isFolder, { duration_ms: duration })
+      
+      return result
+    } catch (error) {
+      // Log error
+      simpleActivityLogger.logError('DELETE', path, error)
+      throw error
+    }
   }
 
   /**
-   * Rename file or folder
+   * Rename file or folder with activity logging
    */
   async renameItem(path, newName) {
-    return await this.request('/rename', {
-      method: 'PUT',
-      body: JSON.stringify({
-        old_path: path,
-        new_name: newName
+    const startTime = performance.now()
+    
+    try {
+      const result = await this.request('/rename', {
+        method: 'PUT',
+        body: JSON.stringify({
+          old_path: path,
+          new_name: newName
+        })
       })
-    })
+      
+      const duration = performance.now() - startTime
+      const newPath = path.substring(0, path.lastIndexOf('/') + 1) + newName
+      
+      // Log rename activity
+      const isFolder = result.type === 'folder' || path.endsWith('/')
+      simpleActivityLogger.logRename(path, newPath, isFolder, { duration_ms: duration })
+      
+      return result
+    } catch (error) {
+      // Log error
+      simpleActivityLogger.logError('RENAME', path, error)
+      throw error
+    }
   }
 
   /**
-   * Move file or folder
+   * Move file or folder with activity logging
    */
   async moveItem(sourcePath, destinationPath) {
-    return await this.request('/move', {
-      method: 'PUT',
-      body: JSON.stringify({
-        source_path: sourcePath,
-        dest_path: destinationPath
+    const startTime = performance.now()
+    
+    try {
+      const result = await this.request('/move', {
+        method: 'PUT',
+        body: JSON.stringify({
+          source_path: sourcePath,
+          dest_path: destinationPath
+        })
       })
-    })
+      
+      const duration = performance.now() - startTime
+      
+      // Log move activity
+      const isFolder = result.type === 'folder' || sourcePath.endsWith('/')
+      simpleActivityLogger.logMove(sourcePath, destinationPath, isFolder, { duration_ms: duration })
+      
+      return result
+    } catch (error) {
+      // Log error
+      simpleActivityLogger.logError('MOVE', sourcePath, error)
+      throw error
+    }
   }
 
   /**
-   * Copy file or folder
+   * Copy file or folder with activity logging
    */
   async copyItem(sourcePath, destinationPath) {
-    return await this.request('/copy', {
-      method: 'POST',
-      body: JSON.stringify({
-        source_path: sourcePath,
-        dest_path: destinationPath
+    const startTime = performance.now()
+    
+    try {
+      const result = await this.request('/copy', {
+        method: 'POST',
+        body: JSON.stringify({
+          source_path: sourcePath,
+          dest_path: destinationPath
+        })
       })
-    })
+      
+      const duration = performance.now() - startTime
+      
+      // Log copy activity
+      const isFolder = result.type === 'folder' || sourcePath.endsWith('/')
+      simpleActivityLogger.logCopy(sourcePath, destinationPath, isFolder, { duration_ms: duration })
+      
+      return result
+    } catch (error) {
+      // Log error
+      simpleActivityLogger.logError('COPY', sourcePath, error)
+      throw error
+    }
   }
 
   /**
@@ -567,11 +885,43 @@ class NASAPIService {
   }
 
   /**
-   * Check permissions for a specific path
+   * Check permissions for a specific path with enhanced logging
    */
   async checkPermissions(path) {
     const encodedPath = encodeURIComponent(path)
     return await this.request(`/permissions/check?path=${encodedPath}`)
+  }
+
+  /**
+   * Get permission audit logs (Admin only)
+   */
+  async getPermissionAuditLog(filters = {}) {
+    const params = new URLSearchParams()
+    
+    if (filters.user_id) params.append('user_id', filters.user_id)
+    if (filters.path) params.append('path', filters.path)
+    if (filters.action) params.append('action', filters.action)
+    if (filters.limit) params.append('limit', filters.limit)
+    
+    const queryString = params.toString()
+    const endpoint = queryString ? `/permissions/audit-log?${queryString}` : '/permissions/audit-log'
+    
+    return await this.request(endpoint)
+  }
+
+  /**
+   * Get permission performance summary (Admin only)
+   */
+  async getPermissionPerformanceSummary(filters = {}) {
+    const params = new URLSearchParams()
+    
+    if (filters.user_id) params.append('user_id', filters.user_id)
+    if (filters.hours) params.append('hours', filters.hours)
+    
+    const queryString = params.toString()
+    const endpoint = queryString ? `/permissions/performance-summary?${queryString}` : '/permissions/performance-summary'
+    
+    return await this.request(endpoint)
   }
 
   /**

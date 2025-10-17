@@ -3,7 +3,20 @@
  * Integrates with the existing activity logging system
  */
 
-import { useGlobalActivityLogger, ActivityTypes } from '@/composables/useActivityLogger.js'
+import { useActivityLogger } from '@/composables/useActivityLogger.js'
+
+// Activity types constants
+export const ActivityTypes = {
+  FILE_DOWNLOAD: 'FILE_DOWNLOAD',
+  FILE_UPLOAD: 'FILE_UPLOAD',
+  FILE_COPY: 'FILE_COPY',
+  FILE_MOVE: 'FILE_MOVE',
+  FILE_DELETE: 'FILE_DELETE',
+  FILE_RENAME: 'FILE_RENAME',
+  FILE_CREATE: 'FILE_CREATE',
+  FOLDER_CREATE: 'FOLDER_CREATE',
+  FOLDER_OPEN: 'FOLDER_OPEN'
+}
 
 class ActivityLogger {
   constructor() {
@@ -17,7 +30,7 @@ class ActivityLogger {
    */
   initLogger() {
     try {
-      this.logger = useGlobalActivityLogger()
+      this.logger = useActivityLogger()
     } catch (error) {
       console.warn('Could not initialize activity logger:', error)
       this.logger = null
@@ -82,10 +95,13 @@ class ActivityLogger {
   async logDownload(fileName, filePath) {
     if (!this.logger) return
     
-    await this.logger.logFileOperation('download', filePath, {
+    this.logger.logFileDownload(filePath, {
+      size: null,
+      mime_type: null
+    }, {
       fileName,
       description: `Téléchargement de "${fileName}"`
-    }, true)
+    })
   }
 
   /**
@@ -97,14 +113,15 @@ class ActivityLogger {
     const count = Array.isArray(items) ? items.length : 1
     const itemNames = Array.isArray(items) ? items.map(item => item.name || item) : [items.name || items]
     const firstItem = Array.isArray(items) ? items[0] : items
-    const filePath = firstItem?.path || firstItem?.name || 'unknown'
+    const sourcePath = firstItem?.path || firstItem?.name || 'unknown'
+    const destPath = `${sourcePath}_copy`
     
-    await this.logger.logFileOperation('copy', filePath, {
+    this.logger.logCopy(sourcePath, destPath, false, {
       items: itemNames,
       count,
       source,
       description: `Copie de ${count} élément${count > 1 ? 's' : ''} (${source})`
-    }, true)
+    })
   }
 
   /**
@@ -115,15 +132,17 @@ class ActivityLogger {
     
     const count = Array.isArray(items) ? items.length : 1
     const itemNames = Array.isArray(items) ? items.map(item => item.name || item) : [items.name || items]
+    const firstItem = Array.isArray(items) ? items[0] : items
+    const sourcePath = firstItem?.path || firstItem?.name || 'unknown'
     
-    await this.logger.logFileOperation('copy', targetPath, {
+    this.logger.logCopy(sourcePath, targetPath, false, {
       items: itemNames,
       count,
       targetPath,
       source,
       operation: 'paste',
       description: `Collage de ${count} élément${count > 1 ? 's' : ''} vers "${targetPath}" (${source})`
-    }, true)
+    })
   }
 
   /**
@@ -135,14 +154,15 @@ class ActivityLogger {
     const count = Array.isArray(items) ? items.length : 1
     const itemNames = Array.isArray(items) ? items.map(item => item.name || item) : [items.name || items]
     const firstItem = Array.isArray(items) ? items[0] : items
-    const filePath = firstItem?.path || firstItem?.name || 'unknown'
+    const sourcePath = firstItem?.path || firstItem?.name || 'unknown'
+    const destPath = `${sourcePath}_moved`
     
-    await this.logger.logFileOperation('move', filePath, {
+    this.logger.logMove(sourcePath, destPath, false, {
       items: itemNames,
       count,
       operation: 'cut',
       description: `Coupe de ${count} élément${count > 1 ? 's' : ''}`
-    }, true)
+    })
   }
 
   /**
@@ -153,13 +173,18 @@ class ActivityLogger {
     
     const count = Array.isArray(files) ? files.length : 1
     const fileNames = Array.isArray(files) ? files.map(file => file.name) : [files.name]
+    const firstFile = Array.isArray(files) ? files[0] : files
+    const filePath = `${targetPath}/${firstFile.name || 'unknown'}`
     
-    await this.logger.logFileOperation('upload', targetPath, {
+    this.logger.logFileUpload(filePath, {
+      size: firstFile.size || null,
+      mime_type: firstFile.type || null
+    }, {
       files: fileNames,
       count,
       targetPath,
       description: `Upload de ${count} fichier${count > 1 ? 's' : ''} vers "${targetPath}"`
-    }, true)
+    })
   }
 
   /**
@@ -170,14 +195,19 @@ class ActivityLogger {
     
     const count = Array.isArray(files) ? files.length : 1
     const fileNames = Array.isArray(files) ? files.map(file => file.name) : [files.name]
+    const firstFile = Array.isArray(files) ? files[0] : files
+    const filePath = `${targetPath}/${firstFile.name || 'unknown'}`
     
-    await this.logger.logFileOperation('upload', targetPath, {
+    this.logger.logFileUpload(filePath, {
+      size: firstFile.size || null,
+      mime_type: firstFile.type || null
+    }, {
       files: fileNames,
       count,
       targetPath,
       operation: 'drag_drop',
       description: `Glisser-déposer de ${count} fichier${count > 1 ? 's' : ''} vers "${targetPath}"`
-    }, true)
+    })
   }
 
   /**
@@ -186,15 +216,23 @@ class ActivityLogger {
   async logCreate(itemName, itemType, path) {
     if (!this.logger) return
     
-    const operation = itemType === 'folder' ? 'create_folder' : 'create_file'
     const fullPath = `${path}/${itemName}`.replace(/\/+/g, '/')
     
-    await this.logger.logFileOperation(operation, fullPath, {
-      itemName,
-      itemType,
-      path,
-      description: `Création ${itemType === 'folder' ? 'du dossier' : 'du fichier'} "${itemName}"`
-    }, true)
+    if (itemType === 'folder') {
+      this.logger.logFolderCreate(fullPath, {
+        itemName,
+        itemType,
+        path,
+        description: `Création du dossier "${itemName}"`
+      })
+    } else {
+      this.logger.logFileCreate(fullPath, {
+        itemName,
+        itemType,
+        path,
+        description: `Création du fichier "${itemName}"`
+      })
+    }
   }
 
   /**
@@ -207,12 +245,13 @@ class ActivityLogger {
     const itemNames = Array.isArray(items) ? items.map(item => item.name || item) : [items.name || items]
     const firstItem = Array.isArray(items) ? items[0] : items
     const filePath = firstItem?.path || firstItem?.name || 'unknown'
+    const isFolder = firstItem?.isDirectory || firstItem?.type === 'folder'
     
-    await this.logger.logFileOperation('delete', filePath, {
+    this.logger.logDelete(filePath, isFolder, {
       items: itemNames,
       count,
       description: `Suppression de ${count} élément${count > 1 ? 's' : ''}`
-    }, true)
+    })
   }
 
   /**
@@ -221,12 +260,15 @@ class ActivityLogger {
   async logRename(oldName, newName, path) {
     if (!this.logger) return
     
-    await this.logger.logFileOperation('rename', path, {
+    const oldPath = `${path}/${oldName}`.replace(/\/+/g, '/')
+    const newPath = `${path}/${newName}`.replace(/\/+/g, '/')
+    
+    this.logger.logRename(oldPath, newPath, false, {
       oldName,
       newName,
       path,
       description: `Renommage de "${oldName}" en "${newName}"`
-    }, true)
+    })
   }
 
   /**
@@ -237,23 +279,24 @@ class ActivityLogger {
     
     const count = Array.isArray(items) ? items.length : 1
     const itemNames = Array.isArray(items) ? items.map(item => item.name || item) : [items.name || items]
+    const firstItem = Array.isArray(items) ? items[0] : items
+    const isFolder = firstItem?.isDirectory || firstItem?.type === 'folder'
     
-    await this.logger.logFileOperation('move', targetPath, {
+    this.logger.logMove(sourcePath, targetPath, isFolder, {
       items: itemNames,
       count,
       sourcePath,
       targetPath,
       description: `Déplacement de ${count} élément${count > 1 ? 's' : ''} vers "${targetPath}"`
-    }, true)
+    })
   }
 
   /**
    * Flush any pending logs
    */
   async flush() {
-    if (this.logger && this.logger.flushLogs) {
-      await this.logger.flushLogs()
-    }
+    // No flush method needed for the current implementation
+    console.log('📝 Activity logger flush requested')
   }
 
 

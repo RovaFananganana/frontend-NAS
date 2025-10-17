@@ -10,19 +10,26 @@ import { initializeTheme } from './utils/themeUtils'
 initializeTheme()
 import { onMounted } from 'vue'
 import { useStore } from 'vuex'
+import TokenService from '@/services/tokenService'
 
 export default {
   name: 'App',
   setup() {
     const store = useStore()
-
+    
     onMounted(async () => {
-      if (store.state.token) {
+      console.log('🚀 App.vue mounted')
+      
+      // Check if we have a token but no user data
+      if (TokenService.hasToken() && !store.state.user) {
+        console.log('🔄 Token exists but no user data, fetching user...')
         try {
-          await store.dispatch('fetchUser')
+          await store.dispatch('fetchCurrentUser')
+          console.log('✅ User data fetched successfully')
         } catch (error) {
-          console.error('Erreur lors du chargement des informations utilisateur:', error)
-          store.commit('logout')
+          console.error('❌ Error fetching user data:', error)
+          console.log('🧹 Clearing invalid token...')
+          store.dispatch('logout')
         }
       }
     })

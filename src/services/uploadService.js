@@ -69,6 +69,10 @@ class UploadService {
     
     // Processing state
     this.isProcessing = ref(false)
+    
+    // Event handlers
+    this.errorHandlers = []
+    this.successHandlers = []
     this.isPaused = ref(false)
   }
 
@@ -227,6 +231,9 @@ class UploadService {
         // Move to failed uploads
         this.moveToFailed(uploadItem)
         this.stats.failedFiles++
+        
+        // Emit error event for UI handling
+        this.emitError(uploadItem, error)
       }
     } finally {
       // Remove from active uploads
@@ -291,10 +298,42 @@ class UploadService {
 
   moveToCompleted(uploadItem) {
     this.completedUploads.value.push(uploadItem)
+    
+    // Emit success event
+    this.emitSuccess(uploadItem)
   }
 
   moveToFailed(uploadItem) {
     this.failedUploads.value.push(uploadItem)
+  }
+  
+  // Event handling methods
+  onError(handler) {
+    this.errorHandlers.push(handler)
+  }
+  
+  onSuccess(handler) {
+    this.successHandlers.push(handler)
+  }
+  
+  emitError(uploadItem, error) {
+    this.errorHandlers.forEach(handler => {
+      try {
+        handler(uploadItem, error)
+      } catch (e) {
+        console.error('Error in upload error handler:', e)
+      }
+    })
+  }
+  
+  emitSuccess(uploadItem) {
+    this.successHandlers.forEach(handler => {
+      try {
+        handler(uploadItem)
+      } catch (e) {
+        console.error('Error in upload success handler:', e)
+      }
+    })
   }
 
   updateOverallProgress() {

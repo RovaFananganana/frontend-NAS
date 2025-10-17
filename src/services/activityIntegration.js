@@ -5,8 +5,21 @@
  * Integrates with file operations, authentication, navigation, and favorites
  */
 
-import { useGlobalActivityLogger, ActivityTypes } from '@/composables/useActivityLogger.js'
+import { useActivityLogger } from '@/composables/useActivityLogger.js'
 import { activityAPI } from './activityAPI.js'
+
+// Activity types constants
+export const ActivityTypes = {
+  FILE_DOWNLOAD: 'FILE_DOWNLOAD',
+  FILE_UPLOAD: 'FILE_UPLOAD',
+  FILE_COPY: 'FILE_COPY',
+  FILE_MOVE: 'FILE_MOVE',
+  FILE_DELETE: 'FILE_DELETE',
+  FILE_RENAME: 'FILE_RENAME',
+  FILE_CREATE: 'FILE_CREATE',
+  FOLDER_CREATE: 'FOLDER_CREATE',
+  FOLDER_OPEN: 'FOLDER_OPEN'
+}
 
 class ActivityIntegrationService {
   constructor() {
@@ -19,7 +32,7 @@ class ActivityIntegrationService {
    */
   init() {
     if (!this.isInitialized) {
-      this.logger = useGlobalActivityLogger()
+      this.logger = useActivityLogger()
       this.setupGlobalErrorHandler()
       this.setupNavigationLogging()
       this.isInitialized = true
@@ -105,7 +118,27 @@ class ActivityIntegrationService {
    */
   async logActivity(action, resource = null, details = null, success = true, batch = false) {
     if (!this.logger) this.init()
-    return await this.logger.logActivity(action, resource, details, success, batch)
+    
+    // Use the appropriate method based on action type
+    switch (action) {
+      case 'download':
+        return this.logger.logFileDownload(resource, details?.fileInfo || {}, details?.timing || {})
+      case 'upload':
+        return this.logger.logFileUpload(resource, details?.fileInfo || {}, details?.timing || {})
+      case 'copy':
+        return this.logger.logCopy(details?.sourcePath || resource, details?.destPath || resource, details?.isFolder || false, details?.timing || {})
+      case 'move':
+        return this.logger.logMove(details?.sourcePath || resource, details?.destPath || resource, details?.isFolder || false, details?.timing || {})
+      case 'delete':
+        return this.logger.logDelete(resource, details?.isFolder || false, details?.timing || {})
+      case 'rename':
+        return this.logger.logRename(details?.oldPath || resource, details?.newPath || resource, details?.isFolder || false, details?.timing || {})
+      case 'folder_open':
+        return this.logger.logFolderOpen(resource, details?.timing || {})
+      default:
+        // For other actions, log as error for now
+        return this.logger.logError(action, resource, { details, success })
+    }
   }
 
   /**
@@ -113,7 +146,7 @@ class ActivityIntegrationService {
    */
   async logNavigation(path, details = {}) {
     if (!this.logger) this.init()
-    return await this.logger.logNavigation(path, details)
+    return this.logger.logFolderOpen(path, { navigation: true, ...details })
   }
 
   /**
@@ -121,7 +154,7 @@ class ActivityIntegrationService {
    */
   async logFileOperation(operation, filePath, details = {}, success = true) {
     if (!this.logger) this.init()
-    return await this.logger.logFileOperation(operation, filePath, details, success)
+    return this.logActivity(operation, filePath, { ...details, success })
   }
 
   /**
@@ -129,7 +162,7 @@ class ActivityIntegrationService {
    */
   async logAuth(type, details = {}, success = true) {
     if (!this.logger) this.init()
-    return await this.logger.logAuth(type, details, success)
+    return this.logger.logError('auth_' + type, null, { ...details, success })
   }
 
   /**
@@ -137,7 +170,7 @@ class ActivityIntegrationService {
    */
   async logFavorite(operation, path, details = {}) {
     if (!this.logger) this.init()
-    return await this.logger.logFavorite(operation, path, details)
+    return this.logger.logError('favorite_' + operation, path, details)
   }
 
   /**
@@ -145,7 +178,7 @@ class ActivityIntegrationService {
    */
   async logError(error, context, details = {}) {
     if (!this.logger) this.init()
-    return await this.logger.logError(error, context, details)
+    return this.logger.logError(context, error?.message || error, { error: error?.stack, ...details })
   }
 
   /**
@@ -154,12 +187,12 @@ class ActivityIntegrationService {
   async logInteraction(type, element, details = {}) {
     if (!this.logger) this.init()
     
-    return await this.logger.logActivity('user_interaction', element, {
+    return this.logger.logError('user_interaction', element, {
       interaction_type: type,
       element_id: element,
       timestamp: new Date().toISOString(),
       ...details
-    }, true, true) // Batch user interactions
+    })
   }
 
   /**
@@ -168,12 +201,12 @@ class ActivityIntegrationService {
   async logPerformance(metric, value, details = {}) {
     if (!this.logger) this.init()
     
-    return await this.logger.logActivity('performance_metric', metric, {
+    return this.logger.logError('performance_metric', metric, {
       metric_name: metric,
       metric_value: value,
       timestamp: new Date().toISOString(),
       ...details
-    }, true, true) // Batch performance metrics
+    })
   }
 
   /**
@@ -182,12 +215,12 @@ class ActivityIntegrationService {
   async logSearch(query, results, details = {}) {
     if (!this.logger) this.init()
     
-    return await this.logger.logActivity('search', query, {
+    return this.logger.logError('search', query, {
       search_query: query,
       result_count: results,
       timestamp: new Date().toISOString(),
       ...details
-    }, true, true) // Batch search activities
+    })
   }
 
   /**
@@ -195,7 +228,8 @@ class ActivityIntegrationService {
    */
   async flushLogs() {
     if (!this.logger) this.init()
-    return await this.logger.flushLogs()
+    // No flush method needed for current implementation
+    console.log('📝 Activity integration flush requested')
   }
 
   /**

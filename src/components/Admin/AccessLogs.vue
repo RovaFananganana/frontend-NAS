@@ -125,8 +125,8 @@
                   </div>
                 </td>
                 <td>
-                  <div class="text-sm max-w-xs truncate" :title="log.target">
-                    {{ log.target }}
+                  <div class="text-sm max-w-xs truncate" :title="formatLogDetails(log)">
+                    {{ formatLogDetails(log) }}
                   </div>
                 </td>
                 <td>
@@ -204,9 +204,9 @@
         </div>
 
         <div class="mb-4">
-          <div class="text-sm font-medium opacity-70 mb-2">Cible</div>
+          <div class="text-sm font-medium opacity-70 mb-2">Détails</div>
           <div class="bg-base-200 p-3 rounded text-sm">
-            {{ selectedLog.target }}
+            {{ formatLogDetails(selectedLog) }}
           </div>
         </div>
 
@@ -349,35 +349,129 @@ const formatDateTime = (timestamp) => {
 
 const getActionLabel = (action) => {
   const labels = {
+    // Actions actuelles
+    'ACCESS_FOLDER': 'Lecture de dossier',
+    'ACCESS_FILE': 'Lecture de fichier',
+    'DOWNLOAD_FILE': 'Téléchargement',
+    'CREATE_FILE': 'Création de fichier',
+    'UPLOAD_FILE': 'Upload de fichier',
+    'COPY_FILE': 'Copie de fichier',
+    'COPY_FOLDER': 'Copie de dossier',
+    'DELETE_FILE': 'Suppression de fichier',
+    'DELETE_FOLDER': 'Suppression de dossier',
+    'MOVE_FILE': 'Déplacement de fichier',
+    'MOVE_FOLDER': 'Déplacement de dossier',
+    'RENAME_FILE': 'Renommage de fichier',
+    'RENAME_FOLDER': 'Renommage de dossier',
+    'CREATE_FOLDER': 'Création de dossier',
+    
+    // Actions legacy
     'CREATE': 'Création',
     'READ': 'Lecture',
     'UPDATE': 'Modification',
     'DELETE': 'Suppression',
+    'LOGIN': 'Connexion',
+    'LOGOUT': 'Déconnexion',
+    'ERROR': 'Erreur',
+    'UPLOAD': 'Upload',
+    'DOWNLOAD': 'Téléchargement',
+    'COPY': 'Copie',
+    'MOVE': 'Déplacement',
+    'RENAME': 'Renommage',
+    'SHARE': 'Partage',
+    'ADD_FAVORITE': 'Ajout aux favoris',
+    'REMOVE_FAVORITE': 'Retrait des favoris',
+    
+    // Actions utilisateurs/groupes
     'CREATE_USER': 'Créer utilisateur',
     'UPDATE_USER': 'Modifier utilisateur',
     'DELETE_USER': 'Supprimer utilisateur',
     'CREATE_GROUP': 'Créer groupe',
     'UPDATE_GROUP': 'Modifier groupe',
     'DELETE_GROUP': 'Supprimer groupe',
-    'CREATE_FOLDER': 'Créer dossier',
-    'DELETE_FOLDER': 'Supprimer dossier',
     'ADD_USER_TO_GROUP': 'Ajout utilisateur au groupe',
     'REMOVE_USER_FROM_GROUP': 'Retrait du groupe',
     'UPDATE_PROFILE': 'Modifier profil',
+    
+    // Actions permissions
     'CREATE_PERMISSION': 'Accorder permission',
     'DELETE_PERMISSION': 'Supprimer permission',
-    'UPDATE_PERMISSION': 'Modifier permission'
+    'UPDATE_PERMISSION': 'Modifier permission',
+    
+    // Actions snake_case
+    'file_download': 'Téléchargement de fichier',
+    'file_upload': 'Upload de fichier',
+    'file_delete': 'Suppression de fichier',
+    'file_rename': 'Renommage de fichier',
+    'file_move': 'Déplacement de fichier',
+    'file_copy': 'Copie de fichier',
+    'folder_create': 'Création de dossier',
+    'folder_delete': 'Suppression de dossier',
+    'navigation': 'Navigation',
+    'favorite_add': 'Ajout aux favoris',
+    'favorite_remove': 'Retrait des favoris'
   }
+  
+  // Si l'action n'est pas trouvée, essayer de la formater automatiquement
+  if (!labels[action]) {
+    // Convertir snake_case en mots
+    const formatted = action.toLowerCase()
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase())
+    
+    // Traductions spécifiques
+    return formatted
+      .replace(/File/g, 'fichier')
+      .replace(/Folder/g, 'dossier')
+      .replace(/Download/g, 'Téléchargement')
+      .replace(/Upload/g, 'Upload')
+      .replace(/Delete/g, 'Suppression')
+      .replace(/Create/g, 'Création')
+      .replace(/Move/g, 'Déplacement')
+      .replace(/Rename/g, 'Renommage')
+      .replace(/Copy/g, 'Copie')
+      .replace(/Access/g, 'Accès')
+      .replace(/Login/g, 'Connexion')
+      .replace(/Logout/g, 'Déconnexion')
+  }
+  
   return labels[action] || action
 }
 
 const getActionBadgeClass = (action) => {
-  if (action.startsWith('CREATE')) return 'badge-success'
-  if (action.startsWith('UPDATE')) return 'badge-warning'
-  if (action.startsWith('DELETE')) return 'badge-error'
-  if (action.startsWith('READ')) return 'badge-info'
-  if (action.includes('GROUP')) return 'badge-primary'
-  if (action.includes('PERMISSION')) return 'badge-secondary'
+  if (!action) return 'badge-ghost'
+  
+  const actionUpper = action.toUpperCase()
+  
+  // Actions d'erreur/suppression (rouge)
+  if (actionUpper.includes('DELETE') || actionUpper.includes('REMOVE') || actionUpper.includes('LOGOUT')) {
+    return 'badge-error'
+  }
+  
+  // Actions de succès/création (vert)
+  if (actionUpper.includes('CREATE') || actionUpper.includes('UPLOAD') || 
+      actionUpper.includes('ADD') || actionUpper.includes('LOGIN')) {
+    return 'badge-success'
+  }
+  
+  // Actions d'information/accès (bleu)
+  if (actionUpper.includes('ACCESS') || actionUpper.includes('READ') || 
+      actionUpper.includes('NAVIGATION') || actionUpper.includes('DOWNLOAD')) {
+    return 'badge-info'
+  }
+  
+  // Actions d'avertissement/modification (orange)
+  if (actionUpper.includes('UPDATE') || actionUpper.includes('MOVE') || 
+      actionUpper.includes('RENAME') || actionUpper.includes('COPY') || 
+      actionUpper.includes('SHARE')) {
+    return 'badge-warning'
+  }
+  
+  // Actions spéciales (violet)
+  if (actionUpper.includes('GROUP') || actionUpper.includes('PERMISSION')) {
+    return 'badge-secondary'
+  }
+  
   return 'badge-ghost'
 }
 
@@ -451,6 +545,107 @@ const applyFilters = () => {
 
 const showLogDetails = (log) => {
   selectedLog.value = log
+}
+
+const formatLogDetails = (log) => {
+  try {
+    // Cas spécial : si target contient "path - {json}", extraire seulement le path
+    if (log.target && log.target.includes(' - {')) {
+      const pathPart = log.target.split(' - {')[0]
+      if (pathPart && pathPart.trim()) {
+        return pathPart.trim()
+      }
+    }
+    
+    let parsedDetails = null
+    
+    // Essayer de parser target s'il contient du JSON
+    if (log.target && log.target.includes('{')) {
+      try {
+        // Si target commence par un chemin suivi de JSON, extraire le JSON
+        const jsonStart = log.target.indexOf('{')
+        if (jsonStart > 0) {
+          const jsonPart = log.target.substring(jsonStart)
+          parsedDetails = JSON.parse(jsonPart)
+        } else {
+          parsedDetails = JSON.parse(log.target)
+        }
+      } catch (e) {
+        // Si le parsing échoue, essayer d'extraire le chemin avant le JSON
+        const jsonStart = log.target.indexOf('{')
+        if (jsonStart > 0) {
+          const pathPart = log.target.substring(0, jsonStart).trim()
+          if (pathPart && pathPart !== '-') {
+            return pathPart
+          }
+        }
+        return log.target
+      }
+    }
+    
+    // Essayer de parser details s'il contient du JSON
+    if (!parsedDetails && log.details && typeof log.details === 'string' && log.details.includes('{')) {
+      try {
+        parsedDetails = JSON.parse(log.details)
+      } catch (e) {
+        // Si le parsing échoue, utiliser details tel quel
+        return log.details
+      }
+    }
+    
+    // Si on a des détails parsés, extraire les informations importantes
+    if (parsedDetails) {
+      // Pour les opérations de déplacement/renommage
+      if (parsedDetails.source_path && parsedDetails.destination_path) {
+        return `${parsedDetails.source_path} → ${parsedDetails.destination_path}`
+      }
+      if (parsedDetails.old_path && parsedDetails.new_path) {
+        return `${parsedDetails.old_path} → ${parsedDetails.new_path}`
+      }
+      
+      // Pour les opérations simples, juste le chemin
+      if (parsedDetails.path) {
+        return parsedDetails.path
+      }
+      
+      // Si c'est un objet avec d'autres propriétés, essayer d'extraire le plus important
+      if (parsedDetails.frontend_context && parsedDetails.frontend_context.path) {
+        return parsedDetails.frontend_context.path
+      }
+      
+      // Pour les erreurs, afficher le message d'erreur
+      if (parsedDetails.failed_operation && parsedDetails.error_message) {
+        return `${parsedDetails.failed_operation}: ${parsedDetails.error_message}`
+      }
+      
+      // Si c'est une erreur avec juste le message
+      if (parsedDetails.error_message) {
+        return parsedDetails.error_message
+      }
+    }
+    
+    // Si target ne contient pas de JSON, l'utiliser directement
+    if (log.target && !log.target.includes('{')) {
+      return log.target
+    }
+    
+    // Si details ne contient pas de JSON, l'utiliser directement
+    if (log.details && typeof log.details === 'string' && !log.details.includes('{')) {
+      return log.details
+    }
+    
+    return 'Aucun détail'
+  } catch (error) {
+    console.warn('Erreur formatage détails admin:', error)
+    // En cas d'erreur, retourner la première valeur non-JSON disponible
+    if (log.target && !log.target.includes('{')) {
+      return log.target
+    }
+    if (log.details && typeof log.details === 'string' && !log.details.includes('{')) {
+      return log.details
+    }
+    return 'Aucun détail'
+  }
 }
 
 // Lifecycle

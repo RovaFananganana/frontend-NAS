@@ -145,33 +145,15 @@ const deleteItem = async (item) => {
     throw new Error('Élément invalide')
   }
 
-  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001'
-  const token = TokenService.getToken()
-
-  if (!token) {
-    throw new Error('Token d\'authentification manquant')
-  }
-
+  // Use nasAPI for consistent logging and error handling
+  const { nasAPI } = await import('@/services/nasAPI.js')
+  
   try {
-    const response = await axios.delete(`${baseURL}/nas/delete`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      data: {
-        path: item.path,
-        recursive: isAdmin.value
-      }
-    })
-
-    if (!response.data?.success) {
-      throw new Error(response.data?.error || 'Erreur lors de la suppression')
-    }
-
-    return response.data
+    const result = await nasAPI.deleteItem(item.path)
+    return result
   } catch (error) {
-    console.error('Erreur API delete:', error.response?.data || error.message)
-    throw new Error(error.response?.data?.error || error.message)
+    console.error('Erreur lors de la suppression:', error)
+    throw error
   }
 }
 
