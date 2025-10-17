@@ -6,27 +6,12 @@
       <div class="flex gap-2">
         <button class="btn btn-sm btn-outline" @click="refreshPermissions" :disabled="loading">
           <i class="fas fa-sync-alt mr-2"></i>
-          {{ loading ? 'Refreshing...' : 'Refresh' }}
-        </button>
-
-        <button class="btn btn-sm btn-info" @click="testNasConnection" :disabled="loading || testing">
-          <i class="fas fa-network-wired mr-2" :class="{ 'animate-spin': testing }"></i>
-          {{ testing ? 'Test...' : 'Test NAS' }}
-        </button>
-
-        <button class="btn btn-sm btn-warning" @click="syncWithNas" :disabled="loading || syncing">
-          <i class="fas fa-server mr-2" :class="{ 'animate-spin': syncing }"></i>
-          {{ syncing ? 'Synchronisation...' : 'Sync NAS' }}
-        </button>
-
-        <button class="btn btn-sm btn-secondary" @click="showOrphanedFolders" :disabled="loading">
-          <i class="fas fa-search mr-2"></i>
-          Find Orphaned
+          {{ loading ? 'Actualiser...' : 'Actualiser' }}
         </button>
 
         <button class="btn btn-sm btn-primary" @click="openBulkPermissionModal">
           <i class="fas fa-users-cog mr-2"></i>
-          Bulk Permissions
+          Permissions groupées
         </button>
       </div>
     </div>
@@ -35,24 +20,18 @@
     <div class="flex items-center gap-4 flex-wrap">
       <div class="flex-1 min-w-64">
         <div class="relative">
-          <input v-model="searchQuery" placeholder="Search folders, users, or groups..."
+          <input v-model="searchQuery" placeholder="Recherche par nom..."
             class="input input-bordered w-full pl-10" />
           <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
         </div>
       </div>
 
-      <select v-model="filterType" class="select select-bordered">
-        <option value="all">All Resources</option>
-        <option value="folders">Folders Only</option>
-        <option value="files">Files Only</option>
-      </select>
-
       <select v-model="filterPermission" class="select select-bordered">
-        <option value="all">All Permissions</option>
-        <option value="read">Read Access</option>
-        <option value="write">Write Access</option>
-        <option value="delete">Delete Access</option>
-        <option value="share">Share Access</option>
+        <option value="all">Toutes les permissions</option>
+        <option value="read">Lecture</option>
+        <option value="write">Écriture</option>
+        <option value="delete">Suppression</option>
+        <option value="share">Partage</option>
       </select>
     </div>
 
@@ -312,41 +291,7 @@
       </div>
     </div>
 
-    <!-- Modal de confirmation de synchronisation -->
-    <div v-if="syncModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white p-6 rounded-lg shadow-xl w-96 max-w-md">
-        <h3 class="font-bold text-lg mb-4 flex items-center">
-          <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
-          Synchroniser avec le NAS
-        </h3>
-        <div class="mb-6">
-          <p class="mb-4">Cette opération va :</p>
-          <ul class="list-disc list-inside space-y-2 text-sm">
-            <li class="text-error">Supprimer les dossiers fictifs de la base de données</li>
-            <li class="text-success">Ajouter les nouveaux dossiers du NAS</li>
-            <li class="text-info">Synchroniser la structure avec le NAS réel</li>
-          </ul>
-          <div class="alert alert-warning mt-4">
-            <i class="fas fa-info-circle"></i>
-            <span class="text-sm">Les permissions des dossiers supprimés seront perdues.</span>
-          </div>
-          <div class="alert alert-info mt-2">
-            <i class="fas fa-lightbulb"></i>
-            <div class="text-sm">
-              <strong>Alternative :</strong> Vous pouvez aussi supprimer les dossiers fictifs un par un via le menu "⋮"
-              de chaque dossier.
-            </div>
-          </div>
-        </div>
-        <div class="flex justify-end gap-2">
-          <button class="btn btn-outline" @click="closeSyncModal">Annuler</button>
-          <button class="btn btn-warning" @click="confirmSyncWithNas" :disabled="syncing">
-            <i class="fas fa-server mr-2"></i>
-            Synchroniser
-          </button>
-        </div>
-      </div>
-    </div>
+
 
     <!-- Modal de confirmation de suppression de dossier -->
     <div v-if="deleteModal.visible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -783,13 +728,10 @@ const folders = ref([])
 const users = ref([])
 const groups = ref([])
 const loading = ref(false)
-const syncing = ref(false)
-const testing = ref(false)
 const error = ref('')
 
 // Filters and search
 const searchQuery = ref('')
-const filterType = ref('all')
 const filterPermission = ref('all')
 
 // Pagination
@@ -830,9 +772,7 @@ const successModal = ref({
   folderName: ''
 })
 
-const syncModal = ref({
-  visible: false
-})
+
 
 const deleteModal = ref({
   visible: false,
@@ -897,13 +837,19 @@ const filteredFolders = computed(() => {
     })
   }
 
-
   // Apply permission filter
   if (filterPermission.value !== 'all') {
     filtered = filtered.filter(folder =>
       folder.permissions.some(p => p[`can_${filterPermission.value}`])
     )
   }
+
+  // Sort by name (case insensitive)
+  filtered.sort((a, b) => {
+    const aName = (a.name || '').toLowerCase()
+    const bName = (b.name || '').toLowerCase()
+    return aName.localeCompare(bName)
+  })
 
   return filtered
 })
@@ -991,140 +937,7 @@ const refreshPermissions = async () => {
   }
 }
 
-const testNasConnection = async () => {
-  testing.value = true
-  try {
-    const { adminAPI } = await import('@/services/api')
 
-    // Test with dry run first
-    const result = await adminAPI.syncWithNas({ dryRun: true, maxDepth: 2 })
-
-    console.log('Test NAS result:', result)
-    console.log('Test NAS result.data:', result.data)
-
-    if (result.data && result.data.success) {
-      const stats = result.data.stats || {}
-      const message = `Test NAS réussi ! 
-        Trouvé : ${stats.folders_scanned || 0} dossiers, ${stats.files_scanned || 0} fichiers
-        À supprimer : ${stats.folders_removed || 0} dossiers fictifs
-        À ajouter : ${stats.folders_added || 0} nouveaux dossiers`
-
-      store.dispatch('showSuccess', message)
-    } else {
-      const errorMsg = result.data?.message || result.data?.error || result.message || 'Test NAS échoué'
-      throw new Error(errorMsg)
-    }
-  } catch (error) {
-    console.error('Error testing NAS:', error)
-    let message = 'Erreur lors du test NAS'
-
-    if (error.message) {
-      if (error.message.includes('404')) {
-        message = 'Endpoint non trouvé. Backend pas à jour ?'
-      } else if (error.message.includes('connection')) {
-        message = 'Impossible de se connecter au NAS. Vérifiez le réseau de travail.'
-      } else {
-        message = `Test NAS échoué : ${error.message}`
-      }
-    }
-
-    store.dispatch('showError', message)
-  } finally {
-    testing.value = false
-  }
-}
-
-const syncWithNas = () => {
-  syncModal.value.visible = true
-}
-
-const confirmSyncWithNas = async () => {
-  syncModal.value.visible = false
-  syncing.value = true
-
-  try {
-    console.log('🔄 Démarrage synchronisation NAS-DB...')
-
-    // Import nasAPI for sync (using the new /nas/sync endpoint)
-    const { nasAPI } = await import('@/services/nasAPI.js')
-
-    // Perform synchronization using the new endpoint
-    const result = await nasAPI.syncDatabase({
-      dry_run: false,
-      max_depth: 10
-    })
-
-    // Debug logging
-    console.log('Sync result:', result)
-    console.log('Sync result.data:', result.data)
-
-    // Check if result has success property directly or in data
-    const syncData = result.data || result
-
-    if (syncData && syncData.success) {
-      // Clear cache and reload data
-      permissionCache.clear()
-      await loadFolders()
-
-      // Show success with detailed stats
-      const stats = syncData.stats || {}
-      console.log('Sync stats:', stats)
-
-      const message = `✅ Synchronisation réussie !
-📊 Statistiques:
-• ${stats.folders_removed || 0} dossier(s) supprimé(s)
-• ${stats.folders_added || 0} dossier(s) ajouté(s)
-• ${stats.files_removed || 0} fichier(s) supprimé(s)
-• ${stats.files_added || 0} fichier(s) ajouté(s)
-• ${stats.folders_scanned || 0} dossier(s) analysé(s)
-• ${stats.files_scanned || 0} fichier(s) analysé(s)`
-
-      store.dispatch('showSuccess', message)
-
-      // Log additional info
-      if (syncData.nas_structure) {
-        console.log(`�  NAS: ${syncData.nas_structure.folders_count} dossiers, ${syncData.nas_structure.files_count} fichiers`)
-      }
-      if (syncData.db_structure) {
-        console.log(`🗄️ DB: ${syncData.db_structure.folders_count} dossiers, ${syncData.db_structure.files_count} fichiers`)
-      }
-
-    } else {
-      // Log the full result for debugging
-      console.error('Sync failed with result:', result)
-      const errorMsg = syncData?.message || syncData?.error || result.message || 'Synchronisation échouée'
-      throw new Error(errorMsg)
-    }
-  } catch (error) {
-    console.error('❌ Error syncing with NAS:', error)
-    let message = 'Erreur lors de la synchronisation avec le NAS'
-
-    if (error.message) {
-      if (error.message.includes('404')) {
-        message = 'Endpoint de synchronisation non trouvé. Vérifiez que le backend est à jour.'
-      } else if (error.message.includes('Network')) {
-        message = 'Erreur réseau. Vérifiez votre connexion au réseau de travail.'
-      } else if (error.message.includes('NAS')) {
-        message = 'Impossible de se connecter au NAS. Vérifiez que vous êtes sur le réseau de travail.'
-      } else {
-        message = `Erreur de synchronisation : ${error.message}`
-      }
-    }
-
-    // Show more detailed error message if available
-    if (error.response?.data?.stats?.errors?.length > 0) {
-      message += '\n\nErreurs détaillées:\n' + error.response.data.stats.errors.join('\n')
-    }
-
-    store.dispatch('showError', message)
-  } finally {
-    syncing.value = false
-  }
-}
-
-const closeSyncModal = () => {
-  syncModal.value.visible = false
-}
 
 const confirmDeleteFolder = (folder) => {
   deleteModal.value = {
@@ -1204,45 +1017,7 @@ const deleteFolderDirect = async () => {
   }
 }
 
-const showOrphanedFolders = async () => {
-  loading.value = true
-  try {
-    // Test each folder by trying to browse it via NAS API
-    const { nasAPI } = await import('@/services/nasAPI.js')
-    const orphanedFolders = []
 
-    for (const folder of folders.value) {
-      try {
-        // Try to browse the folder path on NAS - use path instead of name
-        const folderPath = folder.path || `/${folder.name}` || '/'
-        console.log(`Testing folder: ${folder.name} at path: ${folderPath}`)
-
-        const result = await nasAPI.browse(folderPath)
-        if (!result.success) {
-          console.log(`Folder ${folder.name} not found on NAS`)
-          orphanedFolders.push(folder)
-        }
-      } catch (error) {
-        // If browsing fails, it's likely an orphaned folder
-        console.log(`Error browsing folder ${folder.name}:`, error)
-        orphanedFolders.push(folder)
-      }
-    }
-
-    if (orphanedFolders.length > 0) {
-      const folderNames = orphanedFolders.map(f => f.name).join(', ')
-      store.dispatch('showWarning', `${orphanedFolders.length} dossier(s) fictif(s) trouvé(s) : ${folderNames}`)
-    } else {
-      store.dispatch('showSuccess', 'Aucun dossier fictif trouvé ! Tous les dossiers existent sur le NAS.')
-    }
-
-  } catch (error) {
-    console.error('Error checking orphaned folders:', error)
-    store.dispatch('showError', 'Erreur lors de la vérification des dossiers fictifs')
-  } finally {
-    loading.value = false
-  }
-}
 
 
 
@@ -1344,6 +1119,8 @@ const confirmSavePermission = async () => {
       successModal.value.targetName = getTargetName()
       successModal.value.folderName = modal.value.folder.name
       closeConfirmationModal()
+      // Rafraîchir automatiquement les données
+      await loadFolders()
     }
   } catch (err) {
     console.error(err)
@@ -1517,6 +1294,9 @@ const confirmToggleChange = async () => {
     toggleSuccessModal.value.granted = newValue
     toggleSuccessModal.value.visible = true
     
+    // Rafraîchir automatiquement les données
+    await loadFolders()
+    
   } catch (error) {
     console.error('Erreur lors de la modification de la permission:', error)
     // Ici on pourrait afficher un toast d'erreur
@@ -1568,8 +1348,9 @@ const confirmRemovePermissionAction = async () => {
     removeSuccessModal.value.folderName = folder.name
     removeSuccessModal.value.visible = true
     
-    // Invalider le cache
+    // Invalider le cache et rafraîchir
     permissionCache.delete(`folder-permissions-${folder.id}`)
+    await loadFolders()
     
   } catch (error) {
     console.error('Erreur lors de la suppression de la permission:', error)

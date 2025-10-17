@@ -98,8 +98,11 @@ export const userAPI = {
     }),
 
   // Logs
-  getLogs: (page = 1, perPage = 20) =>
-    api.get("/users/my-logs", { params: { page, per_page: perPage } }),
+  getLogs: (page = 1, perPage = 20, action = null) => {
+    const params = { page, per_page: perPage }
+    if (action) params.action = action
+    return api.get("/users/my-logs", { params })
+  },
   logActivity: (activityData) =>
     api.post("/users/log-activity", activityData),
 };

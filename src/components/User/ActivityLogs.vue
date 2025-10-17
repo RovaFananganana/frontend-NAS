@@ -53,13 +53,40 @@
         <table class="logs-table">
           <thead>
             <tr>
-              <th>Date & Heure</th>
-              <th>Action</th>
-              <th>Détails</th>
+              <th @click="handleSort('timestamp')" class="sortable-header">
+                <div class="flex items-center gap-2 cursor-pointer">
+                  <span>Date & Heure</span>
+                  <i v-if="sortColumn === 'timestamp'" :class="[
+                    sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
+                    'text-primary text-xs'
+                  ]"></i>
+                  <i v-else class="fas fa-sort text-gray-400 text-xs"></i>
+                </div>
+              </th>
+              <th @click="handleSort('action')" class="sortable-header">
+                <div class="flex items-center gap-2 cursor-pointer">
+                  <span>Action</span>
+                  <i v-if="sortColumn === 'action'" :class="[
+                    sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
+                    'text-primary text-xs'
+                  ]"></i>
+                  <i v-else class="fas fa-sort text-gray-400 text-xs"></i>
+                </div>
+              </th>
+              <th @click="handleSort('details')" class="sortable-header">
+                <div class="flex items-center gap-2 cursor-pointer">
+                  <span>Détails</span>
+                  <i v-if="sortColumn === 'details'" :class="[
+                    sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
+                    'text-primary text-xs'
+                  ]"></i>
+                  <i v-else class="fas fa-sort text-gray-400 text-xs"></i>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="log in logs" :key="log.id" :class="getLogRowClass(log.action)">
+            <tr v-for="log in sortedLogs" :key="log.id" :class="getLogRowClass(log.action)">
               <td class="timestamp">{{ formatDate(log.timestamp || log.created_at) }}</td>
               <td class="operation">
                 <span :class="getOperationClass(log.action)">
@@ -102,7 +129,43 @@ const filters = ref({
   action: ''
 })
 
+// État du tri
+const sortColumn = ref('timestamp')
+const sortDirection = ref('desc')
+
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage.value)))
+
+// Computed pour les logs triés
+const sortedLogs = computed(() => {
+  if (!logs.value || logs.value.length === 0) return []
+  
+  const sorted = [...logs.value].sort((a, b) => {
+    let aValue, bValue
+    
+    switch (sortColumn.value) {
+      case 'timestamp':
+        aValue = new Date(a.timestamp || a.created_at || 0)
+        bValue = new Date(b.timestamp || b.created_at || 0)
+        break
+      case 'action':
+        aValue = (a.action || '').toLowerCase()
+        bValue = (b.action || '').toLowerCase()
+        break
+      case 'details':
+        aValue = formatLogDetails(a).toLowerCase()
+        bValue = formatLogDetails(b).toLowerCase()
+        break
+      default:
+        return 0
+    }
+    
+    if (aValue < bValue) return sortDirection.value === 'asc' ? -1 : 1
+    if (aValue > bValue) return sortDirection.value === 'asc' ? 1 : -1
+    return 0
+  })
+  
+  return sorted
+})
 
 function formatDate(v) {
   if (!v) return '—'
@@ -136,7 +199,7 @@ function formatAction(action) {
     'DELETE': 'Suppression',
     'UPDATE': 'Modification',
     'SHARE': 'Partage',
-    'ERROR': 'Erreur',
+    'ERROR': 'Erreur de chargement',
     'ADD_FAVORITE': 'Ajout aux favoris',
     'REMOVE_FAVORITE': 'Retrait des favoris',
     'UPLOAD': 'Upload',
@@ -442,7 +505,7 @@ async function load() {
   try {
     // Force reload by adding timestamp to avoid cache
     const timestamp = Date.now()
-    const { data } = await userAPI.getLogs(page.value, perPage.value)
+    const { data } = await userAPI.getLogs(page.value, perPage.value, filters.value.action)
     // Backend returns { logs, total, pages, current_page }
     logs.value = data?.logs || data?.items || data || []
     total.value = data?.total ?? logs.value.length
@@ -460,6 +523,18 @@ async function load() {
 function go(p) {
   page.value = Math.min(Math.max(1, p), totalPages.value)
   load()
+}
+
+// Gestion du tri
+function handleSort(column) {
+  if (sortColumn.value === column) {
+    // Inverser la direction si c'est la même colonne
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    // Nouvelle colonne, tri ascendant par défaut (sauf pour timestamp qui est desc par défaut)
+    sortColumn.value = column
+    sortDirection.value = column === 'timestamp' ? 'desc' : 'asc'
+  }
 }
 
 onMounted(load)
@@ -566,6 +641,15 @@ onMounted(load)
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
+}
+
+.sortable-header {
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.sortable-header:hover {
+  background: #f3f4f6 !important;
 }
 
 .logs-table td {

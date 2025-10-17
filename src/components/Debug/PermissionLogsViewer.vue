@@ -5,15 +5,15 @@
       <div class="controls">
         <button @click="refreshLogs" :disabled="loading" class="btn-refresh">
           <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
-          Refresh
+          Actualiser
         </button>
         <button @click="clearLogs" class="btn-clear">
           <i class="fas fa-trash"></i>
-          Clear
+          Effacer
         </button>
         <button @click="exportLogs" class="btn-export">
           <i class="fas fa-download"></i>
-          Export
+          Exporter
         </button>
       </div>
     </div>
@@ -24,23 +24,23 @@
       <div class="metrics-grid">
         <div class="metric-card">
           <div class="metric-value">{{ metrics.totalChecks }}</div>
-          <div class="metric-label">Total Checks</div>
+          <div class="metric-label">Total vérifications</div>
         </div>
         <div class="metric-card">
           <div class="metric-value">{{ (metrics.cache_hit_rate * 100).toFixed(1) }}%</div>
-          <div class="metric-label">Cache Hit Rate</div>
+          <div class="metric-label">Taux de cache</div>
         </div>
         <div class="metric-card">
           <div class="metric-value">{{ metrics.averageDuration.toFixed(1) }}ms</div>
-          <div class="metric-label">Avg Duration</div>
+          <div class="metric-label">Durée moyenne</div>
         </div>
         <div class="metric-card">
           <div class="metric-value">{{ metrics.failures }}</div>
-          <div class="metric-label">Failures</div>
+          <div class="metric-label">Échecs</div>
         </div>
         <div class="metric-card">
           <div class="metric-value">{{ metrics.cache_size }}</div>
-          <div class="metric-label">Cache Size</div>
+          <div class="metric-label">Taille cache</div>
         </div>
       </div>
     </div>
@@ -50,23 +50,23 @@
       <h4>Filters</h4>
       <div class="filters-grid">
         <div class="filter-group">
-          <label>Operation:</label>
+          <label>Opération:</label>
           <select v-model="filters.operation">
-            <option value="">All Operations</option>
-            <option value="load_permissions_start">Load Start</option>
-            <option value="permissions_loaded_success">Load Success</option>
-            <option value="permissions_load_error">Load Error</option>
-            <option value="cache_hit">Cache Hit</option>
-            <option value="cache_miss">Cache Miss</option>
-            <option value="action_check_denied">Access Denied</option>
+            <option value="">Toutes les opérations</option>
+            <option value="load_permissions_start">Début de chargement</option>
+            <option value="permissions_loaded_success">Chargement réussi</option>
+            <option value="permissions_load_error">Erreur de chargement</option>
+            <option value="cache_hit">Cache trouvé</option>
+            <option value="cache_miss">Cache manqué</option>
+            <option value="action_check_denied">Accès refusé</option>
           </select>
         </div>
         <div class="filter-group">
-          <label>Path:</label>
-          <input v-model="filters.path" type="text" placeholder="Filter by path...">
+          <label>Chemin:</label>
+          <input v-model="filters.path" type="text" placeholder="Filtrer par chemin...">
         </div>
         <div class="filter-group">
-          <label>Since:</label>
+          <label>Depuis:</label>
           <input v-model="filters.since" type="datetime-local">
         </div>
       </div>
@@ -79,12 +79,57 @@
         <table class="logs-table">
           <thead>
             <tr>
-              <th>Timestamp</th>
-              <th>Operation</th>
-              <th>Path</th>
-              <th>Duration</th>
-              <th>Result</th>
-              <th>Details</th>
+              <th @click="handleSort('timestamp')" class="sortable-header">
+                <div class="flex items-center gap-2 cursor-pointer">
+                  <span>Horodatage</span>
+                  <i v-if="sortColumn === 'timestamp'" :class="[
+                    sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
+                    'text-primary text-xs'
+                  ]"></i>
+                  <i v-else class="fas fa-sort text-gray-400 text-xs"></i>
+                </div>
+              </th>
+              <th @click="handleSort('operation')" class="sortable-header">
+                <div class="flex items-center gap-2 cursor-pointer">
+                  <span>Opération</span>
+                  <i v-if="sortColumn === 'operation'" :class="[
+                    sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
+                    'text-primary text-xs'
+                  ]"></i>
+                  <i v-else class="fas fa-sort text-gray-400 text-xs"></i>
+                </div>
+              </th>
+              <th @click="handleSort('path')" class="sortable-header">
+                <div class="flex items-center gap-2 cursor-pointer">
+                  <span>Chemin</span>
+                  <i v-if="sortColumn === 'path'" :class="[
+                    sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
+                    'text-primary text-xs'
+                  ]"></i>
+                  <i v-else class="fas fa-sort text-gray-400 text-xs"></i>
+                </div>
+              </th>
+              <th @click="handleSort('duration')" class="sortable-header">
+                <div class="flex items-center gap-2 cursor-pointer">
+                  <span>Durée</span>
+                  <i v-if="sortColumn === 'duration'" :class="[
+                    sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
+                    'text-primary text-xs'
+                  ]"></i>
+                  <i v-else class="fas fa-sort text-gray-400 text-xs"></i>
+                </div>
+              </th>
+              <th @click="handleSort('result')" class="sortable-header">
+                <div class="flex items-center gap-2 cursor-pointer">
+                  <span>Résultat</span>
+                  <i v-if="sortColumn === 'result'" :class="[
+                    sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
+                    'text-primary text-xs'
+                  ]"></i>
+                  <i v-else class="fas fa-sort text-gray-400 text-xs"></i>
+                </div>
+              </th>
+              <th>Détails</th>
             </tr>
           </thead>
           <tbody>
@@ -165,6 +210,10 @@ export default {
     const selectedLog = ref(null)
     const currentPage = ref(1)
     const pageSize = ref(50)
+    
+    // État du tri
+    const sortColumn = ref('timestamp')
+    const sortDirection = ref('desc')
 
     const filters = ref({
       operation: '',
@@ -185,7 +234,41 @@ export default {
     })
 
     const filteredLogs = computed(() => {
-      return getPermissionLogs(filters.value)
+      const logs = getPermissionLogs(filters.value)
+      
+      // Appliquer le tri
+      return [...logs].sort((a, b) => {
+        let aValue, bValue
+        
+        switch (sortColumn.value) {
+          case 'timestamp':
+            aValue = new Date(a.timestamp || 0)
+            bValue = new Date(b.timestamp || 0)
+            break
+          case 'operation':
+            aValue = (a.operation || '').toLowerCase()
+            bValue = (b.operation || '').toLowerCase()
+            break
+          case 'path':
+            aValue = (a.path || '').toLowerCase()
+            bValue = (b.path || '').toLowerCase()
+            break
+          case 'duration':
+            aValue = a.duration_ms || 0
+            bValue = b.duration_ms || 0
+            break
+          case 'result':
+            aValue = String(a.result || '').toLowerCase()
+            bValue = String(b.result || '').toLowerCase()
+            break
+          default:
+            return 0
+        }
+        
+        if (aValue < bValue) return sortDirection.value === 'asc' ? -1 : 1
+        if (aValue > bValue) return sortDirection.value === 'asc' ? 1 : -1
+        return 0
+      })
     })
 
     const totalPages = computed(() => {
@@ -235,6 +318,18 @@ export default {
 
     const closeLogDetails = () => {
       selectedLog.value = null
+    }
+    
+    // Gestion du tri
+    const handleSort = (column) => {
+      if (sortColumn.value === column) {
+        // Inverser la direction si c'est la même colonne
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+      } else {
+        // Nouvelle colonne, tri ascendant par défaut (sauf pour timestamp qui est desc par défaut)
+        sortColumn.value = column
+        sortDirection.value = column === 'timestamp' ? 'desc' : 'asc'
+      }
     }
 
     const formatTimestamp = (timestamp) => {
@@ -298,6 +393,9 @@ export default {
       exportLogs: exportLogsData,
       showLogDetails,
       closeLogDetails,
+      handleSort,
+      sortColumn,
+      sortDirection,
       formatTimestamp,
       getLogRowClass,
       getOperationClass,
@@ -417,6 +515,15 @@ export default {
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
+}
+
+.sortable-header {
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.sortable-header:hover {
+  background: #f3f4f6 !important;
 }
 
 .logs-table td {

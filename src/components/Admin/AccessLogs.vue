@@ -372,7 +372,7 @@ const getActionLabel = (action) => {
     'DELETE': 'Suppression',
     'LOGIN': 'Connexion',
     'LOGOUT': 'Déconnexion',
-    'ERROR': 'Erreur',
+    'ERROR': 'Erreur de chargement',
     'UPLOAD': 'Upload',
     'DOWNLOAD': 'Téléchargement',
     'COPY': 'Copie',

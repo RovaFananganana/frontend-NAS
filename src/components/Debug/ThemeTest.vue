@@ -1,7 +1,7 @@
 <template>
   <div class="p-6 space-y-4">
     <h2 class="text-2xl font-bold text-base-content">Theme Test Component</h2>
-    
+
     <!-- Background colors test -->
     <div class="grid grid-cols-2 gap-4">
       <div class="p-4 bg-base-100 border border-base-300 rounded-lg">
@@ -35,33 +35,24 @@
     <!-- Theme switcher -->
     <div class="space-y-4">
       <div class="flex flex-wrap gap-2">
-        <button 
-          v-for="theme in availableThemes"
-          :key="theme.value"
-          @click="changeTheme(theme.value)"
-          class="btn btn-sm"
-          :class="currentTheme === theme.value ? 'btn-primary' : 'btn-outline'"
-        >
+        <button v-for="theme in availableThemes" :key="theme.value" @click="changeTheme(theme.value)" class="btn btn-sm"
+          :class="currentTheme === theme.value ? 'btn-primary' : 'btn-outline'">
           <i :class="theme.icon" class="mr-2"></i>
           {{ theme.name }}
         </button>
       </div>
-      
+
       <!-- Test all themes button -->
       <button @click="testAllThemes" class="btn btn-secondary btn-sm">
         <i class="fas fa-flask mr-2"></i>
         Tester tous les thèmes
       </button>
-      
+
       <!-- Theme test results -->
       <div v-if="Object.keys(themeTestResults).length > 0" class="p-4 bg-base-200 rounded-lg">
         <h4 class="font-semibold text-base-content mb-2">Résultats des tests de thèmes:</h4>
         <div class="grid grid-cols-2 gap-2 text-sm">
-          <div 
-            v-for="(result, themeName) in themeTestResults" 
-            :key="themeName"
-            class="flex items-center gap-2"
-          >
+          <div v-for="(result, themeName) in themeTestResults" :key="themeName" class="flex items-center gap-2">
             <span :class="result ? 'text-success' : 'text-error'">
               <i :class="result ? 'fas fa-check' : 'fas fa-times'"></i>
             </span>
@@ -83,7 +74,7 @@ const themeTestResults = ref({})
 const changeTheme = async (theme) => {
   currentTheme.value = theme
   applyTheme(theme)
-  
+
   // Test theme after application
   await nextTick()
   setTimeout(() => {

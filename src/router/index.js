@@ -9,8 +9,7 @@ import User from '../views/User.vue'
 import NotFound from '../views/NotFound.vue'
 import ForceLogin from '../components/Debug/ForceLogin.vue'
 
-import FormattingUtilsDemo from '../components/Demo/FormattingUtilsDemo.vue'
-import FileOperationsExample from '../components/Examples/FileOperationsExample.vue'
+
 
 const routes = [
   {
