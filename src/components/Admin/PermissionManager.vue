@@ -774,6 +774,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { permissionAPI } from '@/services/api'
 import { useStore } from 'vuex'
 import { createCachedApiCall, permissionCache, PerformanceMonitor } from '@/services/performance'
+import httpClient from '@/services/httpClient.js'
 
 const store = useStore()
 
@@ -1137,21 +1138,8 @@ const deleteFolder = async () => {
 
   loading.value = true
   try {
-    // Use the correct backend URL for folder deletion
-    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001'
-    const response = await fetch(`${baseURL}/folders/${deleteModal.value.folder.id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    const result = await response.json()
+    // Use the HTTP client for folder deletion
+    const result = await httpClient.delete(`/folders/${deleteModal.value.folder.id}`)
 
     // Remove folder from local data
     folders.value = folders.value.filter(f => f.id !== deleteModal.value.folder.id)
@@ -1180,34 +1168,16 @@ const deleteFolderDirect = async () => {
   loading.value = true
   try {
     // Try different API endpoints
-    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001'
     const folderId = deleteModal.value.folder.id
+    let result
 
-    // Try the admin API first
-    let response = await fetch(`${baseURL}/admin/folders/${folderId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    // If admin endpoint doesn't work, try the regular folders endpoint
-    if (!response.ok) {
-      response = await fetch(`${baseURL}/folders/${folderId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      })
+    try {
+      // Try the admin API first
+      result = await httpClient.delete(`/admin/folders/${folderId}`)
+    } catch (adminError) {
+      // If admin endpoint doesn't work, try the regular folders endpoint
+      result = await httpClient.delete(`/folders/${folderId}`)
     }
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    const result = await response.json()
 
     // Remove folder from local data
     folders.value = folders.value.filter(f => f.id !== deleteModal.value.folder.id)

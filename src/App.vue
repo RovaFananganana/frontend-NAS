@@ -1,44 +1,20 @@
 <template>
   <div id="app">
-    <!-- Notification globale -->
-    <Notification v-if="notification.show" :message="notification.message" :type="notification.type"
-      @close="hideNotification" />
-
     <!-- Route principale -->
     <router-view />
-
-
   </div>
 </template>
 
 <script>
 import { initializeTheme } from './utils/themeUtils'
 initializeTheme()
-import { ref, onMounted, provide } from 'vue'
+import { onMounted } from 'vue'
 import { useStore } from 'vuex'
-import Notification from './components/Shared/Notification.vue'
 
 export default {
   name: 'App',
-  components: { Notification },
   setup() {
     const store = useStore()
-    const notification = ref({
-      show: false,
-      message: '',
-      type: 'info'
-    })
-
-    const showNotification = (message, type = 'info') => {
-      notification.value = { show: true, message, type }
-      setTimeout(() => hideNotification(), 5000)
-    }
-
-    const hideNotification = () => {
-      notification.value.show = false
-    }
-
-    provide('showNotification', showNotification)
 
     onMounted(async () => {
       if (store.state.token) {
@@ -51,10 +27,7 @@ export default {
       }
     })
 
-    return {
-      notification,
-      hideNotification
-    }
+    return {}
   }
 }
 </script>

@@ -15,6 +15,8 @@
       {{ item.is_directory ? 'Ouvrir' : 'Prévisualiser' }}
     </button>
 
+
+
     <!-- Télécharger (fichiers seulement) -->
     <button 
       v-if="item && !item.is_directory && permissions.can_read"
@@ -42,6 +44,7 @@
       v-if="item && permissions.can_read"
       class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
       @click="$emit('copy', item)"
+      title="Copier pour coller dans le NAS ou vers le presse-papiers système"
     >
       <i class="fas fa-copy w-4"></i>
       Copier
@@ -260,6 +263,10 @@ const props = defineProps({
   currentViewMode: {
     type: String,
     default: 'DETAILED_LIST'
+  },
+  clipboardSupported: {
+    type: Boolean,
+    default: false
   }
 })
 

@@ -132,17 +132,6 @@
     </div>
   </div>
 
-  <!-- Notifications -->
-  <div v-if="notification.show" class="toast toast-top toast-end">
-    <div :class="[
-      'alert',
-      notification.type === 'success' ? 'alert-success' :
-        notification.type === 'error' ? 'alert-error' :
-          'alert-info'
-    ]">
-      <span>{{ notification.message }}</span>
-    </div>
-
     <!-- Menu contextuel pour les favoris -->
     <div v-if="contextMenu.show"
       class="fixed bg-base-100 border border-base-300 shadow-lg rounded-lg py-2 z-50 min-w-48"
@@ -161,7 +150,6 @@
         Retirer des favoris
       </button>
     </div>
-  </div>
 </template>
 
 <script setup>
@@ -227,12 +215,7 @@ const contextMenu = ref({
   favorite: null
 })
 
-// Notification système
-const notification = ref({
-  show: false,
-  message: '',
-  type: 'info'
-})
+// Notification système removed
 
 // Computed
 const maxFavorites = computed(() => 50) // Limite par défaut
@@ -241,10 +224,10 @@ const maxFavorites = computed(() => 50) // Limite par défaut
 const refresh = async () => {
   try {
     await loadFavoritesFromBackend()
-    showNotification('Favoris actualisés', 'success')
+    console.log('Favoris actualisés', 'success')
   } catch (error) {
     console.error('Erreur lors du chargement des favoris:', error)
-    showNotification('Erreur lors du chargement des favoris', 'error')
+    console.log('Erreur lors du chargement des favoris', 'error')
   }
 }
 
@@ -256,10 +239,10 @@ const navigateToFavorite = (favorite) => {
       source: 'favorite',
       favorite: favorite
     })
-    showNotification(`Navigation vers ${favorite.item_name}`, 'info')
+    console.log(`Navigation vers ${favorite.item_name}`, 'info')
   } catch (error) {
     console.error('Erreur lors de la navigation:', error)
-    showNotification('Erreur lors de la navigation', 'error')
+    console.log('Erreur lors de la navigation', 'error')
   }
 }
 
@@ -267,10 +250,10 @@ const removeFavoriteLocal = async (favorite) => {
   try {
     await removeFavoriteFromBackend(favorite.item_path || favorite.path)
     emit('favorite-removed', favorite)
-    showNotification(`${favorite.item_name || favorite.name} retiré des favoris`, 'success')
+    console.log(`${favorite.item_name || favorite.name} retiré des favoris`, 'success')
   } catch (error) {
     console.error('Erreur lors de la suppression du favori:', error)
-    showNotification('Erreur lors de la suppression du favori', 'error')
+    console.log('Erreur lors de la suppression du favori', 'error')
     emit('error', error)
   }
 }
@@ -289,10 +272,10 @@ const exportFavorites = () => {
     document.body.removeChild(link)
 
     URL.revokeObjectURL(url)
-    showNotification('Favoris exportés avec succès', 'success')
+    console.log('Favoris exportés avec succès', 'success')
   } catch (error) {
     console.error('Erreur lors de l\'export:', error)
-    showNotification('Erreur lors de l\'export des favoris', 'error')
+    console.log('Erreur lors de l\'export des favoris', 'error')
   }
 }
 
@@ -304,10 +287,10 @@ const importFavorites = (event) => {
   reader.onload = (e) => {
     try {
       // Import temporairement désactivé - nécessite implémentation backend
-      showNotification('Import temporairement indisponible', 'warning')
+      console.log('Import temporairement indisponible', 'warning')
     } catch (error) {
       console.error('Erreur lors de l\'import:', error)
-      showNotification('Format de fichier invalide', 'error')
+      console.log('Format de fichier invalide', 'error')
     }
   }
   reader.readAsText(file)
@@ -328,30 +311,19 @@ const clearAllFavorites = async () => {
     const success = false
     if (success) {
       await loadFavoritesFromBackend()
-      showNotification('Tous les favoris ont été supprimés', 'success')
+      console.log('Tous les favoris ont été supprimés', 'success')
     } else {
-      showNotification('Erreur lors de la suppression', 'error')
+      console.log('Erreur lors de la suppression', 'error')
     }
   } catch (error) {
     console.error('Erreur lors de la suppression:', error)
-    showNotification('Erreur lors de la suppression', 'error')
+    console.log('Erreur lors de la suppression', 'error')
   } finally {
     showClearConfirm.value = false
   }
 }
 
-const showNotification = (message, type = 'info') => {
-  notification.value = {
-    show: true,
-    message,
-    type
-  }
-
-  // Auto-hide après 3 secondes
-  setTimeout(() => {
-    notification.value.show = false
-  }, 3000)
-}
+// showNotification function removed
 
 // Écouteur d'événements pour les changements de favoris
 let unsubscribeFavoritesChanged = null
@@ -368,15 +340,15 @@ const addCurrentPathToFavorites = async (name = null) => {
         path: props.currentPath,
         name: folderName
       })
-      showNotification(`${folderName} ajouté aux favoris`, 'success')
+      console.log(`${folderName} ajouté aux favoris`, 'success')
       return true
     } else {
-      showNotification('Ce dossier est déjà dans les favoris', 'info')
+      console.log('Ce dossier est déjà dans les favoris', 'info')
       return false
     }
   } catch (error) {
     console.error('Erreur lors de l\'ajout aux favoris:', error)
-    showNotification('Erreur lors de l\'ajout aux favoris', 'error')
+    console.log('Erreur lors de l\'ajout aux favoris', 'error')
     return false
   }
 }

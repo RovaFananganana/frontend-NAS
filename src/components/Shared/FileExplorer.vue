@@ -1,14 +1,4 @@
 <template>
-  <!-- Skip links for accessibility -->
-  <div class="skip-links">
-    <a href="#file-explorer-main" class="skip-link">
-      Aller au contenu principal de l'explorateur
-    </a>
-    <a href="#view-mode-selector" class="skip-link">
-      Aller au sélecteur de mode d'affichage
-    </a>
-  </div>
-
   <div ref="explorerContainer" :class="[
     'file-explorer file-explorer-enhanced file-explorer-focus-trap',
     {
@@ -75,58 +65,75 @@
       </div>
     </div>
 
-    <!-- Conteneur principal avec gestion d'erreur -->
-    <div id="file-explorer-main" class="file-explorer-content" role="main"
-      aria-label="Contenu de l'explorateur de fichiers">
+    <!-- Conteneur principal avec gestion d'erreur et drag & drop -->
+    <DragDropZone
+      :target-path="currentPath"
+      :disabled="loading || !!error"
+      :accept-folders="true"
+      :max-file-size="500 * 1024 * 1024"
+      :max-files="20"
+      drop-message="Déposez vos fichiers et dossiers ici"
+      upload-message="Upload en cours..."
+      @files-dropped="handleFilesDrop"
+      @upload-started="handleUploadStarted"
+      @upload-progress="handleUploadProgress"
+      @upload-completed="handleUploadCompleted"
+      @upload-error="handleUploadError"
+      @drag-enter="handleDragEnter"
+      @drag-leave="handleDragLeave"
+    >
+      <div id="file-explorer-main" class="file-explorer-content" role="main"
+        aria-label="Contenu de l'explorateur de fichiers">
 
-      <!-- État de chargement global -->
-      <div v-if="loading && !files.length" class="loading-state-enhanced" role="status" aria-live="polite"
-        aria-label="Chargement en cours">
-        <div class="loading-spinner-enhanced" aria-hidden="true"></div>
-        <span class="text-base-content/70">Chargement des fichiers...</span>
-      </div>
-
-      <!-- État d'erreur global -->
-      <div v-else-if="error" class="alert alert-error" role="alert" aria-live="assertive">
-        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-        <div>
-          <h3 class="font-bold">Erreur de chargement</h3>
-          <div class="text-sm">{{ error }}</div>
+        <!-- État de chargement global -->
+        <div v-if="loading && !files.length" class="loading-state-enhanced" role="status" aria-live="polite"
+          aria-label="Chargement en cours">
+          <div class="loading-spinner-enhanced" aria-hidden="true"></div>
+          <span class="text-base-content/70">Chargement des fichiers...</span>
         </div>
-        <button @click="refresh" class="btn btn-sm btn-outline" aria-label="Réessayer le chargement des fichiers">
-          <i class="fas fa-redo mr-1" aria-hidden="true"></i>
-          Réessayer
-        </button>
-      </div>
 
-      <!-- État de la recherche -->
-      <div v-if="isSearchActive" class="search-status mb-4" role="status" aria-live="polite">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <div v-if="isSearching" class="loading loading-spinner loading-sm" aria-hidden="true"></div>
-            <i v-else-if="hasResults" class="fas fa-search text-primary" aria-hidden="true"></i>
-            <i v-else class="fas fa-search text-base-content/50" aria-hidden="true"></i>
-            <span class="text-sm">{{ searchStatusMessage }}</span>
+        <!-- État d'erreur global -->
+        <div v-else-if="error" class="alert alert-error" role="alert" aria-live="assertive">
+          <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+          <div>
+            <h3 class="font-bold">Erreur de chargement</h3>
+            <div class="text-sm">{{ error }}</div>
           </div>
-          <div v-if="searchStats.searchTime > 0" class="text-xs text-base-content/50">
-            {{ searchStats.searchTime }}ms
+          <button @click="refresh" class="btn btn-sm btn-outline" aria-label="Réessayer le chargement des fichiers">
+            <i class="fas fa-redo mr-1" aria-hidden="true"></i>
+            Réessayer
+          </button>
+        </div>
+
+        <!-- État de la recherche -->
+        <div v-if="isSearchActive" class="search-status mb-4" role="status" aria-live="polite">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <div v-if="isSearching" class="loading loading-spinner loading-sm" aria-hidden="true"></div>
+              <i v-else-if="hasResults" class="fas fa-search text-primary" aria-hidden="true"></i>
+              <i v-else class="fas fa-search text-base-content/50" aria-hidden="true"></i>
+              <span class="text-sm">{{ searchStatusMessage }}</span>
+            </div>
+            <div v-if="searchStats.searchTime > 0" class="text-xs text-base-content/50">
+              {{ searchStats.searchTime }}ms
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Composant de vue dynamique -->
-      <component v-if="!loading && !error" :is="currentViewComponent" :current-path="currentPath" :files="files" :loading="loading"
-        :error="error" :focused-index="focusedIndex" :user-role="userRole" :file-operations-state="{
-          hasOperation,
-          isCopyOperation,
-          isCutOperation,
-          operationItems,
-          isItemInOperation,
-          getItemIndicatorClass
-        }" :is-selected="isSelected" :is-favorite="isItemFavorite" @path-selected="handlePathSelected"
-        @file-selected="handleFileSelected" @file-double-click="handleFileDoubleClick" @sort-changed="handleSortChanged"
-        @navigate-back="handleNavigateBack" @show-actions="handleShowActions" @context-menu="showContextMenu" />
-    </div>
+        <!-- Composant de vue dynamique -->
+        <component v-if="!loading && !error" :is="currentViewComponent" :current-path="currentPath" :files="files" :loading="loading"
+          :error="error" :focused-index="focusedIndex" :user-role="userRole" :file-operations-state="{
+            hasOperation,
+            isCopyOperation,
+            isCutOperation,
+            operationItems,
+            isItemInOperation,
+            getItemIndicatorClass
+          }" :is-selected="isSelected" :is-favorite="isItemFavorite" @path-selected="handlePathSelected"
+          @file-selected="handleFileSelected" @file-double-click="handleFileDoubleClick" @sort-changed="handleSortChanged"
+          @navigate-back="handleNavigateBack" @show-actions="handleShowActions" @context-menu="showContextMenu" />
+      </div>
+    </DragDropZone>
 
     <!-- Barre d'état avec informations -->
     <div v-if="!loading && !error"
@@ -181,8 +188,9 @@
       count: operationCount,
       description: getOperationDescription()
     }" :show-permission-errors="showPermissionErrors" :is-favorite="isItemFavorite(contextMenu.item)"
-    :current-view-mode="currentMode" @open="openContextItem" @download="downloadContextFile" @rename="openRenameModal"
-    @copy="copyContextItem" @cut="cutContextItem" @paste="pasteItems" @permissions="openPermissions"
+    :current-view-mode="currentMode" :clipboard-supported="clipboardService.getState().isSupported"
+    @open="openContextItem" @download="downloadContextFile"
+    @rename="openRenameModal" @copy="copyContextItem" @cut="cutContextItem" @paste="pasteItems" @permissions="openPermissions"
     @move="openMoveModal" @create-folder="openCreateFolderModal" @create-file="openCreateFileModal"
     @delete="confirmDelete" @properties="showProperties" @toggle-favorite="handleToggleFavorite"
     @view-mode-changed="handleViewModeChange" />
@@ -212,21 +220,15 @@
   <UploadModal v-if="showUploadModal && currentPath" :current-path="currentPath" @close="showUploadModal = false"
     @uploaded="onFilesUploaded" @error="handleUploadError" />
 
-  <!-- Notifications -->
-  <div v-if="notification.show" class="toast toast-top toast-end">
-    <div :class="[
-      'alert',
-      notification.type === 'success' ? 'alert-success' :
-        notification.type === 'error' ? 'alert-error' :
-          'alert-info'
-    ]">
-      <span>{{ notification.message }}</span>
-    </div>
-  </div>
+  <!-- Upload Progress Panel -->
+  <UploadProgressPanel />
+
+
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useStore } from 'vuex'
 import { useViewMode } from '@/composables/useViewMode.js'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts.js'
 import { useFileExplorerNavigation } from '@/composables/useFileExplorerNavigation.js'
@@ -239,6 +241,11 @@ import { useFileOperations } from '@/composables/useFileOperations.js'
 import { useFavorites } from '@/composables/useFavorites.js'
 import { useFileSearch } from '@/composables/useFileSearch.js'
 import { nasAPI } from '@/services/nasAPI.js'
+import TokenService from '@/services/tokenService.js'
+import httpClient from '@/services/httpClient.js'
+import { uploadService } from '@/services/uploadService.js'
+import { clipboardService } from '@/services/clipboardService.js'
+import { activityLogger } from '@/services/activityLogger.js'
 import { VIEW_MODES } from '@/types/viewMode.js'
 
 // Composants
@@ -259,6 +266,8 @@ import PropertiesModal from './PropertiesModal.vue'
 import CreateFolderModal from './CreateFolderModal.vue'
 import CreateFileModal from './CreateFileModal.vue'
 import UploadModal from './UploadModal.vue'
+import DragDropZone from './DragDropZone.vue'
+import UploadProgressPanel from './UploadProgressPanel.vue'
 
 // Props
 const props = defineProps({
@@ -317,6 +326,9 @@ const {
   isSelected,
   setCurrentMode
 } = useViewMode()
+
+// Store Vuex pour accéder aux informations utilisateur
+const store = useStore()
 
 const {
   isMobile,
@@ -399,12 +411,7 @@ const itemToRename = ref(null)
 const itemsToMove = ref([])
 const itemsToDelete = ref([])
 
-// Notification state
-const notification = ref({
-  show: false,
-  message: '',
-  type: 'info'
-})
+// Notification state removed
 
 // File operations composable for copy/cut/paste
 const {
@@ -860,6 +867,145 @@ const {
   selectAll: selectAllKeyboard
 } = useFileExplorerNavigation(navigationOptions)
 
+// Keyboard shortcuts setup
+const keyboardShortcuts = {
+  'Ctrl+v': async (event) => {
+    // Handle paste from system clipboard
+    await handleClipboardPaste(event)
+  },
+  'Ctrl+Shift+c': async (event) => {
+    // Copy selected files to system clipboard
+    await handleCopySelectedToClipboard(event)
+  },
+  'F5': (event) => {
+    // Refresh current directory
+    event.preventDefault()
+    refresh()
+  }
+}
+
+const { addShortcut, removeShortcut, setActive: setKeyboardShortcutsActive } = useKeyboardShortcuts(keyboardShortcuts, {
+  context: 'fileExplorer',
+  preventDefault: true
+})
+
+// Clipboard paste handler
+const handleClipboardPaste = async (event) => {
+  try {
+    console.log('📋 Clipboard paste triggered in FileExplorer')
+    
+    // Check if we're in a text input - if so, let the browser handle it
+    const activeElement = document.activeElement
+    const isInTextInput = activeElement && (
+      activeElement.tagName.toLowerCase() === 'input' ||
+      activeElement.tagName.toLowerCase() === 'textarea' ||
+      activeElement.contentEditable === 'true'
+    )
+    
+    if (isInTextInput) {
+      console.log('📋 In text input, letting browser handle paste')
+      return
+    }
+    
+    // Prevent default browser paste behavior
+    event.preventDefault()
+    
+    // Check if clipboard service is supported
+    if (!clipboardService.getState().isSupported) {
+      console.log('Clipboard API not supported in this browser', 'error')
+      return
+    }
+    
+    // Check if clipboard has files
+    const hasFiles = await clipboardService.hasFilesInClipboard()
+    if (!hasFiles) {
+      console.log('No files found in clipboard. Copy files from Windows Explorer first.', 'info')
+      return
+    }
+    
+    // Show loading state
+    console.log('Pasting files from clipboard...', 'info')
+    
+    // Paste files to current directory
+    const result = await clipboardService.pasteFiles(currentPath.value)
+    
+    if (result.success) {
+      // Log activity
+      activityLogger.logPaste(result.files || [], currentPath.value, 'external')
+      
+      console.log(result.message, 'success')
+      
+      // Refresh file list after a short delay to show uploaded files
+      setTimeout(() => {
+        refresh()
+      }, 1000)
+    } else {
+      console.log(`Paste failed: ${result.error}`, 'error')
+    }
+    
+  } catch (error) {
+    console.error('Clipboard paste error:', error)
+    console.log(`Paste failed: ${error.message}`, 'error')
+  }
+}
+
+// Function removed - now handled by copyContextItem
+
+// Copy selected files to system clipboard handler
+const handleCopySelectedToClipboard = async (event) => {
+  try {
+    // Check if we're in a text input - if so, let the browser handle it
+    const activeElement = document.activeElement
+    const isInTextInput = activeElement && (
+      activeElement.tagName.toLowerCase() === 'input' ||
+      activeElement.tagName.toLowerCase() === 'textarea' ||
+      activeElement.contentEditable === 'true'
+    )
+    
+    if (isInTextInput) {
+      console.log('📋 In text input, letting browser handle copy')
+      return
+    }
+    
+    // Prevent default browser copy behavior
+    event.preventDefault()
+    
+    // Check if any files are selected
+    if (selectedFiles.value.length === 0) {
+      console.log('No files selected to copy', 'info')
+      return
+    }
+    
+    console.log('📋 Copying selected files to system clipboard:', selectedFiles.value.length)
+    
+    // Check if clipboard service is supported
+    if (!clipboardService.getState().isSupported) {
+      console.log('Clipboard API not supported in this browser', 'error')
+      return
+    }
+    
+    // Show loading state
+    const fileCount = selectedFiles.value.length
+    console.log(`Copying ${fileCount} file${fileCount > 1 ? 's' : ''} to clipboard...`, 'info')
+    
+    // Get file paths from selected files
+    const filePaths = selectedFiles.value.map(file => file.path)
+    
+    // Copy files to system clipboard
+    const result = await clipboardService.copyFilesToClipboard(filePaths)
+    
+    if (result.success) {
+      console.log(`${fileCount} file${fileCount > 1 ? 's' : ''} copied to clipboard. You can now paste them in other applications.`, 'success')
+    } else {
+      console.log(`Copy failed: ${result.error}`, 'error')
+    }
+    
+  } catch (error) {
+    console.error('Copy selected to clipboard error:', error)
+    console.log(`Copy failed: ${error.message}`, 'error')
+  }
+}
+
 // Context menu and file operations methods
 const handleGlobalContextMenu = (event) => {
   console.log('� Global lcontext menu triggered on:', event.target.tagName, event.target.className)
@@ -916,9 +1062,12 @@ const openContextItem = (item) => {
 
 const downloadContextFile = async (item) => {
   try {
+    console.log('📥 Starting download for:', item.name, 'at path:', item.path)
+    
     // Skip system files that might cause issues
     const systemFiles = ['desktop.ini', 'thumbs.db', '.ds_store', 'folder.jpg', 'albumartsmall.jpg']
     if (systemFiles.includes(item.name.toLowerCase())) {
+      console.warn('❌ Skipping system file:', item.name)
       emit('error', {
         error: new Error('Cannot download system files'),
         action: 'download',
@@ -930,38 +1079,92 @@ const downloadContextFile = async (item) => {
     }
 
     emit('info', `Téléchargement de ${item.name} en cours...`)
+    console.log('🚀 Calling nasAPI.downloadFile...')
 
-    const blob = await nasAPI.downloadFile(item.path, (percentage, loaded, total) => {
-      // Emit progress updates
-      emit('download-progress', {
-        file: item,
-        percentage: Math.round(percentage),
-        loaded,
-        total,
-        timestamp: Date.now()
+    let blob
+    try {
+      // Essayer d'abord avec la méthode normale
+      blob = await nasAPI.downloadFile(item.path, (percentage, loaded, total) => {
+        console.log(`📊 Download progress: ${percentage}% (${loaded}/${total})`)
+        emit('download-progress', {
+          file: item,
+          percentage: Math.round(percentage),
+          loaded,
+          total,
+          timestamp: Date.now()
+        })
       })
-    })
+    } catch (apiError) {
+      console.warn('⚠️ Primary download method failed, trying fallback...', apiError.message)
+      
+      // Méthode de fallback : téléchargement direct via URL
+      const encodedPath = item.path.split('/').map(segment => encodeURIComponent(segment)).join('/')
+      const downloadUrl = `/download/${encodedPath}`
+      
+      console.log('🔄 Trying direct download URL:', downloadUrl)
+      
+      blob = await httpClient.downloadFile(downloadUrl)
+    }
 
-    // Create download link
+    console.log('✅ Download completed, blob size:', blob.size)
+
+    if (!blob || blob.size === 0) {
+      throw new Error('Le fichier téléchargé est vide')
+    }
+
+    // Create download link with better browser compatibility
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = item.name
+    link.style.display = 'none'
+    
+    // Add to DOM temporarily
     document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
+    
+    console.log('🔗 Triggering download for:', item.name)
+    
+    // Trigger download with user gesture simulation
+    const clickEvent = new MouseEvent('click', {
+      view: window,
+      bubbles: true,
+      cancelable: false
+    })
+    link.dispatchEvent(clickEvent)
+    
+    // Clean up after a short delay
+    setTimeout(() => {
+      if (document.body.contains(link)) {
+        document.body.removeChild(link)
+      }
+      window.URL.revokeObjectURL(url)
+      console.log('🧹 Cleaned up download link')
+    }, 1000)
 
+    // Log activity
+    activityLogger.logDownload(item.name, item.path)
+    
     emit('file-downloaded', { file: item, timestamp: Date.now() })
     emit('success', `Téléchargement de ${item.name} terminé`)
+    
   } catch (err) {
-    console.error('Error downloading file:', err)
+    console.error('❌ Download error:', err)
+    console.error('Error details:', {
+      message: err.message,
+      status: err.status,
+      code: err.code,
+      name: err.name
+    })
 
     let errorMessage = `Erreur lors du téléchargement: ${err.message}`
     if (err.status === 403) {
       errorMessage = 'Permission refusée pour télécharger ce fichier'
     } else if (err.status === 404) {
       errorMessage = 'Fichier introuvable'
+    } else if (err.name === 'NetworkError') {
+      errorMessage = 'Erreur réseau - vérifiez votre connexion'
+    } else if (err.message.includes('empty')) {
+      errorMessage = 'Le fichier est vide ou corrompu'
     }
 
     emit('error', {
@@ -975,6 +1178,7 @@ const downloadContextFile = async (item) => {
   contextMenu.value.show = false
 }
 
+
 const copyContextItem = async (item) => {
   // Check read permission for copying
   const canCopy = await canPerformAction(item.path, 'read')
@@ -984,8 +1188,33 @@ const copyContextItem = async (item) => {
     return
   }
 
-  // Use the file operations composable
+  // Copy for internal NAS operations
   copy([item], currentPath.value)
+  
+  // Log activity
+  activityLogger.logCopy([item], 'internal')
+  
+  // Also copy to system clipboard if supported
+  if (clipboardService.getState().isSupported) {
+    try {
+      console.log('📋 Also copying to system clipboard:', item.name)
+      const result = await clipboardService.copyFilesToClipboard([item.path])
+      
+      if (result.success) {
+        console.log(`✅ ${item.name} copied to both NAS clipboard and system clipboard`)
+        console.log(`ℹ️ ${result.message}`)
+        // Log system clipboard copy
+        activityLogger.logCopy([item], 'system')
+      } else {
+        console.warn(`⚠️ Failed to copy to system clipboard: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('❌ System clipboard copy error:', error)
+    }
+  } else {
+    console.log('ℹ️ System clipboard not supported - file copied to NAS clipboard only')
+  }
+  
   contextMenu.value.show = false
 }
 
@@ -1026,6 +1255,9 @@ const pasteItems = async () => {
     const result = await paste(currentPath.value)
 
     if (result.success) {
+      // Log activity
+      activityLogger.logPaste(operationItems.value, currentPath.value, 'internal')
+      
       // Refresh the file list to show changes
       await loadFiles(currentPath.value)
     }
@@ -1156,16 +1388,16 @@ const handleToggleFavorite = async (item) => {
     const wasAdded = await toggleFavorite(item.path, item.name, itemType)
 
     if (wasAdded) {
-      showNotification(`${item.name} ajouté aux favoris`, 'success')
+      console.log(`${item.name} ajouté aux favoris`, 'success')
     } else {
-      showNotification(`${item.name} retiré des favoris`, 'success')
+      console.log(`${item.name} retiré des favoris`, 'success')
     }
 
     contextMenu.value.show = false
 
   } catch (err) {
     console.error('Error toggling favorite:', err)
-    showNotification(`Erreur: ${err.message}`, 'error')
+    console.log(`Erreur: ${err.message}`, 'error')
 
     emit('error', {
       error: err,
@@ -1208,18 +1440,7 @@ const handleViewModeChange = (newMode) => {
   console.log('✅ FileExplorer: View mode changed successfully')
 }
 
-const showNotification = (message, type = 'info') => {
-  notification.value = {
-    show: true,
-    message,
-    type
-  }
-
-  // Auto-hide after 3 seconds
-  setTimeout(() => {
-    notification.value.show = false
-  }, 3000)
-}
+// Notifications are now handled by individual modals in components
 
 // Modal event handlers
 const onPermissionsUpdated = () => {
@@ -1231,8 +1452,12 @@ const onItemRenamed = async (renameData) => {
     // renameData is an object: {oldPath, newPath, newName}
     console.log('Item renamed:', renameData)
 
+    // Log activity
+    const oldName = renameData.oldPath.split('/').pop()
+    activityLogger.logRename(oldName, renameData.newName, renameData.newPath)
+
     // Show success notification
-    showNotification(`Élément renommé en "${renameData.newName}"`, 'success')
+    console.log(`Élément renommé en "${renameData.newName}"`, 'success')
 
     // Refresh the file list to show changes
     await loadFiles(currentPath.value)
@@ -1250,7 +1475,7 @@ const onItemRenamed = async (renameData) => {
 
   } catch (error) {
     console.error('Error handling rename:', error)
-    showNotification(`Erreur lors du renommage: ${error.message}`, 'error')
+    console.log(`Erreur lors du renommage: ${error.message}`, 'error')
   }
 }
 
@@ -1260,6 +1485,9 @@ const onItemsMoved = () => {
 
 const onItemsDeleted = async (items) => {
   try {
+    // Log activity
+    activityLogger.logDelete(items)
+    
     for (const item of items) {
       // Remove from selection if it was selected
       if (selectedFiles.value.includes(item.path)) {
@@ -1269,7 +1497,7 @@ const onItemsDeleted = async (items) => {
 
     // Show success notification
     const itemCount = items.length
-    showNotification(
+    console.log(
       `${itemCount} élément${itemCount > 1 ? 's' : ''} supprimé${itemCount > 1 ? 's' : ''}`,
       'success'
     )
@@ -1279,34 +1507,117 @@ const onItemsDeleted = async (items) => {
 
   } catch (error) {
     console.error('Error handling deletion:', error)
-    showNotification(`Erreur lors de la suppression: ${error.message}`, 'error')
+    console.log(`Erreur lors de la suppression: ${error.message}`, 'error')
   }
 }
 
 const onFolderCreated = (event) => {
+  // Log activity
+  activityLogger.logCreate(event?.folderName || 'nouveau dossier', 'folder', currentPath.value)
+  
   // Show success notification
-  showNotification(`Dossier "${event?.folderName || 'nouveau dossier'}" créé avec succès`, 'success')
+  console.log(`Dossier "${event?.folderName || 'nouveau dossier'}" créé avec succès`, 'success')
   // Refresh the file list
   loadFiles(currentPath.value)
 }
 
 const onFileCreated = (event) => {
+  // Log activity
+  activityLogger.logCreate(event.fileName, 'file', currentPath.value)
+  
   // Show success notification
-  showNotification(`Fichier "${event.fileName}" créé avec succès`, 'success')
+  console.log(`Fichier "${event.fileName}" créé avec succès`, 'success')
   // Refresh the file list
   loadFiles(currentPath.value)
 }
 
 const onFilesUploaded = (event) => {
+  // Log activity
+  activityLogger.logUpload(event.files || [], currentPath.value)
+  
   // Show success notification
-  showNotification(`${event.files?.length || 1} fichier(s) uploadé(s) avec succès`, 'success')
+  console.log(`${event.files?.length || 1} fichier(s) uploadé(s) avec succès`, 'success')
   // Refresh the file list
   loadFiles(currentPath.value)
 }
 
 const handleUploadError = (error) => {
   // Show error notification
-  showNotification(`Erreur d'upload: ${error.message}`, 'error')
+  console.log(`Erreur d'upload: ${error.message}`, 'error')
+}
+
+// Drag & Drop event handlers
+const handleFilesDrop = async (event) => {
+  console.log('📁 Files dropped:', event.files.length, 'files to', event.targetPath)
+  
+  // Log activity
+  activityLogger.logDragDrop(event.files, event.targetPath)
+  
+  try {
+    // Start batch upload
+    await startBatchUpload(event.files, event.targetPath)
+  } catch (error) {
+    console.error('Error handling dropped files:', error)
+    handleUploadError(error)
+  }
+}
+
+const handleUploadStarted = () => {
+  console.log('📤 Upload started')
+  // Could show a global upload indicator here if needed
+}
+
+const handleUploadProgress = (progress) => {
+  console.log('📊 Upload progress:', progress + '%')
+  // Emit progress for parent components
+  emit('upload-progress', progress)
+}
+
+const handleUploadCompleted = () => {
+  console.log('✅ Upload completed')
+  // Refresh file list to show new files
+  loadFiles(currentPath.value)
+}
+
+const handleDragEnter = () => {
+  console.log('🎯 Drag enter detected')
+  // Could add visual feedback here if needed
+}
+
+const handleDragLeave = () => {
+  console.log('🚪 Drag leave detected')
+  // Could remove visual feedback here if needed
+}
+
+// Batch upload functionality using upload service
+const startBatchUpload = async (files, targetPath) => {
+  console.log('🚀 Starting batch upload of', files.length, 'files to', targetPath)
+  
+  if (!files || files.length === 0) {
+    throw new Error('Aucun fichier à uploader')
+  }
+  
+  // Check permissions
+  if (!canPerformAction('write', targetPath)) {
+    throw new Error('Permissions insuffisantes pour uploader dans ce dossier')
+  }
+  
+  try {
+    // Add files to upload service queue
+    const uploadIds = uploadService.addFiles(files, targetPath, {
+      overwrite: false,
+      maxRetries: 3
+    })
+    
+    console.log('✅ Added', files.length, 'files to upload queue with IDs:', uploadIds)
+    
+    // The upload service will handle the actual uploading with progress tracking
+    // The UploadProgressPanel will show the progress automatically
+    
+  } catch (error) {
+    console.error('Failed to start batch upload:', error)
+    throw error
+  }
 }
 
 // Version simple de la recherche sans le composable complexe
@@ -1422,11 +1733,17 @@ onMounted(async () => {
 
   // Activate keyboard navigation
   activateNavigation()
+  
+  // Activate keyboard shortcuts
+  setKeyboardShortcutsActive(true)
 })
 
 onUnmounted(() => {
   // Deactivate keyboard navigation
   deactivateNavigation()
+  
+  // Deactivate keyboard shortcuts
+  setKeyboardShortcutsActive(false)
   
   // Cleanup search
   cleanupSearch()

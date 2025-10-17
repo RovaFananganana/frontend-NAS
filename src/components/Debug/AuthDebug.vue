@@ -85,6 +85,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { getToken, getUser } from '@/services/auth.js'
+import httpClient from '@/services/httpClient.js'
 
 const store = useStore()
 const router = useRouter()
@@ -113,41 +114,28 @@ const testBackend = async () => {
   try {
     // First test NAS health endpoint (no auth required)
     console.log('Testing NAS health endpoint...')
-    const healthResponse = await fetch('/nas/health')
+    const healthData = await httpClient.get('/nas/health')
+    console.log('NAS health check successful:', healthData)
     
-    if (healthResponse.ok) {
-      const healthData = await healthResponse.json()
-      console.log('NAS health check successful:', healthData)
-      
-      // If we have a token, test authenticated endpoint
-      if (hasToken.value) {
-        console.log('Testing authenticated endpoint...')
-        const authResponse = await fetch('/users/me', {
-          headers: {
-            'Authorization': `Bearer ${getToken()}`,
-            'Content-Type': 'application/json'
-          }
-        })
-        
-        if (authResponse.ok) {
-          backendStatus.value = 'connected'
-          const authData = await authResponse.json()
-          console.log('Auth test successful:', authData)
-        } else {
-          backendStatus.value = 'error'
-          backendError.value = `Auth failed: HTTP ${authResponse.status}`
-          
-          if (authResponse.status === 401) {
-            backendError.value += ' - Token may be expired'
-          }
-        }
-      } else {
+    // If we have a token, test authenticated endpoint
+    if (hasToken.value) {
+      console.log('Testing authenticated endpoint...')
+      try {
+        const authData = await httpClient.get('/users/me')
         backendStatus.value = 'connected'
-        backendError.value = 'Backend connected but no auth token'
+        console.log('Auth test successful:', authData)
+      } catch (authError) {
+        backendStatus.value = 'error'
+        backendError.value = `Auth failed: ${authError.message}`
+        
+        if (authError.status === 401) {
+          console.log('Removing invalid token...')
+          store.dispatch('logout')
+        }
       }
     } else {
-      backendStatus.value = 'error'
-      backendError.value = `Health check failed: HTTP ${healthResponse.status}`
+      backendStatus.value = 'connected'
+      backendError.value = 'Backend connected but no auth token'
     }
   } catch (error) {
     backendStatus.value = 'error'

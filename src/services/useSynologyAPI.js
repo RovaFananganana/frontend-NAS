@@ -211,6 +211,96 @@ export function useSynologyAPI() {
     }
   }
 
+  // Copie
+  const copyFile = async (sourcePath, destFolderPath, onProgress = null) => {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const normalizedSource = NasPathUtils.normalize(sourcePath)
+      const normalizedDest = NasPathUtils.normalize(destFolderPath)
+      
+      const response = await api.post('/copy', { 
+        source_path: normalizedSource, 
+        dest_path: normalizedDest 
+      })
+      
+      const result = {
+        success: response.data.success || true,
+        source_path: response.data.source_path || sourcePath,
+        dest_path: response.data.dest_path,
+        message: response.data.message || 'Copie réussie',
+        type: response.data.type || 'file',
+        copied_items: response.data.copied_items || [],
+        errors: response.data.errors || [],
+        stats: response.data.stats || {},
+        operation_id: response.data.operation_id
+      }
+      
+      // Si on a un callback de progression et un operation_id, suivre la progression
+      if (onProgress && result.operation_id) {
+        await _trackCopyProgress(result.operation_id, onProgress)
+      }
+      
+      return result
+    } catch (err) {
+      const message = err.response?.data?.error || err.message || 'Erreur lors de la copie'
+      error.value = message
+      throw new Error(message)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Suivi de progression de copie
+  const _trackCopyProgress = async (operationId, onProgress) => {
+    const pollInterval = 1000 // 1 seconde
+    let completed = false
+    
+    while (!completed) {
+      try {
+        const response = await api.get(`/copy-progress/${operationId}`)
+        const progress = response.data.progress
+        
+        if (onProgress) {
+          onProgress(progress)
+        }
+        
+        // Vérifier si l'opération est terminée
+        if (progress.status === 'completed' || progress.status === 'failed') {
+          completed = true
+        } else {
+          // Attendre avant le prochain poll
+          await new Promise(resolve => setTimeout(resolve, pollInterval))
+        }
+      } catch (err) {
+        console.error('Erreur lors du suivi de progression:', err)
+        completed = true // Arrêter le polling en cas d'erreur
+      }
+    }
+  }
+
+  // Obtenir la progression d'une copie
+  const getCopyProgress = async (operationId) => {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const response = await api.get(`/copy-progress/${operationId}`)
+      
+      return {
+        success: response.data.success || true,
+        progress: response.data.progress
+      }
+    } catch (err) {
+      const message = err.response?.data?.error || err.message || 'Erreur lors de la récupération de la progression'
+      error.value = message
+      throw new Error(message)
+    } finally {
+      loading.value = false
+    }
+  }
+
   // Upload de fichier avec progression
   const uploadFile = async (file, destPath, onProgress = null) => {
     loading.value = true
@@ -453,6 +543,8 @@ export function useSynologyAPI() {
     deleteFile,
     renameFile,
     moveFile,
+    copyFile,
+    getCopyProgress,
     uploadFile,
     downloadFile,
     getDownloadUrl,

@@ -22,8 +22,7 @@ export default createStore({
     sidebarOpen: false,
     loading: false,
     
-    // Notifications with enhanced structure
-    notifications: [],
+
     
     // Navigation
     currentFolder: null,
@@ -121,37 +120,7 @@ export default createStore({
       state.breadcrumbs = breadcrumbs
     },
 
-    // Enhanced Notifications mutations
-    ADD_NOTIFICATION(state, notification) {
-      const id = Date.now() + Math.random()
-      const newNotification = {
-        id,
-        type: notification.type || 'info',
-        title: notification.title || '',
-        message: notification.message || '',
-        timeout: notification.timeout || 5000,
-        actions: notification.actions || [],
-        persistent: notification.persistent || false,
-        timestamp: new Date().toISOString()
-      }
-      
-      state.notifications.push(newNotification)
 
-      // Auto-remove notification if not persistent
-      if (!newNotification.persistent && newNotification.timeout > 0) {
-        setTimeout(() => {
-          state.notifications = state.notifications.filter(n => n.id !== id)
-        }, newNotification.timeout)
-      }
-    },
-
-    REMOVE_NOTIFICATION(state, id) {
-      state.notifications = state.notifications.filter(n => n.id !== id)
-    },
-
-    CLEAR_ALL_NOTIFICATIONS(state) {
-      state.notifications = []
-    },
 
     // Performance mutations
     ADD_API_CALL(state, apiCall) {
@@ -321,58 +290,7 @@ export default createStore({
       dispatch('navigateToFolder', null)
     },
 
-    // Enhanced Notification actions
-    showNotification({ commit }, notification) {
-      commit('ADD_NOTIFICATION', notification)
-    },
 
-    showSuccess({ commit }, message) {
-      commit('ADD_NOTIFICATION', {
-        type: 'success',
-        title: 'Succès',
-        message,
-        timeout: 3000
-      })
-    },
-
-    showError({ commit }, message) {
-      commit('ADD_NOTIFICATION', {
-        type: 'error',
-        title: 'Erreur',
-        message,
-        timeout: 5000
-      })
-    },
-
-    showWarning({ commit }, message) {
-      commit('ADD_NOTIFICATION', {
-        type: 'warning',
-        title: 'Attention',
-        message,
-        timeout: 4000
-      })
-    },
-
-    showInfo({ commit }, message) {
-      commit('ADD_NOTIFICATION', {
-        type: 'info',
-        title: 'Information',
-        message,
-        timeout: 4000
-      })
-    },
-
-    showPersistentNotification({ commit }, notification) {
-      commit('ADD_NOTIFICATION', {
-        ...notification,
-        persistent: true,
-        timeout: 0
-      })
-    },
-
-    clearAllNotifications({ commit }) {
-      commit('CLEAR_ALL_NOTIFICATIONS')
-    },
 
     // Performance actions
     trackApiCall({ commit }, apiCall) {

@@ -6,50 +6,6 @@
     :aria-label="`Liste des fichiers, ${files?.length || 0} éléments`"
     :aria-busy="loading"
   >
-    <!-- Header -->
-    <div class="list-header bg-base-200 border-b border-base-300">
-      <table class="table w-full table-fixed">
-        <thead>
-          <tr class="border-none" role="row">
-            <th 
-              v-for="column in displayedColumns" 
-              :key="column.key"
-              @click="handleSort(column.key)"
-              @keydown.enter="handleSort(column.key)"
-              @keydown.space.prevent="handleSort(column.key)"
-              :class="[
-                'column-header cursor-pointer hover:bg-base-300/50 transition-colors duration-200',
-                'font-semibold text-base-content/80 px-3 py-2',
-                {
-                  'bg-primary/10 text-primary': sortColumn === column.key,
-                  'hover:bg-primary/5': sortColumn !== column.key
-                }
-              ]"
-              role="columnheader"
-              :aria-sort="getSortAriaValue(column.key)"
-              :aria-label="`Trier par ${column.label}${sortColumn === column.key ? (sortDirection === 'asc' ? ', tri croissant actuel' : ', tri décroissant actuel') : ''}`"
-              tabindex="0"
-            >
-              <div class="flex items-center gap-2">
-                <span class="truncate">{{ column.label }}</span>
-                <i 
-                  v-if="sortColumn === column.key" 
-                  :class="[
-                    sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
-                    'text-primary text-xs'
-                  ]"
-                ></i>
-                <i 
-                  v-else 
-                  class="fas fa-sort text-base-content/30 text-xs opacity-0 group-hover:opacity-60 transition-opacity"
-                ></i>
-              </div>
-            </th>
-          </tr>
-        </thead>
-      </table>
-    </div>
-    
     <!-- Loading state -->
     <div v-if="loading" class="flex justify-center py-8">
       <div class="loading loading-spinner loading-md"></div>
@@ -67,24 +23,68 @@
       <p>Aucun fichier dans ce dossier</p>
     </div>
     
-    <!-- Body -->
-    <div v-else class="overflow-y-auto max-h-96" @contextmenu="handleEmptySpaceContextMenu">
-      <table class="table w-full table-fixed">
-        <tbody>
-          <FileListItem
-            v-for="(file, index) in sortedFiles"
-            :key="file.path || file.name"
-            :file="file"
-            :selected="props.isSelected(file.path || file.name)"
-            :focused="focusedIndex === index"
-            :visible-columns="displayedColumns"
-            :is-favorite="props.isFavorite(file.path || file.name)"
-            @click="handleFileClick"
-            @double-click="handleFileDoubleClick"
-            @context-menu="handleContextMenu"
-          />
-        </tbody>
-      </table>
+    <!-- ✅ TABLEAU UNIFIÉ - En-têtes et données dans le même tableau -->
+    <div v-else class="overflow-hidden">
+      <div class="overflow-y-auto" style="max-height: calc(100vh - 300px);" @contextmenu="handleEmptySpaceContextMenu">
+        <table class="table w-full table-fixed">
+          <!-- Header avec sticky pour rester visible au scroll -->
+          <thead class="bg-base-200 border-b border-base-300 sticky top-0 z-10">
+            <tr class="border-none" role="row">
+              <th 
+                v-for="column in displayedColumns" 
+                :key="column.key"
+                @click="handleSort(column.key)"
+                @keydown.enter="handleSort(column.key)"
+                @keydown.space.prevent="handleSort(column.key)"
+                :style="{ width: column.width }"
+                :class="[
+                  'column-header cursor-pointer hover:bg-base-300/50 transition-colors duration-200',
+                  'font-semibold text-base-content/80 px-3 py-2',
+                  {
+                    'bg-primary/10 text-primary': sortColumn === column.key,
+                    'hover:bg-primary/5': sortColumn !== column.key
+                  }
+                ]"
+                role="columnheader"
+                :aria-sort="getSortAriaValue(column.key)"
+                :aria-label="`Trier par ${column.label}${sortColumn === column.key ? (sortDirection === 'asc' ? ', tri croissant actuel' : ', tri décroissant actuel') : ''}`"
+                tabindex="0"
+              >
+                <div class="flex items-center gap-2">
+                  <span class="truncate">{{ column.label }}</span>
+                  <i 
+                    v-if="sortColumn === column.key" 
+                    :class="[
+                      sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down',
+                      'text-primary text-xs'
+                    ]"
+                  ></i>
+                  <i 
+                    v-else 
+                    class="fas fa-sort text-base-content/30 text-xs opacity-0 group-hover:opacity-60 transition-opacity"
+                  ></i>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          
+          <!-- Body dans le même tableau -->
+          <tbody>
+            <FileListItem
+              v-for="(file, index) in sortedFiles"
+              :key="file.path || file.name"
+              :file="file"
+              :selected="props.isSelected(file.path || file.name)"
+              :focused="focusedIndex === index"
+              :visible-columns="displayedColumns"
+              :is-favorite="props.isFavorite(file.path || file.name)"
+              @click="handleFileClick"
+              @double-click="handleFileDoubleClick"
+              @context-menu="handleContextMenu"
+            />
+          </tbody>
+        </table>
+      </div>
     </div>
     
     <!-- Aide contextuelle pour les raccourcis -->
@@ -212,7 +212,7 @@ const sortedFiles = computed(() => {
   return sortFiles(props.files)
 })
 
-// Computed pour les colonnes affichées
+// Computed pour les colonnes affichées avec largeurs
 const displayedColumns = computed(() => {
   const allColumns = [
     { 
@@ -224,19 +224,19 @@ const displayedColumns = computed(() => {
     { 
       key: 'size', 
       label: 'Taille', 
-      required: true, // Forcer l'affichage
+      required: true,
       width: '15%'
     },
     { 
       key: 'type', 
       label: 'Type', 
-      required: true, // Forcer l'affichage
+      required: true,
       width: '15%'
     },
     { 
       key: 'date', 
       label: 'Date de modification', 
-      required: true, // Forcer l'affichage
+      required: true,
       width: '30%'
     }
   ]
@@ -279,7 +279,7 @@ const handleSort = (column) => {
 
 // Gestion des clics sur les fichiers
 const handleFileClick = (file, event) => {
-  const fileIndex = sortedFiles.value.findIndex(f => (f.path || f.name) === (file.path || f.name))
+  const fileIndex = sortedFiles.value.findIndex(f => (f.path || f.name) === (file.path || file.name))
   
   emit('file-selected', {
     file,
@@ -322,17 +322,24 @@ const handleEmptySpaceContextMenu = (event) => {
     emit('context-menu', event, null) // null indicates empty space
   }
 }
-
-
-
-
-
-
 </script>
 
 <style scoped>
 .detailed-list-view {
   min-height: 200px;
+  position: relative;
+}
+
+/* Tableau avec largeurs fixes */
+.table-fixed {
+  table-layout: fixed;
+}
+
+/* En-têtes sticky */
+.table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 /* En-têtes de colonnes */
@@ -344,36 +351,41 @@ const handleEmptySpaceContextMenu = (event) => {
   background-color: hsl(var(--b3) / 0.5);
 }
 
-/* Alignement des colonnes */
-.table-fixed {
-  table-layout: fixed;
-}
-
-.table-fixed th,
-.table-fixed td {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Permettre le wrap pour la colonne nom */
-.table-fixed td:first-child {
-  white-space: normal;
-  word-break: break-word;
-}
-
-/* Alignement spécifique par colonne */
-.table td:nth-child(2) {
-  text-align: right; /* Taille */
-}
-
-.table td:nth-child(3) {
-  text-align: center; /* Type */
-}
-
 /* Amélioration de l'accessibilité */
 .table th[role="columnheader"]:focus {
   outline: 2px solid hsl(var(--p));
   outline-offset: -2px;
+}
+
+/* Scrollbar personnalisée */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--bc) / 0.2) transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar {
+  width: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--bc) / 0.2);
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--bc) / 0.3);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .detailed-list-view {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
 }
 </style>

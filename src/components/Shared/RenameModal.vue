@@ -67,6 +67,7 @@
 <script setup>
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { nasAPI } from '@/services/nasAPI'
+import httpClient from '@/services/httpClient.js'
 
 const props = defineProps({
   item: {
@@ -113,52 +114,10 @@ const rename = async () => {
   error.value = ''
 
   try {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-    
-    if (!token) {
-      throw new Error('Token d\'authentification manquant')
-    }
-
-    const response = await fetch('/nas/rename', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        old_path: props.item.path,
-        new_name: trimmedName
-      })
+    const data = await httpClient.post('/nas/rename', {
+      old_path: props.item.path,
+      new_name: trimmedName
     })
-
-    // Gérer les différents codes de statut
-    if (!response.ok) {
-      let errorMessage = 'Erreur lors du renommage'
-      
-      try {
-        const errorData = await response.json()
-        errorMessage = errorData.error || errorData.msg || errorMessage
-      } catch (parseError) {
-        // Si on ne peut pas parser la réponse JSON
-        if (response.status === 401) {
-          errorMessage = 'Session expirée, veuillez vous reconnecter'
-        } else if (response.status === 403) {
-          errorMessage = 'Permissions insuffisantes pour cette opération'
-        } else if (response.status === 404) {
-          errorMessage = 'L\'élément à renommer n\'existe plus'
-        } else if (response.status === 409) {
-          errorMessage = 'Un élément avec ce nom existe déjà'
-        } else if (response.status === 500) {
-          errorMessage = 'Erreur interne du serveur'
-        } else {
-          errorMessage = `Erreur HTTP ${response.status}: ${response.statusText}`
-        }
-      }
-      
-      throw new Error(errorMessage)
-    }
-
-    const data = await response.json()
 
     if (data.success) {
       // Emit success event with updated information

@@ -97,7 +97,7 @@
     <!-- Body avec hover effects optimisés -->
     <div 
       v-else 
-      class="max-h-96 overflow-y-auto custom-scrollbar"
+      class="max-h-screen overflow-y-auto custom-scrollbar"
       :style="getOptimizedStyles()"
       @contextmenu="handleEmptySpaceContextMenu"
     >

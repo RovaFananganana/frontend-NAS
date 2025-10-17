@@ -6,6 +6,7 @@
  */
 
 import TokenService from './tokenService.js'
+import httpClient from './httpClient.js'
 
 class NASAPIError extends Error {
   constructor(message, status, code) {
@@ -262,64 +263,40 @@ class NASAPIService {
   }
 
   /**
-   * Download file with progress tracking
+   * Download file with progress tracking using axios
    */
   async downloadFile(filePath, onProgress = null) {
-    // Better encoding for special characters
-    const encodedPath = filePath.split('/').map(segment => encodeURIComponent(segment)).join('/')
+    // Better encoding for special characters and normalize path
+    const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath
+    const encodedPath = normalizedPath.split('/').map(segment => encodeURIComponent(segment)).join('/')
     
     try {
-      const response = await fetch(`${this.baseURL}/download/${encodedPath}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${TokenService.getToken()}`
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new NASAPIError(
-          errorData.error || `Download failed: ${response.statusText}`,
-          response.status
-        )
-      }
-
-      // Get the total file size from headers
-      const contentLength = response.headers.get('Content-Length')
-      const total = contentLength ? parseInt(contentLength, 10) : 0
-
-      if (!response.body || !onProgress || total === 0) {
-        // Fallback to simple blob if no progress tracking needed or supported
-        return response.blob()
-      }
-
-      // Create a readable stream to track progress
-      const reader = response.body.getReader()
-      let loaded = 0
-      const chunks = []
-
-      while (true) {
-        const { done, value } = await reader.read()
-        
-        if (done) break
-        
-        chunks.push(value)
-        loaded += value.length
-        
-        // Call progress callback
-        if (onProgress && total > 0) {
-          const percentComplete = (loaded / total) * 100
+      // Use httpClient's downloadFile method which handles axios blob downloads with progress
+      const blob = await httpClient.downloadFile(
+        `/nas/download/${encodedPath}`,
+        onProgress ? (percentComplete, loaded, total) => {
           onProgress(percentComplete, loaded, total)
+        } : null,
+        {
+          timeout: 300000, // 5 minutes for large file downloads
+          headers: {
+            'Authorization': `Bearer ${TokenService.getToken()}`
+          }
         }
-      }
-
-      // Combine all chunks into a single blob
-      return new Blob(chunks)
+      )
+      
+      return blob
       
     } catch (error) {
-      if (error instanceof NASAPIError) {
-        throw error
+      // Transform httpClient errors to NASAPIError for consistency
+      if (error.name === 'HTTPClientError') {
+        throw new NASAPIError(
+          error.message || 'Download failed',
+          error.status || 0,
+          error.code || 'DOWNLOAD_ERROR'
+        )
       }
+      
       throw new NASAPIError(`Download failed: ${error.message}`, 0, 'DOWNLOAD_ERROR')
     }
   }
@@ -595,6 +572,15 @@ class NASAPIService {
   async checkPermissions(path) {
     const encodedPath = encodeURIComponent(path)
     return await this.request(`/permissions/check?path=${encodedPath}`)
+  }
+
+  /**
+   * Download file as blob for clipboard operations
+   * This is an alias for downloadFile that returns the blob directly
+   */
+  async downloadFileAsBlob(filePath, onProgress = null) {
+    const blob = await this.downloadFile(filePath, onProgress)
+    return { blob, fileName: this.getFilename(filePath) }
   }
 }
 

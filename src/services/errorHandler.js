@@ -167,13 +167,8 @@ class ErrorHandler {
       'critical': 'error'
     }[errorInfo.severity] || 'error'
 
-    store.dispatch('showNotification', {
-      type: notificationType,
-      title: this.getErrorTitle(errorInfo),
-      message: errorInfo.userMessage,
-      timeout: this.getTimeoutForSeverity(errorInfo.severity),
-      actions: this.getErrorActions(errorInfo, context)
-    })
+    // Error notifications are now handled by individual components using modals
+    console.error('Error:', errorInfo.userMessage)
   }
 
   // Get error title based on type

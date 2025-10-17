@@ -196,6 +196,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useStore } from 'vuex'
 import Chart from 'chart.js/auto'
+import httpClient from '@/services/httpClient.js'
 
 const store = useStore()
 
@@ -292,17 +293,7 @@ const refreshMetrics = async () => {
   
   try {
     // Call the backend performance analysis endpoint
-    const response = await fetch('/api/admin/performance-metrics', {
-      headers: {
-        'Authorization': `Bearer ${store.state.token || localStorage.getItem('auth_token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-    
-    const data = await response.json()
+    const data = await httpClient.get('/api/admin/performance-metrics')
     metrics.value = data
     
     // Update charts
