@@ -1,42 +1,50 @@
 <!-- components/Shared/CreateFolderModal.vue -->
 <template>
-  <div class="modal-overlay" @click="$emit('close')">
-    <div class="modal-content" @click.stop>
-      <div class="modal-header">
-        <h3>Créer un nouveau dossier</h3>
-        <button @click="$emit('close')" class="close-btn">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-
+  <div class="modal modal-open">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg mb-4">Créer un nouveau dossier</h3>
+      
       <form @submit.prevent="createFolder">
-        <div class="modal-body">
-          <div class="form-group">
-            <label for="folderName">Nom du dossier</label>
-            <input
-              id="folderName"
-              v-model="folderName"
-              type="text"
-              class="form-input"
-              :class="{ 'error': error }"
-              placeholder="Nom du dossier"
-              ref="nameInput"
-              @input="validateName"
-            />
-            <div v-if="error" class="error-message">{{ error }}</div>
-          </div>
-          
-          <div class="form-group">
-            <label>Emplacement</label>
-            <div class="location-info">
-              <i class="fas fa-folder"></i>
-              <span>{{ currentPath === '/' ? 'Racine' : currentPath }}</span>
-            </div>
+        <!-- Nom du dossier -->
+        <div class="form-control mb-4">
+          <label class="label">
+            <span class="label-text">Nom du dossier *</span>
+          </label>
+          <input
+            id="folderName"
+            ref="nameInput"
+            v-model="folderName"
+            type="text"
+            class="input input-bordered w-full"
+            :class="{ 'input-error': error }"
+            placeholder="Nom du dossier"
+            required
+            @input="validateName"
+          />
+          <label v-if="error" class="label">
+            <span class="label-text-alt text-error">{{ error }}</span>
+          </label>
+        </div>
+        
+        <!-- Emplacement -->
+        <div class="form-control mb-4">
+          <label class="label">
+            <span class="label-text">Emplacement</span>
+          </label>
+          <div class="flex items-center gap-2 p-3 bg-base-200 rounded-lg">
+            <i class="fas fa-folder text-primary"></i>
+            <span class="text-sm">{{ currentPath === '/' ? 'Racine' : currentPath }}</span>
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button type="button" @click="$emit('close')" class="btn btn-secondary">
+        <!-- Actions -->
+        <div class="modal-action">
+          <button 
+            type="button" 
+            class="btn btn-ghost" 
+            @click="$emit('close')"
+            :disabled="loading"
+          >
             Annuler
           </button>
           <button
@@ -44,9 +52,9 @@
             class="btn btn-primary"
             :disabled="!folderName.trim() || loading || !!error"
           >
-            <i v-if="loading" class="fas fa-spinner fa-spin"></i>
-            <i v-else class="fas fa-folder-plus"></i>
-            {{ loading ? 'Création...' : 'Créer' }}
+            <span v-if="loading" class="loading loading-spinner loading-sm"></span>
+            <i v-else class="fas fa-folder-plus mr-2"></i>
+            {{ loading ? 'Création...' : 'Créer le dossier' }}
           </button>
         </div>
       </form>

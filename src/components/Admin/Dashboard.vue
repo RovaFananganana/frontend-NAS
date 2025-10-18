@@ -22,7 +22,7 @@
           class="btn btn-secondary btn-sm"
           @click="syncWithNas"
           :disabled="syncing || (nasStatus && !nasStatus.connected)"
-          :title="nasStatus && !nasStatus.connected ? 'NAS not accessible - connect to work network' : ''"
+          :title="nasStatus && !nasStatus.connected ? 'NAS non accessible - se connecter au réseau de travail' : ''"
         >
           <i class="fas fa-hdd mr-2" :class="{ 'animate-spin': syncing }"></i>
           {{ syncing ? 'Synchronisation...' : 'Sync NAS' }}
@@ -42,7 +42,6 @@
     <div v-if="nasStatus" class="alert mb-6" :class="nasStatus.connected ? 'alert-success' : 'alert-warning'">
       <i class="fas" :class="nasStatus.connected ? 'fa-check-circle' : 'fa-wifi-slash'"></i>
       <div>
-        <h4 class="font-bold">NAS Status</h4>
         <p>{{ nasStatus.message }}</p>
         <div v-if="nasStatus.connected && nasStatus.server_info" class="text-sm mt-1">
           Server: {{ nasStatus.server_info.ip }}:{{ nasStatus.server_info.port }} | 
@@ -50,7 +49,7 @@
           Files: {{ nasStatus.root_files_count }}
         </div>
         <div v-else-if="!nasStatus.connected" class="text-sm mt-1">
-          💡 Tip: Connect to work network to enable NAS synchronization
+          💡 Conseil: se connecter au réseau de travail pour activer la synchronisation avec le NAS
         </div>
       </div>
     </div>
