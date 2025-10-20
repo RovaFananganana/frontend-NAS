@@ -307,6 +307,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { adminAPI, permissionAPI } from '@/services/api'
 import { useStore } from 'vuex'
+import { useNotifications } from '@/composables/useNotifications'
 
 const props = defineProps({
   item: {
@@ -318,6 +319,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'updated'])
 
 const store = useStore()
+const { showError } = useNotifications()
 
 // State
 const activeTab = ref('users')
@@ -354,7 +356,16 @@ const loadPermissions = async () => {
     groupPermissions.value = response.data.group_permissions || []
   } catch (error) {
     console.error('Error loading permissions:', error)
-    store.dispatch('showError', 'Erreur lors du chargement des permissions')
+    
+    if (error.code === 'ERR_NETWORK') {
+      showError('Impossible de se connecter au serveur. Vérifiez que le backend est démarré.')
+    } else if (error.response?.status === 404) {
+      showError('Les permissions pour ce fichier/dossier ne sont pas encore configurées dans la base de données.')
+    } else if (error.response?.status === 500) {
+      showError('Erreur serveur lors du chargement des permissions. Le serveur backend doit être redémarré.')
+    } else {
+      showError('Impossible de charger les permissions : ' + (error.message || 'Erreur inconnue'))
+    }
   } finally {
     loading.value = false
   }
@@ -373,7 +384,7 @@ const loadAvailableUsersAndGroups = async () => {
     availableGroups.value = groupsResponse.data || []
   } catch (error) {
     console.error('Error loading users and groups:', error)
-    store.dispatch('showError', 'Erreur lors du chargement des utilisateurs et groupes')
+    showError('Erreur lors du chargement des utilisateurs et groupes')
   }
 }
 
@@ -410,7 +421,7 @@ const addUserPermission = async () => {
         store.dispatch('showSuccess', `Permission ajoutée avec succès pour ${user?.username}`)
       } catch (error) {
         console.error('Error adding user permission:', error)
-        store.dispatch('showError', 'Erreur lors de l\'ajout de la permission')
+        showError('Erreur lors de l\'ajout de la permission')
       }
     }
   }
@@ -449,7 +460,7 @@ const addGroupPermission = async () => {
         store.dispatch('showSuccess', `Permission ajoutée avec succès pour le groupe ${group?.name}`)
       } catch (error) {
         console.error('Error adding group permission:', error)
-        store.dispatch('showError', 'Erreur lors de l\'ajout de la permission')
+        showError('Erreur lors de l\'ajout de la permission')
       }
     }
   }
@@ -488,7 +499,7 @@ const updatePermission = async (permission) => {
         store.dispatch('showSuccess', `Permissions mises à jour pour ${targetName}`)
       } catch (error) {
         console.error('Error updating permission:', error)
-        store.dispatch('showError', 'Erreur lors de la mise à jour des permissions')
+        showError('Erreur lors de la mise à jour des permissions')
       }
     }
   }
@@ -514,7 +525,7 @@ const removePermission = async (permission) => {
         store.dispatch('showSuccess', `Permission supprimée pour ${targetName}`)
       } catch (error) {
         console.error('Error removing permission:', error)
-        store.dispatch('showError', 'Erreur lors de la suppression de la permission')
+        showError('Erreur lors de la suppression de la permission')
       }
     }
   }

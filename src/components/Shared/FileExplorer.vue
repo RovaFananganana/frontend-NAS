@@ -70,7 +70,7 @@
       :target-path="currentPath"
       :disabled="loading || !!error"
       :accept-folders="true"
-      :max-file-size="500 * 1024 * 1024"
+      :max-file-size="5 * 1024 * 1024 * 1024"
       :max-files="20"
       drop-message="Déposez vos fichiers et dossiers ici"
       upload-message="Upload en cours..."
@@ -1011,32 +1011,24 @@ const handleCopySelectedToClipboard = async (event) => {
 
 // Context menu and file operations methods
 const handleGlobalContextMenu = (event) => {
-  console.log('� Global lcontext menu triggered on:', event.target.tagName, event.target.className)
-
   // Check if the click is on empty space (not on a file item or UI element)
   const isOnFileItem = event.target.closest('.file-list-item') ||
     event.target.closest('tr[role="row"]') ||
-    event.target.closest('.file-tile') ||
+    event.target.closest('.mosaic-item') ||
+    event.target.closest('.tree-item') ||
     event.target.closest('button') ||
     event.target.closest('.btn')
 
   if (!isOnFileItem) {
-    console.log('✅ Global empty space detected, preventing default and showing context menu')
     event.preventDefault()
     event.stopPropagation()
     showContextMenu(event, null)
-  } else {
-    console.log('❌ Click on UI element, letting it handle contextmenu')
   }
 }
 
 const showContextMenu = async (event, item) => {
-  console.log('🎯 FileExplorer showContextMenu called:', { item: item?.name || 'empty space', permissions: contextMenuPermissions.value })
-
   // Load permissions for the item
   await loadContextMenuPermissions(item)
-
-  console.log('📋 Context menu permissions loaded:', contextMenuPermissions.value)
 
   contextMenu.value = {
     show: true,

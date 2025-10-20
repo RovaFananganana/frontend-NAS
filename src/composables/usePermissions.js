@@ -55,10 +55,10 @@ export function usePermissions() {
       permissionLogs.value = permissionLogs.value.slice(0, 100)
     }
     
-    // Console logging for development
-    if (import.meta.env.DEV) {
-      console.log(`🔍 [PERMISSION] ${operation}:`, context)
-    }
+    // Console logging disabled for cleaner console
+    // if (import.meta.env.DEV) {
+    //   console.log(`🔍 [PERMISSION] ${operation}:`, context)
+    // }
   }
 
   /**

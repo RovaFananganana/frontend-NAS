@@ -1,17 +1,10 @@
 <template>
-  <div 
-    v-if="show"
-    ref="contextMenu"
-    class="fixed bg-base-100 border border-base-300 shadow-lg rounded-lg py-2 z-50 min-w-52"
-    :style="menuPosition"
-    @click.stop
-  >
+  <div v-if="show" ref="contextMenu"
+    class="fixed bg-base-100 border border-base-300 shadow-lg rounded-lg py-2 z-50 min-w-52" :style="menuPosition"
+    @click.stop>
     <!-- Ouvrir -->
-    <button 
-      v-if="item"
-      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('open', item)"
-    >
+    <button v-if="item" class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
+      @click="$emit('open', item)">
       <i class="fas w-4" :class="item.is_directory ? 'fa-folder-open' : 'fa-eye'"></i>
       {{ item.is_directory ? 'Ouvrir' : 'Prévisualiser' }}
     </button>
@@ -19,11 +12,9 @@
 
 
     <!-- Télécharger (fichiers seulement) -->
-    <button 
-      v-if="item && !item.is_directory && permissions.can_read"
+    <button v-if="item && !item.is_directory && permissions.can_read"
       class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('download', item)"
-    >
+      @click="$emit('download', item)">
       <i class="fas fa-download w-4"></i>
       Télécharger
     </button>
@@ -31,43 +22,32 @@
     <div v-if="item && hasModifyActions" class="divider my-1"></div>
 
     <!-- Renommer -->
-    <button 
-      v-if="item && permissions.can_write"
+    <button v-if="item && permissions.can_write"
       class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('rename', item)"
-    >
+      @click="$emit('rename', item)">
       <i class="fas fa-edit w-4"></i>
       Renommer
     </button>
 
     <!-- Copier -->
-    <button 
-      v-if="item && permissions.can_read"
-      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('copy', item)"
-      title="Copier pour coller dans le NAS ou vers le presse-papiers système"
-    >
+    <button v-if="item && permissions.can_read"
+      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3" @click="$emit('copy', item)"
+      title="Copier pour coller dans le NAS ou vers le presse-papiers système">
       <i class="fas fa-copy w-4"></i>
       Copier
     </button>
 
     <!-- Couper -->
-    <button 
-      v-if="item && permissions.can_write"
-      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('cut', item)"
-    >
+    <button v-if="item && permissions.can_write"
+      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3" @click="$emit('cut', item)">
       <i class="fas fa-cut w-4"></i>
       Couper
     </button>
 
     <!-- Coller -->
-    <button 
-      v-if="showPasteOption && permissions.can_write"
-      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('paste')"
-      :title="getPasteTooltip()"
-    >
+    <button v-if="showPasteOption && permissions.can_write"
+      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3" @click="$emit('paste')"
+      :title="getPasteTooltip()">
       <i class="fas fa-paste w-4"></i>
       Coller
       <span v-if="clipboardInfo" class="text-xs opacity-60 ml-auto">
@@ -76,72 +56,52 @@
     </button>
 
     <!-- Permissions (Admin seulement) -->
-    <button 
-      v-if="item && isAdmin"
-      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('permissions', item)"
-    >
+    <button v-if="item && isAdmin" class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
+      @click="$emit('permissions', item)">
       <i class="fas fa-shield-alt w-4"></i>
       Permissions
     </button>
 
     <!-- Ajouter/Retirer des favoris (Utilisateurs seulement) -->
-    <button 
-      v-if="item && !isAdmin"
-      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('toggle-favorite', item)"
-    >
+    <button v-if="item && !isAdmin" class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
+      @click="$emit('toggle-favorite', item)">
       <i class="w-4" :class="isFavorite ? 'fas fa-star text-warning' : 'far fa-star'"></i>
       {{ isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris' }}
     </button>
 
     <!-- Envoyer vers / Déplacer -->
-    <button 
-      v-if="item && permissions.can_write"
-      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('move', item)"
-    >
+    <button v-if="item && permissions.can_write"
+      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3" @click="$emit('move', item)">
       <i class="fas fa-share w-4"></i>
       Envoyer vers
     </button>
 
     <!-- Nouveau (sur fichier/dossier seulement) -->
-    <div 
-      v-if="item && permissions.can_write"
-      class="relative submenu-container" 
-      @mouseenter="handleNewSubmenuEnter" 
-      @mouseleave="handleNewSubmenuLeave"
-    >
-      <button 
-        class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 justify-between"
-        @click="toggleNewSubmenu"
-      >
+    <div v-if="item && permissions.can_write" class="relative submenu-container" @mouseenter="handleNewSubmenuEnter"
+      @mouseleave="handleNewSubmenuLeave">
+      <button class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 justify-between"
+        @click="toggleNewSubmenu">
         <div class="flex items-center gap-3">
           <i class="fas fa-plus w-4"></i>
           Nouveau
         </div>
         <i class="fas fa-chevron-right text-xs"></i>
       </button>
-      
+
       <!-- Sous-menu Nouveau -->
-      <div 
-        v-if="showNewSubmenu"
+      <div v-if="showNewSubmenu"
         class="absolute left-full top-0 ml-1 bg-base-100 border border-base-300 shadow-xl rounded-box py-2 z-[60] min-w-48 submenu-content animate-in slide-in-from-left-2 duration-200"
-        @mouseenter="handleNewSubmenuContentEnter"
-        @mouseleave="handleNewSubmenuContentLeave"
-      >
-        <button 
+        @mouseenter="handleNewSubmenuContentEnter" @mouseleave="handleNewSubmenuContentLeave">
+        <button
           class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 transition-all duration-200 ease-in-out hover:translate-x-1"
-          @click.stop="$emit('create-folder')"
-        >
+          @click.stop="$emit('create-folder')">
           <i class="fas fa-folder-plus w-4 text-primary"></i>
           Nouveau dossier
         </button>
-        
-        <button 
+
+        <button
           class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 transition-all duration-200 ease-in-out hover:translate-x-1"
-          @click.stop="$emit('create-file')"
-        >
+          @click.stop="$emit('create-file')">
           <i class="fas fa-file-plus w-4 text-success"></i>
           Nouveau fichier
         </button>
@@ -150,56 +110,45 @@
 
     <!-- Affichage (toujours disponible) -->
     <div class="relative submenu-container" @mouseenter="handleViewSubmenuEnter" @mouseleave="handleViewSubmenuLeave">
-      <button 
-        class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 justify-between"
-        @click="toggleViewModeSubmenu"
-      >
+      <button class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 justify-between"
+        @click="toggleViewModeSubmenu">
         <div class="flex items-center gap-3">
           <i class="fas fa-eye w-4"></i>
           Affichage
         </div>
         <i class="fas fa-chevron-right text-xs"></i>
       </button>
-      
+
       <!-- Sous-menu des modes d'affichage -->
-      <div 
-        v-if="showViewModeSubmenu"
+      <div v-if="showViewModeSubmenu"
         class="absolute left-full top-0 ml-1 bg-base-100 border border-base-300 shadow-xl rounded-box py-2 z-[60] min-w-48 submenu-content animate-in slide-in-from-left-2 duration-200"
-        @mouseenter="handleViewSubmenuContentEnter"
-        @mouseleave="handleViewSubmenuContentLeave"
-      >
-        <button 
+        @mouseenter="handleViewSubmenuContentEnter" @mouseleave="handleViewSubmenuContentLeave">
+        <button
           class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 transition-all duration-200 ease-in-out"
-          :class="{ 
+          :class="{
             'bg-primary text-primary-content': currentViewMode === 'detailed-list',
             'hover:translate-x-1': currentViewMode !== 'detailed-list'
-          }"
-          @click.stop="changeViewMode('detailed-list')"
-        >
+          }" @click.stop="changeViewMode('detailed-list')">
           <i class="fas fa-list w-4"></i>
           Liste
         </button>
-        
-        <button 
+
+        <button
           class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 transition-all duration-200 ease-in-out"
-          :class="{ 
+          :class="{
             'bg-primary text-primary-content': currentViewMode === 'tree',
             'hover:translate-x-1': currentViewMode !== 'tree'
-          }"
-          @click.stop="changeViewMode('tree')"
-        >
+          }" @click.stop="changeViewMode('tree')">
           <i class="fas fa-sitemap w-4"></i>
           Arbre
         </button>
-        
-        <button 
+
+        <button
           class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3 transition-all duration-200 ease-in-out"
-          :class="{ 
+          :class="{
             'bg-primary text-primary-content': currentViewMode === 'mosaic',
             'hover:translate-x-1': currentViewMode !== 'mosaic'
-          }"
-          @click.stop="changeViewMode('mosaic')"
-        >
+          }" @click.stop="changeViewMode('mosaic')">
           <i class="fas fa-th w-4"></i>
           Mosaïque
         </button>
@@ -207,21 +156,17 @@
     </div>
 
     <!-- Nouveau dossier (sur espace vide seulement) -->
-    <button 
-      v-if="!item && permissions.can_write"
+    <button v-if="!item && permissions.can_write"
       class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('create-folder')"
-    >
+      @click="$emit('create-folder')">
       <i class="fas fa-folder-plus w-4"></i>
       Nouveau dossier
     </button>
 
     <!-- Nouveau fichier (sur espace vide seulement) -->
-    <button 
-      v-if="!item && permissions.can_write"
+    <button v-if="!item && permissions.can_write"
       class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('create-file')"
-    >
+      @click="$emit('create-file')">
       <i class="fas fa-file-plus w-4"></i>
       Nouveau fichier
     </button>
@@ -229,23 +174,18 @@
     <div v-if="item && permissions.can_delete" class="divider my-1"></div>
 
     <!-- Supprimer -->
-    <button 
-      v-if="item && permissions.can_delete"
+    <button v-if="item && permissions.can_delete"
       class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm text-error flex items-center gap-3"
-      @click="$emit('delete', item)"
-    >
+      @click="$emit('delete', item)">
       <i class="fas fa-trash w-4"></i>
       Supprimer
     </button>
 
     <div v-if="item" class="divider my-1"></div>
-    
+
     <!-- Propriétés -->
-    <button 
-      v-if="item"
-      class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
-      @click="$emit('properties', item)"
-    >
+    <button v-if="item" class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
+      @click="$emit('properties', item)">
       <i class="fas fa-info-circle w-4"></i>
       Propriétés
     </button>
@@ -314,7 +254,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'open',
-  'download', 
+  'download',
   'rename',
   'copy',
   'cut',
@@ -328,6 +268,8 @@ const emit = defineEmits([
   'toggle-favorite',
   'view-mode-changed'
 ])
+
+// Debug logging removed for cleaner console
 
 const store = useStore()
 
@@ -345,30 +287,30 @@ const menuPosition = computed(() => {
   const totalWidth = menuWidth + submenuWidth + 10 // largeur totale avec sous-menu
   const menuHeight = 450 // estimation de la hauteur maximale du menu (augmentée)
   const bottomMargin = 80 // marge pour éviter la barre des tâches
-  
+
   let left = props.x
   let top = props.y
-  
+
   // Vérifier si le menu + sous-menu sort à droite de l'écran
   if (left + totalWidth > window.innerWidth) {
     // Si pas assez de place à droite, positionner le menu plus à gauche
     left = window.innerWidth - totalWidth - 10
   }
-  
+
   // Si toujours pas assez de place, au moins garder le menu principal visible
   if (left + menuWidth > window.innerWidth) {
     left = window.innerWidth - menuWidth - 10
   }
-  
+
   // Vérifier si le menu sort en bas de l'écran (avec marge pour barre des tâches)
   if (top + menuHeight > window.innerHeight - bottomMargin) {
     top = window.innerHeight - menuHeight - bottomMargin
   }
-  
+
   // S'assurer que le menu ne sort pas en haut ou à gauche
   left = Math.max(10, left)
   top = Math.max(10, top)
-  
+
   return {
     left: left + 'px',
     top: top + 'px'
@@ -378,15 +320,15 @@ const menuPosition = computed(() => {
 const isAdmin = computed(() => store.getters.isAdmin)
 
 const showPasteOption = computed(() => {
-  return props.clipboardInfo && 
-         props.clipboardInfo.items && 
-         props.clipboardInfo.items.length > 0
+  return props.clipboardInfo &&
+    props.clipboardInfo.items &&
+    props.clipboardInfo.items.length > 0
 })
 
 const hasModifyActions = computed(() => {
-  return props.permissions.can_write || 
-         props.permissions.can_read || 
-         props.isAdmin
+  return props.permissions.can_write ||
+    props.permissions.can_read ||
+    props.isAdmin
 })
 
 const hasViewOrCreateActions = computed(() => {
@@ -395,10 +337,10 @@ const hasViewOrCreateActions = computed(() => {
 
 const getPasteTooltip = () => {
   if (!props.clipboardInfo) return ''
-  
+
   const { operation, count, description } = props.clipboardInfo
   const operationText = operation === 'copy' ? 'Copier' : 'Déplacer'
-  
+
   return `${operationText} ${count} élément${count > 1 ? 's' : ''}`
 }
 
@@ -416,7 +358,7 @@ const toggleNewSubmenu = () => {
 const changeViewMode = (mode) => {
   emit('view-mode-changed', mode)
   showViewModeSubmenu.value = false
-  
+
   // Nettoyer le timer
   if (viewSubmenuTimer.value) {
     clearTimeout(viewSubmenuTimer.value)
@@ -504,6 +446,7 @@ const handleNewSubmenuContentLeave = () => {
     opacity: 0;
     transform: translateX(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);

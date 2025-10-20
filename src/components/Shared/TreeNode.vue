@@ -47,12 +47,12 @@
           expanded ? 'fas fa-folder-open' : 'fas fa-folder',
           'text-blue-500'
         ]"></i>
-        <i v-else-if="isImageFile(file)" class="fas fa-image text-purple-500"></i>
-        <i v-else-if="isVideoFile(file)" class="fas fa-video text-red-500"></i>
-        <i v-else-if="isAudioFile(file)" class="fas fa-music text-green-500"></i>
-        <i v-else-if="isDocumentFile(file)" class="fas fa-file-alt text-blue-600"></i>
-        <i v-else-if="isArchiveFile(file)" class="fas fa-file-archive text-orange-500"></i>
-        <i v-else-if="isCodeFile(file)" class="fas fa-file-code text-yellow-500"></i>
+        <i v-else-if="isImageFile(file.name)" class="fas fa-image text-purple-500"></i>
+        <i v-else-if="isVideoFile(file.name)" class="fas fa-video text-red-500"></i>
+        <i v-else-if="isAudioFile(file.name)" class="fas fa-music text-green-500"></i>
+        <i v-else-if="isDocumentFile(file.name)" class="fas fa-file-alt text-blue-600"></i>
+        <i v-else-if="isArchiveFile(file.name)" class="fas fa-file-archive text-orange-500"></i>
+        <i v-else-if="isCodeFile(file.name)" class="fas fa-file-code text-yellow-500"></i>
         <i v-else class="fas fa-file text-gray-500"></i>
         
         <!-- Indicateur favori -->

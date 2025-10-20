@@ -279,7 +279,13 @@ const validateFiles = async (files) => {
   for (const file of files) {
     // Vérifier la taille
     if (file.size > props.maxFileSize) {
-      console.warn(`Fichier trop volumineux: ${file.name} (${file.size} bytes)`)
+      const fileSizeGB = (file.size / (1024 * 1024 * 1024)).toFixed(2)
+      const maxSizeGB = (props.maxFileSize / (1024 * 1024 * 1024)).toFixed(0)
+      
+      console.warn(`Fichier trop volumineux: ${file.name} (${fileSizeGB}GB > ${maxSizeGB}GB)`)
+      
+      // Émettre une erreur spécifique pour les gros fichiers
+      emit('upload-error', new Error(`Le fichier "${file.name}" (${fileSizeGB}GB) dépasse la limite de ${maxSizeGB}GB`))
       continue
     }
     
