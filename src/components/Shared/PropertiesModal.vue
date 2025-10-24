@@ -18,28 +18,16 @@
 
       <!-- Properties tabs -->
       <div class="tabs tabs-bordered mb-4">
-        <button 
-          class="tab"
-          :class="{ 'tab-active': activeTab === 'general' }"
-          @click="activeTab = 'general'"
-        >
+        <button class="tab" :class="{ 'tab-active': activeTab === 'general' }" @click="activeTab = 'general'">
           <i class="fas fa-info mr-2"></i>
           Général
         </button>
-        <button 
-          class="tab"
-          :class="{ 'tab-active': activeTab === 'permissions' }"
-          @click="activeTab = 'permissions'"
-        >
+        <button class="tab" :class="{ 'tab-active': activeTab === 'permissions' }" @click="activeTab = 'permissions'">
           <i class="fas fa-shield-alt mr-2"></i>
           Permissions
         </button>
-        <button 
-          v-if="!item?.is_directory"
-          class="tab"
-          :class="{ 'tab-active': activeTab === 'details' }"
-          @click="activeTab = 'details'"
-        >
+        <button v-if="!item?.is_directory" class="tab" :class="{ 'tab-active': activeTab === 'details' }"
+          @click="activeTab = 'details'">
           <i class="fas fa-list mr-2"></i>
           Détails
         </button>
@@ -54,12 +42,12 @@
               <label class="text-sm font-semibold opacity-70">Nom</label>
               <p class="font-mono bg-base-100 p-2 rounded border">{{ item?.name }}</p>
             </div>
-            
+
             <div>
               <label class="text-sm font-semibold opacity-70">Chemin</label>
               <p class="font-mono bg-base-100 p-2 rounded border text-sm">{{ item?.path }}</p>
             </div>
-            
+
             <div>
               <label class="text-sm font-semibold opacity-70">Type</label>
               <p class="bg-base-100 p-2 rounded border">
@@ -74,12 +62,12 @@
               <label class="text-sm font-semibold opacity-70">Taille</label>
               <p class="bg-base-100 p-2 rounded border">{{ formatBytes(item?.size) }}</p>
             </div>
-            
+
             <div>
               <label class="text-sm font-semibold opacity-70">Créé le</label>
               <p class="bg-base-100 p-2 rounded border">{{ formatDate(item?.created) }}</p>
             </div>
-            
+
             <div>
               <label class="text-sm font-semibold opacity-70">Modifié le</label>
               <p class="bg-base-100 p-2 rounded border">{{ formatDate(item?.modified) }}</p>
@@ -119,21 +107,61 @@
             <h5 class="card-title text-base">Vos permissions</h5>
             <div class="grid grid-cols-2 gap-4">
               <div class="flex items-center gap-2">
-                <i class="fas fa-eye text-success"></i>
-                <span>Lecture : Autorisée</span>
+                <i class="fas fa-eye" :class="canRead ? 'text-success' : 'text-error'"></i>
+                <span>Lecture : {{ canRead ? 'Autorisée' : 'Refusée' }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <i class="fas fa-edit text-warning"></i>
+                <i class="fas fa-edit" :class="canWrite ? 'text-success' : 'text-error'"></i>
                 <span>Écriture : {{ canWrite ? 'Autorisée' : 'Refusée' }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <i class="fas fa-trash text-error"></i>
+                <i class="fas fa-trash" :class="canDelete ? 'text-success' : 'text-error'"></i>
                 <span>Suppression : {{ canDelete ? 'Autorisée' : 'Refusée' }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <i class="fas fa-share text-info"></i>
+                <i class="fas fa-share" :class="canShare ? 'text-success' : 'text-error'"></i>
                 <span>Partage : {{ canShare ? 'Autorisé' : 'Refusé' }}</span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Permissions -->
+        <div class="card bg-base-100 border border-base-300">
+          <div class="card-body p-4">
+            <h5 class="card-title text-base">Permissions</h5>
+
+            <div v-if="itemPermissions.length > 0" class="space-y-3">
+              <div v-for="perm in itemPermissions" :key="perm.id"
+                class="border border-base-200 rounded p-3 bg-base-200">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <i class="fas"
+                      :class="perm.target_type === 'user' ? 'fa-user text-primary' : 'fa-users text-secondary'"></i>
+                    <div>
+                      <div class="font-medium text-sm">{{ perm.target_name }}</div>
+                      <div class="text-xs text-base-content/50">
+                        {{ perm.target_type === 'user' ? 'Utilisateur' : 'Groupe' }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                  <span v-if="perm.can_read" class="badge badge-success badge-sm">Lecture</span>
+                  <span v-else class="badge badge-outline badge-sm">Lecture</span>
+                  <span v-if="perm.can_write" class="badge badge-warning badge-sm">Écriture</span>
+                  <span v-else class="badge badge-outline badge-sm">Écriture</span>
+                  <span v-if="perm.can_delete" class="badge badge-error badge-sm">Suppression</span>
+                  <span v-else class="badge badge-outline badge-sm">Suppression</span>
+                  <span v-if="perm.can_share" class="badge badge-info badge-sm">Partage</span>
+                  <span v-else class="badge badge-outline badge-sm">Partage</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="text-center py-6 text-base-content/50">
+              <i class="fas fa-lock text-2xl mb-2"></i>
+              <p class="text-sm">Aucune permission spécifique définie</p>
             </div>
           </div>
         </div>
@@ -148,7 +176,7 @@
               <label class="text-sm font-semibold opacity-70">Extension</label>
               <p class="bg-base-100 p-2 rounded border">{{ getFileExtension(item?.name) }}</p>
             </div>
-            
+
             <div>
               <label class="text-sm font-semibold opacity-70">Type MIME</label>
               <p class="bg-base-100 p-2 rounded border font-mono text-sm">{{ getMimeType(item?.name) }}</p>
@@ -161,7 +189,7 @@
               <label class="text-sm font-semibold opacity-70">Taille en octets</label>
               <p class="bg-base-100 p-2 rounded border font-mono">{{ item?.size?.toLocaleString() || '0' }}</p>
             </div>
-            
+
             <div>
               <label class="text-sm font-semibold opacity-70">Taille lisible</label>
               <p class="bg-base-100 p-2 rounded border">{{ formatBytes(item?.size) }}</p>
@@ -199,10 +227,17 @@
       </div>
     </div>
   </div>
+
+  <!-- Status Modals -->
+  <StatusModals :success-modal="successModal" :error-modal="errorModal" @close-success="closeSuccessModal"
+    @close-error="closeErrorModal" />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { usePermissions } from '@/composables/usePermissions'
+import { useModals } from '@/composables/useModals'
+import StatusModals from './StatusModals.vue'
 
 const props = defineProps({
   item: {
@@ -213,6 +248,19 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
+// Use permissions composable
+const { loadPermissions } = usePermissions()
+
+// Use modals composable
+const {
+  successModal,
+  errorModal,
+  showSuccessModal,
+  closeSuccessModal,
+  showErrorModal,
+  closeErrorModal
+} = useModals()
+
 // State
 const activeTab = ref('general')
 
@@ -222,26 +270,42 @@ const pathSegments = computed(() => {
   return props.item.path.split('/').filter(Boolean)
 })
 
-// Mock permissions - in real app, these would come from API
-const canWrite = ref(true)
-const canDelete = ref(true)
-const canShare = ref(true)
+const itemPermissions = computed(() => {
+  if (!props.item) return []
+
+  // Si le fichier/dossier a une propriété permissions, l'utiliser
+  if (props.item.permissions && Array.isArray(props.item.permissions)) {
+    return props.item.permissions
+  }
+
+  // Sinon, retourner un tableau vide
+  return []
+})
+
+
+// Real permissions from API
+const canRead = ref(false)
+const canWrite = ref(false)
+const canDelete = ref(false)
+const canShare = ref(false)
+
+
 
 // Methods
 const downloadFile = async () => {
   if (props.item.is_directory) {
     return // Don't download directories
   }
-  
+
   try {
     const { nasAPI, NASAPIError } = await import('@/services/nasAPI.js')
     const { useStore } = await import('vuex')
     const store = useStore()
-    
+
     store.dispatch('showInfo', `Téléchargement de ${props.item.name} en cours...`)
-    
+
     const blob = await nasAPI.downloadFile(props.item.path)
-    
+
     // Create download link
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -251,20 +315,18 @@ const downloadFile = async () => {
     link.click()
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
-    
-    store.dispatch('showSuccess', `Téléchargement de ${props.item.name} terminé`)
+
+    showSuccessModal('Téléchargement terminé', `Le fichier "${props.item.name}" a été téléchargé avec succès`)
     emit('close')
   } catch (err) {
     console.error('Error downloading file:', err)
-    const { useStore } = await import('vuex')
-    const store = useStore()
-    
+
     if (err.status === 403) {
-      store.dispatch('showError', 'Permission refusée pour télécharger ce fichier')
+      showErrorModal('Permission refusée', 'Vous n\'avez pas la permission de télécharger ce fichier')
     } else if (err.status === 404) {
-      store.dispatch('showError', 'Fichier introuvable')
+      showErrorModal('Fichier introuvable', 'Le fichier demandé n\'existe plus sur le serveur')
     } else {
-      store.dispatch('showError', `Erreur lors du téléchargement: ${err.message}`)
+      showErrorModal('Erreur de téléchargement', `Une erreur s'est produite : ${err.message}`)
     }
   }
 }
@@ -280,6 +342,31 @@ const copyPath = async () => {
     // Show success message
   } catch (err) {
     console.error('Failed to copy path:', err)
+  }
+}
+
+const loadItemPermissions = async () => {
+  try {
+    if (!props.item || !props.item.path) return
+
+    // Charger les permissions réelles de l'utilisateur pour cet item
+    const permissions = await loadPermissions(props.item.path)
+
+    if (permissions) {
+      canRead.value = permissions.can_read || false
+      canWrite.value = permissions.can_write || false
+      canDelete.value = permissions.can_delete || false
+      canShare.value = permissions.can_share || false
+
+      console.log('Permissions utilisateur chargées:', permissions)
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des permissions:', error)
+    // Les permissions restent à false si erreur
+    canRead.value = false
+    canWrite.value = false
+    canDelete.value = false
+    canShare.value = false
   }
 }
 
@@ -299,7 +386,7 @@ const formatDate = (date) => {
 
 const getFileType = (filename) => {
   if (!filename) return 'Fichier'
-  
+
   const ext = filename.split('.').pop()?.toLowerCase()
   const typeMap = {
     'pdf': 'Document PDF',
@@ -338,7 +425,7 @@ const getFileType = (filename) => {
     'yml': 'Configuration YAML',
     'yaml': 'Configuration YAML'
   }
-  
+
   return typeMap[ext] || `Fichier ${ext?.toUpperCase() || 'inconnu'}`
 }
 
@@ -350,7 +437,7 @@ const getFileExtension = (filename) => {
 
 const getMimeType = (filename) => {
   if (!filename) return 'application/octet-stream'
-  
+
   const ext = filename.split('.').pop()?.toLowerCase()
   const mimeMap = {
     'pdf': 'application/pdf',
@@ -378,17 +465,17 @@ const getMimeType = (filename) => {
     'json': 'application/json',
     'xml': 'application/xml'
   }
-  
+
   return mimeMap[ext] || 'application/octet-stream'
 }
 
 const getItemIcon = (item) => {
   if (!item) return 'fas fa-file'
-  
+
   if (item.is_directory) {
     return 'fas fa-folder'
   }
-  
+
   const ext = item.name?.split('.').pop()?.toLowerCase() || ''
   const iconMap = {
     'pdf': 'fas fa-file-pdf',
@@ -416,11 +503,11 @@ const getItemIcon = (item) => {
 
 const getItemColor = (item) => {
   if (!item) return '#6b7280'
-  
+
   if (item.is_directory) {
     return '#3b82f6'
   }
-  
+
   const ext = item.name?.split('.').pop()?.toLowerCase() || ''
   const colorMap = {
     'pdf': '#dc2626',
@@ -445,4 +532,11 @@ const getItemColor = (item) => {
   }
   return colorMap[ext] || '#6b7280'
 }
+
+
+
+onMounted(() => {
+  loadItemPermissions()
+})
+
 </script>

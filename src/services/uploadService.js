@@ -1,451 +1,330 @@
-/**
- * Upload Service - Manages batch uploads with progress tracking and error recovery
- */
+// services/uploadService.js
 
-import { ref, reactive, computed } from 'vue'
-import { nasAPI } from './nasAPI.js'
-
-// Upload queue item structure
-class UploadItem {
-  constructor(file, targetPath, options = {}) {
-    this.id = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    this.file = file
-    this.targetPath = targetPath
-    this.fileName = file.name
-    this.fileSize = file.size
-    this.relativePath = file.relativePath || file.name
-    this.uploadedBytes = 0
-    this.progress = 0
-    this.status = 'pending' // pending, uploading, completed, error, cancelled
-    this.error = null
-    this.startTime = null
-    this.endTime = null
-    this.retryCount = 0
-    this.maxRetries = options.maxRetries || 3
-    this.overwrite = options.overwrite || false
-  }
-
-  get estimatedTime() {
-    if (this.status !== 'uploading' || this.uploadedBytes === 0) return null
-    
-    const elapsed = Date.now() - this.startTime
-    const bytesPerMs = this.uploadedBytes / elapsed
-    const remainingBytes = this.fileSize - this.uploadedBytes
-    
-    return remainingBytes / bytesPerMs
-  }
-
-  get uploadSpeed() {
-    if (this.status !== 'uploading' || !this.startTime) return 0
-    
-    const elapsed = Date.now() - this.startTime
-    return elapsed > 0 ? (this.uploadedBytes / elapsed) * 1000 : 0 // bytes per second
-  }
-}
+import { ref, reactive } from 'vue'
+import { nasAPI } from './nasAPI'
 
 class UploadService {
   constructor() {
-    // Reactive state
-    this.queue = ref([])
-    this.activeUploads = ref([])
-    this.completedUploads = ref([])
-    this.failedUploads = ref([])
+    this.uploads = reactive(new Map())
+    this.maxConcurrentUploads = 3 // Retour à 3 uploads simultanés
+    this.uploadQueue = []
+    this.activeUploads = 0
+    this.nextUploadId = 1
+  }
+
+  // Créer un nouvel upload
+  createUpload(file, targetPath) {
+    const uploadId = this.nextUploadId++
     
-    // Configuration
-    this.maxConcurrentUploads = ref(3)
-    this.autoRetry = ref(true)
-    this.retryDelay = ref(1000) // ms
+    // Calculer le chemin de destination final
+    let finalTargetPath = targetPath
+    if (file.relativePath && file.relativePath !== file.name) {
+      // Le fichier fait partie d'un dossier, préserver la structure
+      const relativeDirPath = file.relativePath.substring(0, file.relativePath.lastIndexOf('/'))
+      if (relativeDirPath) {
+        finalTargetPath = targetPath + '/' + relativeDirPath
+      }
+    }
     
-    // Statistics
-    this.stats = reactive({
-      totalFiles: 0,
-      completedFiles: 0,
-      failedFiles: 0,
-      totalBytes: 0,
+    const upload = {
+      id: uploadId,
+      fileName: file.name,
+      fileSize: file.size,
+      file: file,
+      targetPath: finalTargetPath,
+      originalTargetPath: targetPath,
+      relativePath: file.relativePath || file.name,
       uploadedBytes: 0,
+      progress: 0,
+      status: 'pending', // pending, uploading, completed, error, cancelled
+      error: null,
       startTime: null,
-      endTime: null
-    })
-    
-    // Processing state
-    this.isProcessing = ref(false)
-    
-    // Event handlers
-    this.errorHandlers = []
-    this.successHandlers = []
-    this.isPaused = ref(false)
-  }
-
-  // Computed properties
-  get overallProgress() {
-    if (this.stats.totalBytes === 0) return 0
-    return (this.stats.uploadedBytes / this.stats.totalBytes) * 100
-  }
-
-  get uploadSpeed() {
-    if (!this.stats.startTime || this.stats.uploadedBytes === 0) return 0
-    
-    const elapsed = Date.now() - this.stats.startTime
-    return elapsed > 0 ? (this.stats.uploadedBytes / elapsed) * 1000 : 0 // bytes per second
-  }
-
-  get estimatedTimeRemaining() {
-    if (this.uploadSpeed === 0) return null
-    
-    const remainingBytes = this.stats.totalBytes - this.stats.uploadedBytes
-    return remainingBytes / this.uploadSpeed
-  }
-
-  get allUploads() {
-    return [
-      ...this.queue.value,
-      ...this.activeUploads.value,
-      ...this.completedUploads.value,
-      ...this.failedUploads.value
-    ]
-  }
-
-  // Add files to upload queue
-  addFiles(files, targetPath, options = {}) {
-    console.log('📤 Adding', files.length, 'files to upload queue')
-    
-    const uploadItems = files.map(file => new UploadItem(file, targetPath, options))
-    
-    // Add to queue
-    this.queue.value.push(...uploadItems)
-    
-    // Update statistics
-    this.stats.totalFiles += files.length
-    this.stats.totalBytes += files.reduce((sum, file) => sum + file.size, 0)
-    
-    // Start processing if not already running
-    if (!this.isProcessing.value && !this.isPaused.value) {
-      this.startProcessing()
+      estimatedTime: 0,
+      speed: 0,
+      retryCount: 0,
+      maxRetries: 3
     }
-    
-    return uploadItems.map(item => item.id)
+
+    this.uploads.set(uploadId, upload)
+    return upload
   }
 
-  // Start processing the upload queue
-  async startProcessing() {
-    if (this.isProcessing.value) return
+  // Ajouter des fichiers à uploader
+  async addFiles(files, targetPath) {
+    console.log(`🚀 UploadService: Adding ${files.length} files to upload queue`)
+    const newUploads = []
     
-    console.log('🚀 Starting upload processing')
-    this.isProcessing.value = true
-    this.stats.startTime = Date.now()
+    // Identifier tous les dossiers à créer
+    const foldersToCreate = new Set()
     
-    try {
-      while (this.queue.value.length > 0 && !this.isPaused.value) {
-        // Start uploads up to the concurrent limit
-        while (
-          this.activeUploads.value.length < this.maxConcurrentUploads.value &&
-          this.queue.value.length > 0 &&
-          !this.isPaused.value
-        ) {
-          const uploadItem = this.queue.value.shift()
-          this.processUpload(uploadItem)
+    for (const file of files) {
+      const upload = this.createUpload(file, targetPath)
+      newUploads.push(upload)
+      
+      // Si le fichier a un chemin relatif (fait partie d'un dossier)
+      if (file.relativePath && file.relativePath !== file.name) {
+        const relativeDirPath = file.relativePath.substring(0, file.relativePath.lastIndexOf('/'))
+        if (relativeDirPath) {
+          // Ajouter tous les dossiers parents
+          const pathParts = relativeDirPath.split('/')
+          let currentPath = ''
+          for (const part of pathParts) {
+            currentPath = currentPath ? `${currentPath}/${part}` : part
+            foldersToCreate.add(`${targetPath}/${currentPath}`)
+          }
         }
-        
-        // Wait a bit before checking again
-        await new Promise(resolve => setTimeout(resolve, 100))
       }
       
-      // Wait for all active uploads to complete
-      while (this.activeUploads.value.length > 0 && !this.isPaused.value) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
-      
-    } catch (error) {
-      console.error('Upload processing error:', error)
-    } finally {
-      this.isProcessing.value = false
-      this.stats.endTime = Date.now()
-      console.log('✅ Upload processing completed')
+      console.log(`📁 Added to queue: ${file.name} (${file.size} bytes) -> ${upload.targetPath}`)
     }
+
+    // Créer les dossiers nécessaires
+    if (foldersToCreate.size > 0) {
+      console.log(`📂 Creating ${foldersToCreate.size} folders:`, Array.from(foldersToCreate))
+      await this.createFolders(Array.from(foldersToCreate))
+    }
+
+    // Ajouter les uploads à la queue
+    for (const upload of newUploads) {
+      this.uploadQueue.push(upload.id)
+    }
+
+    console.log(`📋 Upload queue now has ${this.uploadQueue.length} items`)
+    
+    // Démarrer les uploads
+    this.processQueue()
+    
+    return newUploads
   }
 
-  // Process individual upload
-  async processUpload(uploadItem) {
-    console.log('📤 Processing upload:', uploadItem.fileName)
+  // Traiter la queue d'uploads
+  async processQueue() {
+    console.log(`🔄 Processing queue: ${this.uploadQueue.length} pending, ${this.activeUploads}/${this.maxConcurrentUploads} active`)
     
-    // Move to active uploads
-    this.activeUploads.value.push(uploadItem)
-    uploadItem.status = 'uploading'
-    uploadItem.startTime = Date.now()
-    
-    try {
-      // Ensure target directory exists
-      await this.ensureDirectoryExists(uploadItem.targetPath, uploadItem.relativePath)
+    while (this.uploadQueue.length > 0 && this.activeUploads < this.maxConcurrentUploads) {
+      const uploadId = this.uploadQueue.shift()
+      const upload = this.uploads.get(uploadId)
       
-      // Determine final upload path
-      const finalPath = this.getFinalUploadPath(uploadItem.targetPath, uploadItem.relativePath)
-      
-      // Upload the file
-      await nasAPI.uploadFile(
-        uploadItem.file,
-        finalPath,
-        uploadItem.overwrite,
-        (progress) => {
-          // Update item progress
-          uploadItem.progress = progress
-          uploadItem.uploadedBytes = (progress / 100) * uploadItem.fileSize
-          
-          // Update overall statistics
-          this.updateOverallProgress()
-        }
-      )
-      
-      // Upload completed successfully
-      uploadItem.status = 'completed'
-      uploadItem.endTime = Date.now()
-      uploadItem.progress = 100
-      uploadItem.uploadedBytes = uploadItem.fileSize
-      
-      // Move to completed uploads
-      this.moveToCompleted(uploadItem)
-      this.stats.completedFiles++
-      
-      console.log('✅ Upload completed:', uploadItem.fileName)
-      
-    } catch (error) {
-      console.error('❌ Upload failed:', uploadItem.fileName, error)
-      
-      uploadItem.error = error.message
-      uploadItem.status = 'error'
-      uploadItem.endTime = Date.now()
-      
-      // Try to retry if enabled and retries available
-      if (this.autoRetry.value && uploadItem.retryCount < uploadItem.maxRetries) {
-        uploadItem.retryCount++
-        uploadItem.status = 'pending'
-        uploadItem.error = null
-        
-        console.log(`🔄 Retrying upload (${uploadItem.retryCount}/${uploadItem.maxRetries}):`, uploadItem.fileName)
-        
-        // Add back to queue after delay
-        setTimeout(() => {
-          this.queue.value.unshift(uploadItem)
-        }, this.retryDelay.value)
-        
-      } else {
-        // Move to failed uploads
-        this.moveToFailed(uploadItem)
-        this.stats.failedFiles++
-        
-        // Emit error event for UI handling
-        this.emitError(uploadItem, error)
-      }
-    } finally {
-      // Remove from active uploads
-      const index = this.activeUploads.value.findIndex(item => item.id === uploadItem.id)
-      if (index !== -1) {
-        this.activeUploads.value.splice(index, 1)
+      if (upload && upload.status === 'pending') {
+        console.log(`▶️ Starting upload: ${upload.fileName}`)
+        this.startUpload(upload)
       }
     }
   }
 
-  // Helper methods
-  async ensureDirectoryExists(targetPath, relativePath) {
-    if (relativePath === undefined || relativePath === null) return targetPath
-    
-    // Extract directory path from relative path
-    const lastSlashIndex = relativePath.lastIndexOf('/')
-    if (lastSlashIndex === -1) return targetPath
-    
-    const relativeDirPath = relativePath.substring(0, lastSlashIndex)
-    const fullDirPath = nasAPI.joinPaths(targetPath, relativeDirPath)
-    
-    try {
-      // Check if directory exists
-      await nasAPI.browse(fullDirPath)
-    } catch (error) {
-      // Directory doesn't exist, create it recursively
-      await this.createDirectoryRecursively(fullDirPath)
-    }
-    
-    return fullDirPath
-  }
-
-  async createDirectoryRecursively(dirPath) {
-    const pathSegments = dirPath.split('/').filter(segment => segment !== '')
-    let currentPath = '/'
-    
-    for (const segment of pathSegments) {
-      currentPath = nasAPI.joinPaths(currentPath, segment)
-      
+  // Créer les dossiers nécessaires
+  async createFolders(folderPaths) {
+    for (const folderPath of folderPaths) {
       try {
-        await nasAPI.browse(currentPath)
+        console.log(`📂 Creating folder: ${folderPath}`)
+        
+        // Séparer le chemin parent et le nom du dossier
+        const lastSlashIndex = folderPath.lastIndexOf('/')
+        const parentPath = folderPath.substring(0, lastSlashIndex) || '/'
+        const folderName = folderPath.substring(lastSlashIndex + 1)
+        
+        // Utiliser l'API pour créer le dossier
+        const response = await nasAPI.createFolder(parentPath, folderName)
+        if (response.success) {
+          console.log(`✅ Folder created: ${folderPath}`)
+        } else {
+          console.log(`ℹ️ Folder might already exist: ${folderPath}`)
+        }
       } catch (error) {
-        // Directory doesn't exist, create it
-        const parentPath = nasAPI.getParentPath(currentPath)
-        const folderName = nasAPI.getFilename(currentPath)
+        // Ignorer les erreurs si le dossier existe déjà
+        console.log(`ℹ️ Folder creation skipped (might exist): ${folderPath} - ${error.message}`)
+      }
+    }
+  }
+
+  // Démarrer un upload individuel
+  async startUpload(upload) {
+    try {
+      this.activeUploads++
+      upload.status = 'uploading'
+      upload.startTime = Date.now()
+
+      // Fonction de callback pour la progression
+      const onProgress = (percentComplete) => {
+        console.log(`📊 Progress for ${upload.fileName}: ${percentComplete.toFixed(1)}%`)
         
-        await nasAPI.createFolder(parentPath, folderName)
-        console.log('📁 Created directory:', currentPath)
+        upload.progress = Math.min(100, Math.max(0, percentComplete)) // Clamp entre 0 et 100
+        upload.uploadedBytes = (upload.progress / 100) * upload.fileSize
+        
+        // Calculer la vitesse et le temps estimé
+        const now = Date.now()
+        const elapsed = (now - upload.startTime) / 1000 // en secondes
+        
+        if (elapsed > 0) {
+          upload.speed = upload.uploadedBytes / elapsed // bytes par seconde
+          
+          const remainingBytes = upload.fileSize - upload.uploadedBytes
+          if (upload.speed > 0) {
+            upload.estimatedTime = remainingBytes / upload.speed
+          }
+        }
+      }
+
+      const response = await nasAPI.uploadFile(upload.file, upload.targetPath, false, onProgress)
+      
+      if (response.success) {
+        console.log(`✅ Upload completed successfully: ${upload.fileName}`)
+        upload.status = 'completed'
+        upload.progress = 100
+        upload.estimatedTime = 0
+      } else {
+        throw new Error(response.message || 'Upload failed')
+      }
+
+    } catch (error) {
+      console.error(`❌ Upload error for ${upload.fileName} to ${upload.targetPath}:`, error)
+      upload.status = 'error'
+      upload.error = error.message || 'Erreur inconnue'
+      
+      // Retry automatique si pas encore atteint le maximum
+      if (upload.retryCount < upload.maxRetries) {
+        upload.retryCount++
+        console.log(`🔄 Scheduling retry for ${upload.fileName} (attempt ${upload.retryCount}/${upload.maxRetries})`)
+        setTimeout(() => {
+          this.retryUpload(upload.id)
+        }, 2000) // Attendre 2 secondes avant retry
+      } else {
+        console.log(`💀 Max retries reached for ${upload.fileName}`)
+      }
+    } finally {
+      this.activeUploads--
+      console.log(`📉 Active uploads decreased to ${this.activeUploads}, queue: ${this.uploadQueue.length} pending`)
+      // Continuer avec les uploads suivants
+      this.processQueue()
+    }
+  }
+
+
+
+  // Réessayer un upload
+  async retryUpload(uploadId) {
+    const upload = this.uploads.get(uploadId)
+    if (!upload) return
+
+    upload.retryCount++
+    upload.status = 'pending'
+    upload.error = null
+    upload.progress = 0
+    upload.uploadedBytes = 0
+    upload.speed = 0
+    upload.estimatedTime = 0
+
+    // Remettre en queue
+    this.uploadQueue.unshift(uploadId) // Priorité haute
+    this.processQueue()
+  }
+
+  // Annuler un upload
+  cancelUpload(uploadId) {
+    const upload = this.uploads.get(uploadId)
+    if (!upload) return
+
+    upload.status = 'cancelled'
+    upload.error = 'Annulé par l\'utilisateur'
+    
+    // Retirer de la queue si pas encore démarré
+    const queueIndex = this.uploadQueue.indexOf(uploadId)
+    if (queueIndex > -1) {
+      this.uploadQueue.splice(queueIndex, 1)
+    }
+  }
+
+  // Annuler tous les uploads
+  cancelAllUploads() {
+    for (const [uploadId, upload] of this.uploads) {
+      if (upload.status === 'pending' || upload.status === 'uploading') {
+        this.cancelUpload(uploadId)
+      }
+    }
+    this.uploadQueue = []
+  }
+
+  // Obtenir tous les uploads
+  getAllUploads() {
+    return Array.from(this.uploads.values())
+  }
+
+  // Obtenir les uploads actifs
+  getActiveUploads() {
+    return Array.from(this.uploads.values()).filter(upload => 
+      upload.status === 'pending' || upload.status === 'uploading'
+    )
+  }
+
+  // Nettoyer les uploads terminés
+  clearCompletedUploads() {
+    for (const [uploadId, upload] of this.uploads) {
+      if (upload.status === 'completed') {
+        this.uploads.delete(uploadId)
       }
     }
   }
 
-  getFinalUploadPath(targetPath, relativePath) {
-    if (!relativePath || relativePath === '') return targetPath
-    
-    const lastSlashIndex = relativePath.lastIndexOf('/')
-    if (lastSlashIndex === -1) return targetPath
-    
-    const relativeDirPath = relativePath.substring(0, lastSlashIndex)
-    return nasAPI.joinPaths(targetPath, relativeDirPath)
+  // Vérifier si des uploads sont en cours
+  hasActiveUploads() {
+    return this.getActiveUploads().length > 0
   }
 
-  moveToCompleted(uploadItem) {
-    this.completedUploads.value.push(uploadItem)
-    
-    // Emit success event
-    this.emitSuccess(uploadItem)
-  }
+  // Obtenir les statistiques globales
+  getGlobalStats() {
+    const uploads = this.getAllUploads()
+    const total = uploads.length
+    const completed = uploads.filter(u => u.status === 'completed').length
+    const failed = uploads.filter(u => u.status === 'error').length
+    const active = uploads.filter(u => u.status === 'uploading' || u.status === 'pending').length
 
-  moveToFailed(uploadItem) {
-    this.failedUploads.value.push(uploadItem)
-  }
-  
-  // Event handling methods
-  onError(handler) {
-    this.errorHandlers.push(handler)
-  }
-  
-  onSuccess(handler) {
-    this.successHandlers.push(handler)
-  }
-  
-  emitError(uploadItem, error) {
-    this.errorHandlers.forEach(handler => {
-      try {
-        handler(uploadItem, error)
-      } catch (e) {
-        console.error('Error in upload error handler:', e)
+    const totalBytes = uploads.reduce((sum, u) => sum + u.fileSize, 0)
+    const uploadedBytes = uploads.reduce((sum, u) => sum + u.uploadedBytes, 0)
+    const globalProgress = totalBytes > 0 ? (uploadedBytes / totalBytes) * 100 : 0
+
+    // Log des statistiques si tous les uploads sont terminés
+    if (active === 0 && total > 0) {
+      console.log(`📊 Upload session complete: ${completed}/${total} successful, ${failed} failed`)
+      if (failed > 0) {
+        const failedUploads = uploads.filter(u => u.status === 'error')
+        console.log(`❌ Failed uploads:`, failedUploads.map(u => `${u.fileName}: ${u.error}`))
       }
-    })
-  }
-  
-  emitSuccess(uploadItem) {
-    this.successHandlers.forEach(handler => {
-      try {
-        handler(uploadItem)
-      } catch (e) {
-        console.error('Error in upload success handler:', e)
-      }
-    })
-  }
-
-  updateOverallProgress() {
-    // Calculate total uploaded bytes across all items
-    let totalUploaded = 0
-    
-    // Add completed uploads
-    totalUploaded += this.completedUploads.value.reduce((sum, item) => sum + item.fileSize, 0)
-    
-    // Add progress from active uploads
-    totalUploaded += this.activeUploads.value.reduce((sum, item) => sum + item.uploadedBytes, 0)
-    
-    this.stats.uploadedBytes = totalUploaded
-  }
-
-  // Control methods
-  pause() {
-    console.log('⏸️ Pausing uploads')
-    this.isPaused.value = true
-  }
-
-  resume() {
-    console.log('▶️ Resuming uploads')
-    this.isPaused.value = false
-    
-    if (!this.isProcessing.value && this.queue.value.length > 0) {
-      this.startProcessing()
     }
-  }
 
-  cancel(uploadId) {
-    console.log('❌ Cancelling upload:', uploadId)
-    
-    // Find and remove from queue
-    const queueIndex = this.queue.value.findIndex(item => item.id === uploadId)
-    if (queueIndex !== -1) {
-      const item = this.queue.value.splice(queueIndex, 1)[0]
-      item.status = 'cancelled'
-      this.failedUploads.value.push(item)
-      return true
+    return {
+      total,
+      completed,
+      failed,
+      active,
+      totalBytes,
+      uploadedBytes,
+      globalProgress
     }
-    
-    // Find in active uploads (can't cancel active uploads easily with current API)
-    const activeIndex = this.activeUploads.value.findIndex(item => item.id === uploadId)
-    if (activeIndex !== -1) {
-      const item = this.activeUploads.value[activeIndex]
-      item.status = 'cancelled'
-      // Note: The actual upload will continue, but we mark it as cancelled
-      return true
-    }
-    
-    return false
-  }
-
-  retry(uploadId) {
-    console.log('🔄 Retrying upload:', uploadId)
-    
-    const failedIndex = this.failedUploads.value.findIndex(item => item.id === uploadId)
-    if (failedIndex !== -1) {
-      const item = this.failedUploads.value.splice(failedIndex, 1)[0]
-      
-      // Reset item state
-      item.status = 'pending'
-      item.error = null
-      item.progress = 0
-      item.uploadedBytes = 0
-      item.startTime = null
-      item.endTime = null
-      
-      // Add back to queue
-      this.queue.value.push(item)
-      
-      // Start processing if not running
-      if (!this.isProcessing.value && !this.isPaused.value) {
-        this.startProcessing()
-      }
-      
-      return true
-    }
-    
-    return false
-  }
-
-  clear() {
-    console.log('🧹 Clearing upload service')
-    
-    this.queue.value = []
-    this.completedUploads.value = []
-    this.failedUploads.value = []
-    
-    // Reset statistics
-    this.stats.totalFiles = 0
-    this.stats.completedFiles = 0
-    this.stats.failedFiles = 0
-    this.stats.totalBytes = 0
-    this.stats.uploadedBytes = 0
-    this.stats.startTime = null
-    this.stats.endTime = null
-  }
-
-  // Get upload by ID
-  getUpload(uploadId) {
-    return this.allUploads.find(item => item.id === uploadId)
-  }
-
-  // Get uploads by status
-  getUploadsByStatus(status) {
-    return this.allUploads.filter(item => item.status === status)
   }
 }
 
-// Create and export singleton instance
+// Instance singleton
 export const uploadService = new UploadService()
-export { UploadItem }
-export default uploadService
+
+// Composable pour utiliser le service dans les composants
+export function useUploadService() {
+  const uploads = ref([])
+  
+  // Mettre à jour la liste des uploads
+  const updateUploads = () => {
+    uploads.value = uploadService.getAllUploads()
+  }
+
+  // Surveiller les changements (polling simple)
+  const startPolling = () => {
+    const interval = setInterval(updateUploads, 500)
+    return () => clearInterval(interval)
+  }
+
+  return {
+    uploads,
+    uploadService,
+    updateUploads,
+    startPolling
+  }
+}

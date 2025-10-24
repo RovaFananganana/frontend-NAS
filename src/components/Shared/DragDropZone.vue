@@ -195,6 +195,8 @@ const handleDrop = async (event) => {
   const items = Array.from(event.dataTransfer.items || [])
   const files = Array.from(event.dataTransfer.files || [])
   
+  console.log(`🎯 DragDrop: Received ${items.length} items and ${files.length} files`)
+  
   if (items.length === 0 && files.length === 0) {
     return
   }
@@ -204,11 +206,21 @@ const handleDrop = async (event) => {
     
     // Traiter les items avec webkitGetAsEntry pour supporter les dossiers
     if (items.length > 0 && items[0].webkitGetAsEntry) {
+      console.log(`📁 Using webkitGetAsEntry for ${items.length} items`)
       allFiles = await processDataTransferItems(items)
+      
+      // Si webkitGetAsEntry n'a pas donné tous les fichiers, utiliser le fallback
+      if (allFiles.length < files.length) {
+        console.log(`⚠️ webkitGetAsEntry only got ${allFiles.length}/${files.length} files, using fallback`)
+        allFiles = files
+      }
     } else {
       // Fallback pour les navigateurs qui ne supportent pas webkitGetAsEntry
+      console.log(`📄 Using fallback for ${files.length} files`)
       allFiles = files
     }
+    
+    console.log(`📋 Total files after processing: ${allFiles.length}`)
     
     // Filtrer et valider les fichiers
     const validFiles = await validateFiles(allFiles)
@@ -232,51 +244,105 @@ const handleDrop = async (event) => {
 
 // Traitement des items DataTransfer pour supporter les dossiers
 const processDataTransferItems = async (items) => {
+  console.log(`🔄 Processing ${items.length} DataTransfer items`)
   const files = []
+  let totalDirectories = 0
+  let totalFiles = 0
   
   for (const item of items) {
-    if (item.kind === 'file') {
-      const entry = item.webkitGetAsEntry()
-      if (entry) {
-        await processEntry(entry, files)
+    console.log(`📋 Item kind: ${item.kind}, type: ${item.type}`)
+    
+    // Essayer de traiter l'item même si kind n'est pas 'file'
+    const entry = item.webkitGetAsEntry && item.webkitGetAsEntry()
+    if (entry) {
+      console.log(`📁 Processing entry: ${entry.name} (isFile: ${entry.isFile}, isDirectory: ${entry.isDirectory})`)
+      if (entry.isDirectory) {
+        totalDirectories++
+      } else if (entry.isFile) {
+        totalFiles++
+      }
+      await processEntry(entry, files)
+    } else if (item.kind === 'file') {
+      // Fallback : essayer de récupérer le fichier directement
+      const file = item.getAsFile && item.getAsFile()
+      if (file) {
+        console.log(`📄 Direct file: ${file.name} (${file.size} bytes)`)
+        totalFiles++
+        files.push(file)
       }
     }
   }
   
+  console.log(`📊 Processing summary: ${totalDirectories} directories, ${totalFiles} direct files, ${files.length} total files extracted`)
   return files
 }
 
 // Traitement récursif des entrées (fichiers et dossiers)
 const processEntry = async (entry, files, path = '') => {
-  if (entry.isFile) {
-    // C'est un fichier
-    const file = await new Promise((resolve, reject) => {
-      entry.file(resolve, reject)
-    })
-    
-    // Ajouter le chemin relatif au fichier
-    file.relativePath = path + file.name
-    files.push(file)
-    
-  } else if (entry.isDirectory && props.acceptFolders) {
-    // C'est un dossier
-    const reader = entry.createReader()
-    const entries = await new Promise((resolve, reject) => {
-      reader.readEntries(resolve, reject)
-    })
-    
-    // Traiter récursivement les entrées du dossier
-    for (const childEntry of entries) {
-      await processEntry(childEntry, files, path + entry.name + '/')
+  try {
+    if (entry.isFile) {
+      // C'est un fichier
+      console.log(`📄 Processing file: ${entry.name}`)
+      
+      const file = await new Promise((resolve, reject) => {
+        entry.file(
+          (file) => resolve(file),
+          (error) => {
+            console.error(`❌ Error reading file ${entry.name}:`, error)
+            reject(error)
+          }
+        )
+      })
+      
+      // Ajouter le chemin relatif au fichier
+      file.relativePath = path + file.name
+      files.push(file)
+      console.log(`✅ File added: ${file.name} (${file.size} bytes) - relativePath: ${file.relativePath}`)
+      
+    } else if (entry.isDirectory && props.acceptFolders) {
+      // C'est un dossier
+      console.log(`📁 Processing directory: ${entry.name}`)
+      const reader = entry.createReader()
+      const allEntries = []
+      
+      // readEntries peut ne pas retourner toutes les entrées en une fois
+      // Il faut l'appeler plusieurs fois jusqu'à ce qu'il retourne un tableau vide
+      const readAllEntries = async () => {
+        let entries
+        do {
+          entries = await new Promise((resolve, reject) => {
+            reader.readEntries(resolve, reject)
+          })
+          allEntries.push(...entries)
+          console.log(`📋 Read ${entries.length} entries from ${entry.name}, total: ${allEntries.length}`)
+        } while (entries.length > 0)
+      }
+      
+      await readAllEntries()
+      console.log(`📊 Total entries in ${entry.name}: ${allEntries.length}`)
+      
+      // Traiter récursivement les entrées du dossier
+      for (const childEntry of allEntries) {
+        try {
+          await processEntry(childEntry, files, path + entry.name + '/')
+        } catch (error) {
+          console.error(`❌ Error processing ${childEntry.name}:`, error)
+        }
+      }
     }
+  } catch (error) {
+    console.error(`❌ Error in processEntry for ${entry.name}:`, error)
+    // Continue processing other entries even if one fails
   }
 }
 
 // Validation des fichiers
 const validateFiles = async (files) => {
+  console.log(`🔍 Validating ${files.length} files`)
   const validFiles = []
   
   for (const file of files) {
+    console.log(`📄 Validating: ${file.name} (${file.size} bytes)`)
     // Vérifier la taille
     if (file.size > props.maxFileSize) {
       const fileSizeGB = (file.size / (1024 * 1024 * 1024)).toFixed(2)
@@ -298,8 +364,11 @@ const validateFiles = async (files) => {
       }
     }
     
+    console.log(`✅ File valid: ${file.name}`)
     validFiles.push(file)
   }
+  
+  console.log(`📊 Validation result: ${validFiles.length}/${files.length} files valid`)
   
   // Vérifier le nombre maximum de fichiers
   if (validFiles.length > props.maxFiles) {

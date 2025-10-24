@@ -71,7 +71,7 @@
       :disabled="loading || !!error"
       :accept-folders="true"
       :max-file-size="5 * 1024 * 1024 * 1024"
-      :max-files="20"
+      :max-files="100"
       drop-message="Déposez vos fichiers et dossiers ici"
       upload-message="Upload en cours..."
       @files-dropped="handleFilesDrop"
@@ -190,14 +190,14 @@
     }" :show-permission-errors="showPermissionErrors" :is-favorite="isItemFavorite(contextMenu.item)"
     :current-view-mode="currentMode" :clipboard-supported="clipboardService.getState().isSupported"
     @open="openContextItem" @download="downloadContextFile"
-    @rename="openRenameModal" @copy="copyContextItem" @cut="cutContextItem" @paste="pasteItems" @permissions="openPermissions"
+    @rename="openRenameModal" @copy="copyContextItem" @cut="cutContextItem" @paste="pasteItems" 
     @move="openMoveModal" @create-folder="openCreateFolderModal" @create-file="openCreateFileModal"
     @delete="confirmDelete" @properties="showProperties" @toggle-favorite="handleToggleFavorite"
     @view-mode-changed="handleViewModeChange" />
 
   <!-- Modals -->
-  <PermissionModal v-if="showPermissionModal && selectedItemForPermissions" :item="selectedItemForPermissions"
-    @close="showPermissionModal = false" @updated="onPermissionsUpdated" />
+  <!-- <PermissionModal v-if="showPermissionModal && selectedItemForPermissions" :item="selectedItemForPermissions"
+    @close="showPermissionModal = false" @updated="onPermissionsUpdated" /> -->
 
   <RenameModal v-if="showRenameModal && itemToRename" :item="itemToRename" @close="showRenameModal = false"
     @renamed="onItemRenamed" />
@@ -222,6 +222,15 @@
 
   <!-- Upload Progress Panel -->
   <UploadProgressPanel />
+
+  <!-- Upload Progress Modal -->
+  <UploadProgressModal 
+    :show="showUploadProgress" 
+    :uploads="currentUploads"
+    @close="closeUploadProgress"
+    @retry-upload="retryUpload"
+    @cancel-all="cancelAllUploads"
+  />
 
 
 </template>
@@ -268,6 +277,7 @@ import CreateFileModal from './CreateFileModal.vue'
 import UploadModal from './UploadModal.vue'
 import DragDropZone from './DragDropZone.vue'
 import UploadProgressPanel from './UploadProgressPanel.vue'
+import UploadProgressModal from './UploadProgressModal.vue'
 
 // Props
 const props = defineProps({
@@ -397,7 +407,7 @@ const contextMenu = ref({
   item: null
 })
 
-const showPermissionModal = ref(false)
+// const showPermissionModal = ref(false)
 const showRenameModal = ref(false)
 const showMoveModal = ref(false)
 const showDeleteModal = ref(false)
@@ -405,7 +415,9 @@ const showPropertiesModal = ref(false)
 const showCreateFolderModal = ref(false)
 const showCreateFileModal = ref(false)
 const showUploadModal = ref(false)
-const selectedItemForPermissions = ref(null)
+const showUploadProgress = ref(false)
+const currentUploads = ref([])
+// const selectedItemForPermissions = ref(null)
 const selectedItemForProperties = ref(null)
 const itemToRename = ref(null)
 const itemsToMove = ref([])
@@ -1277,18 +1289,18 @@ const pasteItems = async () => {
   contextMenu.value.show = false
 }
 
-const openPermissions = async (item) => {
-  // Only admins can modify permissions
-  if (!isAdmin.value) {
-    showPermissionError('permissions')
-    contextMenu.value.show = false
-    return
-  }
+// const openPermissions = async (item) => {
+//   // Only admins can modify permissions
+//   if (!isAdmin.value) {
+//     showPermissionError('permissions')
+//     contextMenu.value.show = false
+//     return
+//   }
 
-  selectedItemForPermissions.value = item
-  showPermissionModal.value = true
-  contextMenu.value.show = false
-}
+//   selectedItemForPermissions.value = item
+//   showPermissionModal.value = true
+//   contextMenu.value.show = false
+// }
 
 const openRenameModal = async (item) => {
   // Check write permission for renaming
@@ -1447,9 +1459,9 @@ const handleViewModeChange = (newMode) => {
 // Notifications are now handled by individual modals in components
 
 // Modal event handlers
-const onPermissionsUpdated = () => {
-  loadFiles(currentPath.value)
-}
+// const onPermissionsUpdated = () => {
+//   loadFiles(currentPath.value)
+// }
 
 const onItemRenamed = async (renameData) => {
   try {
@@ -1543,8 +1555,7 @@ const onFilesUploaded = (event) => {
   
   // Show success notification
   console.log(`${event.files?.length || 1} fichier(s) uploadé(s) avec succès`, 'success')
-  // Refresh the file list
-  loadFiles(currentPath.value)
+  // Note: File list refresh is handled by upload completion polling
 }
 
 const handleUploadError = (error) => {
@@ -1597,8 +1608,7 @@ const handleUploadProgress = (progress) => {
 
 const handleUploadCompleted = () => {
   console.log('✅ Upload completed')
-  // Refresh file list to show new files
-  loadFiles(currentPath.value)
+  // Note: File list refresh is handled by upload completion polling
 }
 
 const handleDragEnter = () => {
@@ -1611,17 +1621,7 @@ const handleDragLeave = () => {
   // Could remove visual feedback here if needed
 }
 
-// Setup upload service event handling
-uploadService.onError((uploadItem, error) => {
-  console.log('📢 Upload service error received:', uploadItem.fileName, error)
-  handleUploadError(error)
-})
-
-uploadService.onSuccess((uploadItem) => {
-  console.log('📢 Upload service success received:', uploadItem.fileName)
-  // Refresh the file list to show the new file
-  loadFiles(currentPath.value)
-})
+// Upload service events are handled through the modal polling system
 
 // Batch upload functionality using upload service
 const startBatchUpload = async (files, targetPath) => {
@@ -1632,26 +1632,88 @@ const startBatchUpload = async (files, targetPath) => {
   }
   
   // Check permissions
-  if (!canPerformAction('write', targetPath)) {
+  const hasWritePermission = await canPerformAction(targetPath, 'write')
+  if (!hasWritePermission) {
     throw new Error('Permissions insuffisantes pour uploader dans ce dossier')
   }
   
   try {
     // Add files to upload service queue
-    const uploadIds = uploadService.addFiles(files, targetPath, {
-      overwrite: false,
-      maxRetries: 3
-    })
+    const newUploads = await uploadService.addFiles(files, targetPath)
     
-    console.log('✅ Added', files.length, 'files to upload queue with IDs:', uploadIds)
+    console.log('✅ Added', files.length, 'files to upload queue')
     
-    // The upload service will handle the actual uploading with progress tracking
-    // The UploadProgressPanel will show the progress automatically
+    // Update current uploads and show modal
+    currentUploads.value = uploadService.getAllUploads()
+    showUploadProgress.value = true
+    
+    // Start polling for updates
+    startUploadPolling()
     
   } catch (error) {
     console.error('Failed to start batch upload:', error)
     throw error
   }
+}
+
+// Upload progress management
+let uploadPollingInterval = null
+let hasScheduledRefresh = false
+
+const startUploadPolling = () => {
+  if (uploadPollingInterval) {
+    clearInterval(uploadPollingInterval)
+  }
+  
+  uploadPollingInterval = setInterval(() => {
+    currentUploads.value = uploadService.getAllUploads()
+    
+    // Auto-close modal when all uploads are completed
+    if (currentUploads.value.length > 0) {
+      const allCompleted = currentUploads.value.every(upload => 
+        upload.status === 'completed' || upload.status === 'error'
+      )
+      
+      if (allCompleted && !hasScheduledRefresh) {
+        hasScheduledRefresh = true
+        console.log('📅 Scheduling upload completion refresh in 2 seconds')
+        setTimeout(() => {
+          closeUploadProgress()
+          // Refresh file list to show uploaded files
+          loadFiles(currentPath.value)
+          hasScheduledRefresh = false
+        }, 2000) // Wait 2 seconds before auto-closing
+      }
+    }
+  }, 500)
+}
+
+const stopUploadPolling = () => {
+  if (uploadPollingInterval) {
+    clearInterval(uploadPollingInterval)
+    uploadPollingInterval = null
+  }
+  hasScheduledRefresh = false
+}
+
+const closeUploadProgress = () => {
+  showUploadProgress.value = false
+  stopUploadPolling()
+  
+  // Clear completed uploads
+  uploadService.clearCompletedUploads()
+  currentUploads.value = uploadService.getAllUploads()
+}
+
+const retryUpload = (uploadId) => {
+  uploadService.retryUpload(uploadId)
+  currentUploads.value = uploadService.getAllUploads()
+}
+
+const cancelAllUploads = () => {
+  uploadService.cancelAllUploads()
+  currentUploads.value = uploadService.getAllUploads()
+  closeUploadProgress()
 }
 
 // Version simple de la recherche sans le composable complexe
@@ -1781,6 +1843,9 @@ onUnmounted(() => {
   
   // Cleanup search
   cleanupSearch()
+  
+  // Cleanup upload polling
+  stopUploadPolling()
 })
 </script>
 
