@@ -19,6 +19,14 @@
       <!-- <h1 class="text-3xl font-bold">Tableau de bord Admin</h1> -->
       <div class="flex gap-2">
         <button 
+          class="btn btn-primary btn-sm"
+          @click="refreshStats"
+          :disabled="loading"
+        >
+          <i class="fas fa-sync-alt mr-2"></i>
+          {{ loading ? 'Actualisation...' : 'Actualiser' }}
+        </button>
+        <button 
           class="btn btn-secondary btn-sm"
           @click="syncWithNas"
           :disabled="syncing || (nasStatus && !nasStatus.connected)"
@@ -28,28 +36,51 @@
           {{ syncing ? 'Synchronisation...' : 'Sync NAS' }}
         </button>
         <button 
-          class="btn btn-primary btn-sm"
-          @click="refreshStats"
-          :disabled="loading"
+          class="btn btn-accent btn-sm"
+          @click="openDriveClient"
+          :disabled="!nasStatus?.connected"
+          :title="!nasStatus?.connected ? 'NAS non accessible' : 'Ouvrir Synology Drive Client'"
         >
-          <i class="fas fa-sync-alt mr-2"></i>
-          {{ loading ? 'Actualisation...' : 'Actualiser' }}
+          <i class="fas fa-external-link-alt mr-2"></i>
+          Open Drive Client
+        </button>
+        <button 
+          class="btn btn-outline btn-sm"
+          @click="showConfigModal = true"
+        >
+          <i class="fas fa-cog mr-2"></i>
+          Configurer
         </button>
       </div>
     </div>
 
-    <!-- NAS Status -->
-    <div v-if="nasStatus" class="alert mb-6" :class="nasStatus.connected ? 'alert-success' : 'alert-warning'">
-      <i class="fas" :class="nasStatus.connected ? 'fa-check-circle' : 'fa-wifi-slash'"></i>
-      <div>
-        <p>{{ nasStatus.message }}</p>
-        <div v-if="nasStatus.connected && nasStatus.server_info" class="text-sm mt-1">
-          Server: {{ nasStatus.server_info.ip }}:{{ nasStatus.server_info.port }} | 
-          Share: {{ nasStatus.server_info.share }} | 
-          Files: {{ nasStatus.root_files_count }}
+    <!-- System Status Bar -->
+    <div class="w-full mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- NAS Connection Status -->
+        <div v-if="nasStatus" class="alert" :class="getSystemStatusClass('nas', nasStatus.connected)">
+          <i class="fas" :class="nasStatus.connected ? 'fa-check-circle' : 'fa-wifi-slash'"></i>
+          <div class="flex-1">
+            <div class="font-medium">Connexion NAS</div>
+            <div class="text-sm opacity-90">{{ nasStatus.message }}</div>
+            <div v-if="nasStatus.connected && nasStatus.server_info" class="text-xs mt-1 opacity-75">
+              {{ nasStatus.server_info.ip }}:{{ nasStatus.server_info.port }} | {{ nasStatus.server_info.share }} | {{ nasStatus.root_files_count }} fichiers
+            </div>
+          </div>
         </div>
-        <div v-else-if="!nasStatus.connected" class="text-sm mt-1">
-          💡 Conseil: se connecter au réseau de travail pour activer la synchronisation avec le NAS
+
+        <!-- System Health Status -->
+        <div class="alert" :class="getSystemStatusClass('system', getSystemHealth())">
+          <i class="fas fa-server"></i>
+          <div class="flex-1">
+            <div class="font-medium">État du système</div>
+            <div class="text-sm opacity-90">
+              {{ getSystemHealthMessage() }}
+            </div>
+            <div class="text-xs mt-1 opacity-75">
+              DB: Connectée | Stockage: {{ usagePercentage }}% | Dernière MAJ: {{ formatTime(new Date()) }}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -154,88 +185,51 @@
 
     <!-- Debug Panel removed -->
 
-    <!-- Synology Drive Integration -->
-    <div class="mb-6">
-      <SynologyDriveStatus />
-    </div>
 
-    <!-- Quick Actions -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- Recent Activity -->
-      <div class="card bg-base-100 shadow-xl">
-        <div class="card-body">
-          <h2 class="card-title">
-            <i class="fas fa-clock mr-2"></i>
-            Activité récente
-          </h2>
-          
-          <div v-if="recentLogs.length === 0" class="text-center py-8 opacity-70">
-            <i class="fas fa-inbox text-4xl mb-4"></i>
-            <p>Aucune activité récente</p>
-          </div>
-          
-          <div v-else class="space-y-3">
-            <div 
-              v-for="log in recentLogs" 
-              :key="log.id"
-              class="flex items-center justify-between p-3 bg-base-200 rounded-lg"
-            >
-              <div>
-                <div class="font-medium">{{ getActionLabel(log.action) }}</div>
-                <div class="text-sm opacity-70">{{ log.target }}</div>
-              </div>
-              <div class="text-sm opacity-70">
-                {{ formatDate(log.timestamp) }}
-              </div>
-            </div>
-          </div>
+
+    <!-- Recent Activity - Full Width -->
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title">
+          <i class="fas fa-clock mr-2"></i>
+          Activité récente
+        </h2>
+        
+        <div v-if="recentLogs.length === 0" class="text-center py-8 opacity-70">
+          <i class="fas fa-inbox text-4xl mb-4"></i>
+          <p>Aucune activité récente</p>
         </div>
-      </div>
-
-      <!-- System Status -->
-      <div class="card bg-base-100 shadow-xl">
-        <div class="card-body">
-          <h2 class="card-title">
-            <i class="fas fa-server mr-2"></i>
-            État du système
-          </h2>
-          
-          <div class="space-y-4">
-            <!-- Status indicators -->
-            <div class="flex justify-between items-center">
-              <span>Base de données</span>
-              <div class="badge badge-success">Connectée</div>
-            </div>
-            
-            <div class="flex justify-between items-center">
-              <span>Stockage</span>
-              <div 
-                class="badge"
-                :class="{
-                  'badge-success': usagePercentage < 80,
-                  'badge-warning': usagePercentage >= 80 && usagePercentage < 95,
-                  'badge-error': usagePercentage >= 95
-                }"
+        
+        <div v-else class="overflow-x-auto">
+          <table class="table table-zebra w-full">
+            <thead>
+              <tr>
+                <th class="w-48">Date & Heure</th>
+                <th class="w-40">Action</th>
+                <th>Détails</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr 
+                v-for="log in recentLogs" 
+                :key="log.id"
+                class="hover:bg-base-200"
               >
-                {{ usagePercentage < 80 ? 'Bon' : usagePercentage < 95 ? 'Attention' : 'Critique' }}
-              </div>
-            </div>
-            
-            <div class="flex justify-between items-center">
-              <span>NAS Synology</span>
-              <div 
-                class="badge"
-                :class="nasStatus?.connected ? 'badge-success' : 'badge-warning'"
-              >
-                {{ nasStatus?.connected ? 'Connecté' : 'Déconnecté' }}
-              </div>
-            </div>
-            
-            <div class="flex justify-between items-center">
-              <span>Dernière mise à jour</span>
-              <span class="text-sm opacity-70">{{ formatDate(new Date()) }}</span>
-            </div>
-          </div>
+                <td class="text-sm">
+                  {{ formatFullDate(log.timestamp) }}
+                </td>
+                <td>
+                  <span class="inline-flex items-center gap-2 px-2 py-1 rounded-full text-xs font-medium" :class="getActionBadgeClass(log.action)">
+                    <i class="fas" :class="getActionIcon(log.action)"></i>
+                    {{ getActionLabel(log.action) }}
+                  </span>
+                </td>
+                <td class="text-sm">
+                  {{ formatLogDetails(log) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -250,6 +244,91 @@
         </div>
       </div>
     </div>
+
+    <!-- Configuration Modal -->
+    <div v-if="showConfigModal" class="modal modal-open">
+      <div class="modal-box max-w-2xl">
+        <h3 class="font-bold text-lg mb-4">
+          <i class="fas fa-cog mr-2"></i>
+          Configuration du système
+        </h3>
+        
+        <div class="space-y-6">
+          <!-- NAS Configuration -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-medium">Configuration NAS</span>
+            </label>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="label">
+                  <span class="label-text">Serveur NAS</span>
+                </label>
+                <input 
+                  type="text" 
+                  class="input input-bordered w-full" 
+                  :value="nasStatus?.server_info?.ip || '10.61.17.33'"
+                  readonly
+                />
+              </div>
+              <div>
+                <label class="label">
+                  <span class="label-text">Partage</span>
+                </label>
+                <input 
+                  type="text" 
+                  class="input input-bordered w-full" 
+                  :value="nasStatus?.server_info?.share || 'NAS'"
+                  readonly
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Sync Configuration -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-medium">Configuration de synchronisation</span>
+            </label>
+            <div class="space-y-2">
+              <label class="cursor-pointer label">
+                <span class="label-text">Synchronisation automatique</span>
+                <input type="checkbox" class="toggle toggle-primary" checked />
+              </label>
+              <label class="cursor-pointer label">
+                <span class="label-text">Notifications de synchronisation</span>
+                <input type="checkbox" class="toggle toggle-primary" checked />
+              </label>
+            </div>
+          </div>
+
+          <!-- System Settings -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-medium">Paramètres système</span>
+            </label>
+            <div class="space-y-2">
+              <label class="cursor-pointer label">
+                <span class="label-text">Mode debug</span>
+                <input type="checkbox" class="toggle toggle-secondary" />
+              </label>
+              <label class="cursor-pointer label">
+                <span class="label-text">Logs détaillés</span>
+                <input type="checkbox" class="toggle toggle-secondary" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-primary">
+            <i class="fas fa-save mr-2"></i>
+            Sauvegarder
+          </button>
+          <button class="btn" @click="showConfigModal = false">Annuler</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -258,7 +337,6 @@ import { ref, computed, onMounted } from 'vue'
 import { adminAPI } from '@/services/api'
 import { useStore } from 'vuex'
 import PerformanceDashboard from './PerformanceDashboard.vue'
-import SynologyDriveStatus from '../Shared/SynologyDriveStatus.vue'
 
 
 
@@ -272,6 +350,7 @@ const error = ref('')
 const showPerformanceDashboard = ref(false)
 const syncing = ref(false)
 const nasStatus = ref(null)
+const showConfigModal = ref(false)
 
 // Computed properties
 const performanceIssues = computed(() => {
@@ -314,6 +393,24 @@ const formatDate = (date) => {
   }).format(new Date(date))
 }
 
+const formatFullDate = (date) => {
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  }).format(new Date(date))
+}
+
+const formatTime = (date) => {
+  return new Intl.DateTimeFormat('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(date))
+}
+
 const getActionLabel = (action) => {
   const labels = {
     'CREATE_USER': 'Utilisateur créé',
@@ -323,9 +420,191 @@ const getActionLabel = (action) => {
     'UPDATE_GROUP': 'Groupe modifié',
     'DELETE_GROUP': 'Groupe supprimé',
     'CREATE_FOLDER': 'Dossier créé',
-    'DELETE_FOLDER': 'Dossier supprimé'
+    'DELETE_FOLDER': 'Dossier supprimé',
+    'DOWNLOAD_FILE': 'Fichier téléchargé',
+    'ACCESS_FILE': 'Fichier consulté',
+    'ACCESS_FOLDER': 'Dossier ouvert'
   }
   return labels[action] || action
+}
+
+const getActionIcon = (action) => {
+  const icons = {
+    'CREATE_USER': 'fa-user-plus',
+    'UPDATE_USER': 'fa-user-edit',
+    'DELETE_USER': 'fa-user-minus',
+    'CREATE_GROUP': 'fa-users',
+    'UPDATE_GROUP': 'fa-users-cog',
+    'DELETE_GROUP': 'fa-users-slash',
+    'CREATE_FOLDER': 'fa-folder-plus',
+    'DELETE_FOLDER': 'fa-folder-minus',
+    'DOWNLOAD_FILE': 'fa-download',
+    'ACCESS_FILE': 'fa-file',
+    'ACCESS_FOLDER': 'fa-folder-open'
+  }
+  return icons[action] || 'fa-info-circle'
+}
+
+const getSystemStatusClass = (type, status) => {
+  if (type === 'nas') {
+    return status ? 'alert-success' : 'alert-warning'
+  }
+  if (type === 'system') {
+    if (status === 'good') return 'alert-success'
+    if (status === 'warning') return 'alert-warning'
+    if (status === 'critical') return 'alert-error'
+  }
+  return 'alert-info'
+}
+
+const getSystemHealth = () => {
+  if (usagePercentage.value >= 95) return 'critical'
+  if (usagePercentage.value >= 80) return 'warning'
+  return 'good'
+}
+
+const getSystemHealthMessage = () => {
+  const health = getSystemHealth()
+  if (health === 'critical') return 'Attention critique requise'
+  if (health === 'warning') return 'Surveillance recommandée'
+  return 'Système opérationnel'
+}
+
+const formatLogDetails = (log) => {
+  try {
+    // Cas spécial : si target contient "path - {json}", extraire seulement le path
+    if (log.target && log.target.includes(' - {')) {
+      const pathPart = log.target.split(' - {')[0]
+      if (pathPart && pathPart.trim()) {
+        return pathPart.trim()
+      }
+    }
+    
+    // Cas spécial : si target contient "path | {json}", extraire seulement le path
+    if (log.target && log.target.includes(' | {')) {
+      const pathPart = log.target.split(' | {')[0]
+      if (pathPart && pathPart.trim()) {
+        return pathPart.trim()
+      }
+    }
+    
+    let parsedDetails = null
+    
+    // Essayer de parser target s'il contient du JSON
+    if (log.target && log.target.includes('{')) {
+      try {
+        // Si target commence par un chemin suivi de JSON, extraire le JSON
+        const jsonStart = log.target.indexOf('{')
+        if (jsonStart > 0) {
+          const jsonPart = log.target.substring(jsonStart)
+          parsedDetails = JSON.parse(jsonPart)
+        } else {
+          parsedDetails = JSON.parse(log.target)
+        }
+      } catch (e) {
+        // Si le parsing échoue, essayer d'extraire le chemin avant le JSON
+        const jsonStart = log.target.indexOf('{')
+        if (jsonStart > 0) {
+          const pathPart = log.target.substring(0, jsonStart).trim()
+          if (pathPart && pathPart !== '-') {
+            return pathPart
+          }
+        }
+        return log.target
+      }
+    }
+    
+    // Essayer de parser details s'il contient du JSON
+    if (!parsedDetails && log.details && typeof log.details === 'string' && log.details.includes('{')) {
+      try {
+        parsedDetails = JSON.parse(log.details)
+      } catch (e) {
+        // Si le parsing échoue, utiliser details tel quel
+        return log.details
+      }
+    }
+    
+    // Si on a des détails parsés, extraire les informations importantes
+    if (parsedDetails) {
+      // Pour les opérations de déplacement/renommage
+      if (parsedDetails.source_path && parsedDetails.destination_path) {
+        return `${parsedDetails.source_path} → ${parsedDetails.destination_path}`
+      }
+      if (parsedDetails.old_path && parsedDetails.new_path) {
+        return `${parsedDetails.old_path} → ${parsedDetails.new_path}`
+      }
+      
+      // Pour les opérations simples, juste le chemin
+      if (parsedDetails.path) {
+        return parsedDetails.path
+      }
+      
+      // Si c'est un objet avec d'autres propriétés, essayer d'extraire le plus important
+      if (parsedDetails.frontend_context && parsedDetails.frontend_context.path) {
+        return parsedDetails.frontend_context.path
+      }
+      
+      // Pour les erreurs, afficher le message d'erreur
+      if (parsedDetails.failed_operation && parsedDetails.error_message) {
+        return `${parsedDetails.failed_operation}: ${parsedDetails.error_message}`
+      }
+      
+      // Si c'est une erreur avec juste le message
+      if (parsedDetails.error_message) {
+        return parsedDetails.error_message
+      }
+    }
+    
+    // Si target ne contient pas de JSON, l'utiliser directement
+    if (log.target && !log.target.includes('{')) {
+      return log.target
+    }
+    
+    // Si details ne contient pas de JSON, l'utiliser directement
+    if (log.details && typeof log.details === 'string' && !log.details.includes('{')) {
+      return log.details
+    }
+    
+    return 'Aucun détail'
+  } catch (error) {
+    console.warn('Erreur formatage détails:', error)
+    // En cas d'erreur, retourner la première valeur non-JSON disponible
+    if (log.target && !log.target.includes('{')) {
+      return log.target
+    }
+    if (log.details && typeof log.details === 'string' && !log.details.includes('{')) {
+      return log.details
+    }
+    return 'Aucun détail'
+  }
+}
+
+const getActionBadgeClass = (action) => {
+  const classes = {
+    'CREATE_USER': 'bg-success/20 text-success',
+    'UPDATE_USER': 'bg-info/20 text-info',
+    'DELETE_USER': 'bg-error/20 text-error',
+    'CREATE_GROUP': 'bg-success/20 text-success',
+    'UPDATE_GROUP': 'bg-info/20 text-info',
+    'DELETE_GROUP': 'bg-error/20 text-error',
+    'CREATE_FOLDER': 'bg-success/20 text-success',
+    'DELETE_FOLDER': 'bg-error/20 text-error',
+    'DOWNLOAD_FILE': 'bg-primary/20 text-primary',
+    'ACCESS_FILE': 'bg-accent/20 text-accent',
+    'ACCESS_FOLDER': 'bg-secondary/20 text-secondary',
+    'LOGIN': 'bg-success/20 text-success',
+    'LOGOUT': 'bg-warning/20 text-warning'
+  }
+  return classes[action] || 'bg-base-300 text-base-content'
+}
+
+const openDriveClient = () => {
+  if (nasStatus.value?.connected && nasStatus.value?.server_info) {
+    const driveUrl = `http://${nasStatus.value.server_info.ip}:5000`
+    window.open(driveUrl, '_blank')
+  } else {
+    store.dispatch('showWarning', 'NAS non accessible - impossible d\'ouvrir Drive Client')
+  }
 }
 
 const loadStats = async () => {

@@ -197,14 +197,27 @@ const showPanel = ref(false)
 const stats = computed(() => uploadService.stats)
 const overallProgress = computed(() => uploadService.overallProgress)
 const uploadSpeed = computed(() => uploadService.uploadSpeed)
-const estimatedTimeRemaining = computed(() => uploadService.estimatedTimeRemaining)
-const isProcessing = computed(() => uploadService.isProcessing.value)
-const isPaused = computed(() => uploadService.isPaused.value)
+const estimatedTimeRemaining = computed(() => {
+  const activeUploads = Array.from(uploadService.uploads.values()).filter(upload => upload.status === 'uploading')
+  if (activeUploads.length === 0) return 0
+  const avgTime = activeUploads.reduce((sum, upload) => sum + (upload.estimatedTime || 0), 0) / activeUploads.length
+  return avgTime
+})
+const isProcessing = computed(() => uploadService.activeUploads > 0)
+const isPaused = computed(() => false) // Simplified for now
 
-const activeUploads = computed(() => uploadService.activeUploads.value)
-const queuedUploads = computed(() => uploadService.queue.value)
-const failedUploads = computed(() => uploadService.failedUploads.value)
-const completedUploads = computed(() => uploadService.completedUploads.value)
+const activeUploads = computed(() => {
+  return Array.from(uploadService.uploads.values()).filter(upload => upload.status === 'uploading')
+})
+const queuedUploads = computed(() => {
+  return Array.from(uploadService.uploads.values()).filter(upload => upload.status === 'pending')
+})
+const failedUploads = computed(() => {
+  return Array.from(uploadService.uploads.values()).filter(upload => upload.status === 'error')
+})
+const completedUploads = computed(() => {
+  return Array.from(uploadService.uploads.values()).filter(upload => upload.status === 'completed')
+})
 
 // Recent completed uploads (last 5 minutes)
 const recentCompletedUploads = computed(() => {

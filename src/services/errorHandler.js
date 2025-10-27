@@ -245,19 +245,14 @@ class ErrorHandler {
   // Report critical error to monitoring
   async reportCriticalError(errorInfo, context) {
     try {
-      await fetch('/api/errors/report', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          error: errorInfo,
-          context,
-          userAgent: navigator.userAgent,
-          url: window.location.href,
-          timestamp: new Date().toISOString(),
-          userId: context.userId
-        })
+      const axios = (await import('axios')).default
+      await axios.post('/api/errors/report', {
+        error: errorInfo,
+        context,
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        userId: context.userId
       })
     } catch (reportError) {
       console.error('Failed to report critical error:', reportError)

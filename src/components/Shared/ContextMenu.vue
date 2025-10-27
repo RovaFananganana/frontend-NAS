@@ -5,8 +5,8 @@
     <!-- Ouvrir -->
     <button v-if="item" class="w-full text-left px-4 py-2 hover:bg-base-200 text-sm flex items-center gap-3"
       @click="$emit('open', item)">
-      <i class="fas w-4" :class="item.is_directory ? 'fa-folder-open' : 'fa-eye'"></i>
-      {{ item.is_directory ? 'Ouvrir' : 'Prévisualiser' }}
+      <i class="fas w-4" :class="item.is_directory ? 'fa-folder-open' : 'fa-external-link-alt'"></i>
+      Ouvrir
     </button>
 
 

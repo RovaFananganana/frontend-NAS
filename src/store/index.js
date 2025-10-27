@@ -364,6 +364,27 @@ export default createStore({
       console.log('View mode system initialized')
     },
 
+    // Notification actions (simple console-based for now)
+    showError({ commit }, message) {
+      console.error('❌ Error:', message)
+      // Could be enhanced with toast notifications later
+    },
+
+    showSuccess({ commit }, message) {
+      console.log('✅ Success:', message)
+      // Could be enhanced with toast notifications later
+    },
+
+    showWarning({ commit }, message) {
+      console.warn('⚠️ Warning:', message)
+      // Could be enhanced with toast notifications later
+    },
+
+    showInfo({ commit }, message) {
+      console.info('ℹ️ Info:', message)
+      // Could be enhanced with toast notifications later
+    },
+
     // Initialize app
     async initializeApp({ commit, dispatch }) {
       // Clean up legacy tokens

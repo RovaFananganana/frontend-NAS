@@ -1,34 +1,18 @@
 <template>
-  <div 
-    ref="dropZone"
-    :class="[
-      'drag-drop-zone',
-      {
-        'drag-over': isDragOver,
-        'uploading': isUploading,
-        'disabled': disabled
-      }
-    ]"
-    @dragenter.prevent="handleDragEnter"
-    @dragover.prevent="handleDragOver"
-    @dragleave.prevent="handleDragLeave"
-    @drop.prevent="handleDrop"
-  >
+  <div ref="dropZone" :class="[
+    'drag-drop-zone',
+    {
+      'drag-over': isDragOver,
+      'uploading': isUploading,
+      'disabled': disabled
+    }
+  ]" @dragenter.prevent="handleDragEnter" @dragover.prevent="handleDragOver" @dragleave.prevent="handleDragLeave"
+    @drop.prevent="handleDrop">
     <!-- Slot pour le contenu normal -->
-    <slot 
-      :isDragOver="isDragOver" 
-      :isUploading="isUploading"
-      :uploadProgress="uploadProgress"
-    />
-    
+    <slot :isDragOver="isDragOver" :isUploading="isUploading" :uploadProgress="uploadProgress" />
+
     <!-- Overlay de drop -->
-    <div 
-      v-if="isDragOver && !disabled" 
-      class="drop-overlay"
-      role="status"
-      aria-live="polite"
-      :aria-label="dropMessage"
-    >
+    <div v-if="isDragOver && !disabled" class="drop-overlay" role="status" aria-live="polite" :aria-label="dropMessage">
       <div class="drop-content">
         <i class="fas fa-cloud-upload-alt drop-icon" aria-hidden="true"></i>
         <p class="drop-message">{{ dropMessage }}</p>
@@ -39,26 +23,15 @@
     </div>
 
     <!-- Overlay de progression d'upload -->
-    <div 
-      v-if="isUploading && showProgress" 
-      class="upload-overlay"
-      role="status"
-      aria-live="polite"
-      aria-label="Upload en cours"
-    >
+    <div v-if="isUploading && showProgress" class="upload-overlay" role="status" aria-live="polite"
+      aria-label="Upload en cours">
       <div class="upload-content">
         <i class="fas fa-spinner fa-spin upload-icon" aria-hidden="true"></i>
         <p class="upload-message">{{ uploadMessage }}</p>
         <div v-if="uploadProgress !== null" class="upload-progress">
           <div class="progress-bar">
-            <div 
-              class="progress-fill" 
-              :style="{ width: `${uploadProgress}%` }"
-              :aria-valuenow="uploadProgress"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              role="progressbar"
-            ></div>
+            <div class="progress-fill" :style="{ width: `${uploadProgress}%` }" :aria-valuenow="uploadProgress"
+              aria-valuemin="0" aria-valuemax="100" role="progressbar"></div>
           </div>
           <span class="progress-text">{{ Math.round(uploadProgress) }}%</span>
         </div>
@@ -77,49 +50,49 @@ const props = defineProps({
     type: String,
     required: true
   },
-  
+
   // Types de fichiers acceptés (extensions)
   allowedTypes: {
     type: Array,
     default: () => []
   },
-  
+
   // Taille maximale des fichiers en bytes
   maxFileSize: {
     type: Number,
     default: 100 * 1024 * 1024 // 100MB par défaut
   },
-  
+
   // Nombre maximum de fichiers simultanés
   maxFiles: {
     type: Number,
     default: 10
   },
-  
+
   // Désactiver le drag & drop
   disabled: {
     type: Boolean,
     default: false
   },
-  
+
   // Afficher la progression d'upload
   showProgress: {
     type: Boolean,
     default: true
   },
-  
+
   // Message personnalisé pour le drop
   dropMessage: {
     type: String,
     default: 'Déposez vos fichiers ici'
   },
-  
+
   // Message personnalisé pour l'upload
   uploadMessage: {
     type: String,
     default: 'Upload en cours...'
   },
-  
+
   // Accepter les dossiers
   acceptFolders: {
     type: Boolean,
@@ -155,10 +128,10 @@ const isValidDrop = computed(() => {
 // Méthodes de gestion du drag & drop
 const handleDragEnter = (event) => {
   if (!isValidDrop.value) return
-  
+
   event.preventDefault()
   dragCounter.value++
-  
+
   if (dragCounter.value === 1) {
     isDragOver.value = true
     emit('drag-enter', event)
@@ -167,7 +140,7 @@ const handleDragEnter = (event) => {
 
 const handleDragOver = (event) => {
   if (!isValidDrop.value) return
-  
+
   event.preventDefault()
   // Indiquer que le drop est accepté
   event.dataTransfer.dropEffect = 'copy'
@@ -175,10 +148,10 @@ const handleDragOver = (event) => {
 
 const handleDragLeave = (event) => {
   if (!isValidDrop.value) return
-  
+
   event.preventDefault()
   dragCounter.value--
-  
+
   if (dragCounter.value === 0) {
     isDragOver.value = false
     emit('drag-leave', event)
@@ -187,28 +160,28 @@ const handleDragLeave = (event) => {
 
 const handleDrop = async (event) => {
   if (!isValidDrop.value) return
-  
+
   event.preventDefault()
   isDragOver.value = false
   dragCounter.value = 0
-  
+
   const items = Array.from(event.dataTransfer.items || [])
   const files = Array.from(event.dataTransfer.files || [])
-  
+
   console.log(`🎯 DragDrop: Received ${items.length} items and ${files.length} files`)
-  
+
   if (items.length === 0 && files.length === 0) {
     return
   }
-  
+
   try {
     let allFiles = []
-    
+
     // Traiter les items avec webkitGetAsEntry pour supporter les dossiers
     if (items.length > 0 && items[0].webkitGetAsEntry) {
       console.log(`📁 Using webkitGetAsEntry for ${items.length} items`)
       allFiles = await processDataTransferItems(items)
-      
+
       // Si webkitGetAsEntry n'a pas donné tous les fichiers, utiliser le fallback
       if (allFiles.length < files.length) {
         console.log(`⚠️ webkitGetAsEntry only got ${allFiles.length}/${files.length} files, using fallback`)
@@ -219,23 +192,23 @@ const handleDrop = async (event) => {
       console.log(`📄 Using fallback for ${files.length} files`)
       allFiles = files
     }
-    
+
     console.log(`📋 Total files after processing: ${allFiles.length}`)
-    
+
     // Filtrer et valider les fichiers
     const validFiles = await validateFiles(allFiles)
-    
+
     if (validFiles.length === 0) {
       emit('upload-error', new Error('Aucun fichier valide trouvé'))
       return
     }
-    
+
     // Émettre l'événement avec les fichiers
     emit('files-dropped', {
       files: validFiles,
       targetPath: props.targetPath
     })
-    
+
   } catch (error) {
     console.error('Erreur lors du traitement du drop:', error)
     emit('upload-error', error)
@@ -248,10 +221,10 @@ const processDataTransferItems = async (items) => {
   const files = []
   let totalDirectories = 0
   let totalFiles = 0
-  
+
   for (const item of items) {
     console.log(`📋 Item kind: ${item.kind}, type: ${item.type}`)
-    
+
     // Essayer de traiter l'item même si kind n'est pas 'file'
     const entry = item.webkitGetAsEntry && item.webkitGetAsEntry()
     if (entry) {
@@ -272,7 +245,7 @@ const processDataTransferItems = async (items) => {
       }
     }
   }
-  
+
   console.log(`📊 Processing summary: ${totalDirectories} directories, ${totalFiles} direct files, ${files.length} total files extracted`)
   return files
 }
@@ -283,7 +256,7 @@ const processEntry = async (entry, files, path = '') => {
     if (entry.isFile) {
       // C'est un fichier
       console.log(`📄 Processing file: ${entry.name}`)
-      
+
       const file = await new Promise((resolve, reject) => {
         entry.file(
           (file) => resolve(file),
@@ -293,18 +266,18 @@ const processEntry = async (entry, files, path = '') => {
           }
         )
       })
-      
+
       // Ajouter le chemin relatif au fichier
       file.relativePath = path + file.name
       files.push(file)
       console.log(`✅ File added: ${file.name} (${file.size} bytes) - relativePath: ${file.relativePath}`)
-      
+
     } else if (entry.isDirectory && props.acceptFolders) {
       // C'est un dossier
       console.log(`📁 Processing directory: ${entry.name}`)
       const reader = entry.createReader()
       const allEntries = []
-      
+
       // readEntries peut ne pas retourner toutes les entrées en une fois
       // Il faut l'appeler plusieurs fois jusqu'à ce qu'il retourne un tableau vide
       const readAllEntries = async () => {
@@ -317,10 +290,10 @@ const processEntry = async (entry, files, path = '') => {
           console.log(`📋 Read ${entries.length} entries from ${entry.name}, total: ${allEntries.length}`)
         } while (entries.length > 0)
       }
-      
+
       await readAllEntries()
       console.log(`📊 Total entries in ${entry.name}: ${allEntries.length}`)
-      
+
       // Traiter récursivement les entrées du dossier
       for (const childEntry of allEntries) {
         try {
@@ -340,21 +313,21 @@ const processEntry = async (entry, files, path = '') => {
 const validateFiles = async (files) => {
   console.log(`🔍 Validating ${files.length} files`)
   const validFiles = []
-  
+
   for (const file of files) {
     console.log(`📄 Validating: ${file.name} (${file.size} bytes)`)
     // Vérifier la taille
     if (file.size > props.maxFileSize) {
       const fileSizeGB = (file.size / (1024 * 1024 * 1024)).toFixed(2)
       const maxSizeGB = (props.maxFileSize / (1024 * 1024 * 1024)).toFixed(0)
-      
+
       console.warn(`Fichier trop volumineux: ${file.name} (${fileSizeGB}GB > ${maxSizeGB}GB)`)
-      
+
       // Émettre une erreur spécifique pour les gros fichiers
       emit('upload-error', new Error(`Le fichier "${file.name}" (${fileSizeGB}GB) dépasse la limite de ${maxSizeGB}GB`))
       continue
     }
-    
+
     // Vérifier le type si spécifié
     if (props.allowedTypes.length > 0) {
       const extension = file.name.split('.').pop()?.toLowerCase()
@@ -363,19 +336,19 @@ const validateFiles = async (files) => {
         continue
       }
     }
-    
+
     console.log(`✅ File valid: ${file.name}`)
     validFiles.push(file)
   }
-  
+
   console.log(`📊 Validation result: ${validFiles.length}/${files.length} files valid`)
-  
+
   // Vérifier le nombre maximum de fichiers
   if (validFiles.length > props.maxFiles) {
     console.warn(`Trop de fichiers (${validFiles.length}), limité à ${props.maxFiles}`)
     return validFiles.slice(0, props.maxFiles)
   }
-  
+
   return validFiles
 }
 
@@ -538,15 +511,24 @@ defineExpose({
 }
 
 @keyframes bounce {
-  0%, 20%, 53%, 80%, 100% {
+
+  0%,
+  20%,
+  53%,
+  80%,
+  100% {
     transform: translate3d(0, 0, 0);
   }
-  40%, 43% {
+
+  40%,
+  43% {
     transform: translate3d(0, -10px, 0);
   }
+
   70% {
     transform: translate3d(0, -5px, 0);
   }
+
   90% {
     transform: translate3d(0, -2px, 0);
   }
@@ -562,15 +544,15 @@ defineExpose({
   .drop-content {
     padding: 1rem;
   }
-  
+
   .drop-icon {
     font-size: 2rem;
   }
-  
+
   .drop-message {
     font-size: 1rem;
   }
-  
+
   .upload-content {
     padding: 1rem;
   }

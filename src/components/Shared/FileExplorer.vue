@@ -71,7 +71,7 @@
       :disabled="loading || !!error"
       :accept-folders="true"
       :max-file-size="5 * 1024 * 1024 * 1024"
-      :max-files="100"
+      :max-files="1000"
       drop-message="Déposez vos fichiers et dossiers ici"
       upload-message="Upload en cours..."
       @files-dropped="handleFilesDrop"
@@ -232,6 +232,18 @@
     @cancel-all="cancelAllUploads"
   />
 
+  <!-- File Viewer Modal -->
+  <FileViewerModal
+    :is-open="showFileViewer"
+    :file="fileToView"
+    :mode="fileViewerMode"
+    @close="closeFileViewer"
+    @save="handleFileSave"
+    @download="handleFileDownload"
+    @mode-changed="handleViewerModeChanged"
+    @content-loaded="handleContentLoaded"
+    @error="handleViewerError"
+  />
 
 </template>
 
@@ -278,6 +290,7 @@ import UploadModal from './UploadModal.vue'
 import DragDropZone from './DragDropZone.vue'
 import UploadProgressPanel from './UploadProgressPanel.vue'
 import UploadProgressModal from './UploadProgressModal.vue'
+import { FileViewerModal } from '@/components/FileViewer/index.js'
 
 // Props
 const props = defineProps({
@@ -415,6 +428,11 @@ const showPropertiesModal = ref(false)
 const showCreateFolderModal = ref(false)
 const showCreateFileModal = ref(false)
 const showUploadModal = ref(false)
+
+// File viewer modal state
+const showFileViewer = ref(false)
+const fileToView = ref(null)
+const fileViewerMode = ref('view')
 const showUploadProgress = ref(false)
 const currentUploads = ref([])
 // const selectedItemForPermissions = ref(null)
@@ -778,15 +796,28 @@ const handleFileSelected = (event) => {
   })
 }
 
-const handleFileDoubleClick = (event) => {
+const handleFileDoubleClick = async (event) => {
   const { file } = event
 
   console.log(`FileExplorer: File double-clicked: ${file.name}`, file)
 
-  // Utiliser la navigation clavier pour gérer le double-clic
-  handleKeyboardDoubleClick(file, event)
-
-  // Les événements sont déjà émis par la navigation clavier
+  // Utiliser la nouvelle logique simplifiée
+  try {
+    const { processFileSimple } = await import('@/services/fileHandlerService.js')
+    const result = await processFileSimple(file)
+    
+    // Si le résultat nécessite l'ouverture du viewer, l'ouvrir
+    if (result && result.type === 'viewer') {
+      await openFileViewer(file, 'view')
+    } else if (result && result.type === 'local-application') {
+      // Afficher un message de confirmation
+      console.log('Document ouvert localement:', result.metadata?.smbPath)
+    }
+  } catch (error) {
+    console.error('Erreur lors du traitement du fichier:', error)
+    // Fallback vers l'ancienne méthode
+    handleKeyboardDoubleClick(file, event)
+  }
 }
 
 const handleSortChanged = (event) => {
@@ -848,6 +879,10 @@ const navigationOptions = {
     if (file.is_directory) {
       handlePathSelected(file.path)
     } else {
+      // Open file in viewer for double-click
+      openFileViewer(file)
+      
+      // Still emit the event for any parent components that might need it
       emit('file-double-click', {
         file,
         currentPath: currentPath.value,
@@ -1062,7 +1097,8 @@ const openContextItem = (item) => {
   if (item.is_directory) {
     handlePathSelected(item.path)
   } else {
-    downloadContextFile(item)
+    // Open file in viewer instead of downloading
+    openFileViewer(item)
   }
   contextMenu.value.show = false
 }
@@ -1378,6 +1414,61 @@ const confirmDelete = async (item) => {
 
   itemsToDelete.value = [item]
   showDeleteModal.value = true
+}
+
+// File Viewer Modal Methods
+const openFileViewer = async (file) => {
+  // Check read permission
+  const canRead = await canPerformAction(file.path, 'read')
+  if (!canRead) {
+    showPermissionError('read')
+    contextMenu.value.show = false
+    return
+  }
+
+  // Close context menu if open
+  contextMenu.value.show = false
+
+  // Set file to view and open modal
+  fileToView.value = file
+  fileViewerMode.value = 'view'
+  showFileViewer.value = true
+}
+
+const closeFileViewer = () => {
+  showFileViewer.value = false
+  fileToView.value = null
+  fileViewerMode.value = 'view'
+}
+
+const handleFileSave = async (content) => {
+  try {
+    // TODO: Implement file saving logic
+    // This will be implemented when the actual handlers are created
+    console.log('File save requested:', content)
+    // Note: Success notifications should be handled by the file viewer modal
+  } catch (error) {
+    console.error('Error saving file:', error)
+    showError('Erreur lors de la sauvegarde')
+  }
+}
+
+const handleFileDownload = (file) => {
+  // Use existing download functionality
+  downloadContextFile(file)
+}
+
+const handleViewerModeChanged = (newMode) => {
+  fileViewerMode.value = newMode
+}
+
+const handleContentLoaded = (content) => {
+  console.log('File content loaded:', content)
+}
+
+const handleViewerError = (error) => {
+  console.error('File viewer error:', error)
+  showError('Erreur lors du chargement du fichier')
 }
 
 const showProperties = async (item) => {

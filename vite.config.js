@@ -10,6 +10,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    include: ['pdfjs-dist']
+  },
+  assetsInclude: ['**/*.wasm'],
+  define: {
+    // Define PDF.js worker path at build time
+    __PDFJS_WORKER_SRC__: JSON.stringify('https://unpkg.com/pdfjs-dist@5.4.296/build/pdf.worker.min.js')
+  },
   server: {
     proxy: {
       // Proxy API requests to backend

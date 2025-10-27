@@ -36,23 +36,25 @@ class PermissionDiagnosticService {
     }
 
     try {
-      const response = await fetch(url, config)
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          localStorage.removeItem('token')
-          window.location.href = '/login'
-          throw new Error('Authentication required')
-        }
-        
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || errorData.msg || `HTTP ${response.status}`)
-      }
+      const axios = (await import('axios')).default
+      const response = await axios.request({
+        url,
+        method: config.method || 'GET',
+        data: config.body ? JSON.parse(config.body) : undefined,
+        headers: config.headers
+      })
 
-      return await response.json()
+      return response.data
     } catch (error) {
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token')
+        window.location.href = '/login'
+        throw new Error('Authentication required')
+      }
+      
       console.error('Permission diagnostic API error:', error)
-      throw error
+      const errorData = error.response?.data || {}
+      throw new Error(errorData.error || errorData.msg || error.message)
     }
   }
 

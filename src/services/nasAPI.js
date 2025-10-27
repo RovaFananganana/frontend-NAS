@@ -202,62 +202,48 @@ class NASAPIService {
     }
 
     try {
-      const response = await fetch(url, config)
+      const method = (config.method || 'GET').toLowerCase()
+      const data = config.body ? JSON.parse(config.body) : undefined
+      const axiosConfig = { headers: config.headers }
       
-      if (!response.ok) {
-        // Handle authentication errors
-        if (response.status === 401) {
-          // Token might be expired, redirect to login
-          localStorage.removeItem('token')
-          window.location.href = '/login'
-          throw new NASAPIError('Authentication required', 401, 'AUTH_REQUIRED')
-        }
-        
-        let errorData = {}
-        const contentType = response.headers.get('content-type')
-        
-        if (contentType && contentType.includes('application/json')) {
-          errorData = await response.json().catch(() => ({}))
-        } else {
-          // If we get HTML instead of JSON, it's likely a server error
-          const htmlText = await response.text()
-          if (htmlText.includes('<!DOCTYPE')) {
-            throw new NASAPIError(
-              'Server error - check backend logs',
-              response.status,
-              'SERVER_ERROR'
-            )
-          }
-          errorData = { error: htmlText }
-        }
-        
-        throw new NASAPIError(
-          errorData.error || errorData.msg || `HTTP ${response.status}: ${response.statusText}`,
-          response.status,
-          errorData.code
-        )
+      let response
+      switch (method) {
+        case 'post':
+          response = await httpClient.post(url, data, axiosConfig)
+          break
+        case 'put':
+          response = await httpClient.put(url, data, axiosConfig)
+          break
+        case 'delete':
+          response = await httpClient.delete(url, axiosConfig)
+          break
+        default:
+          response = await httpClient.get(url, axiosConfig)
       }
-
-      // Handle different response types
-      const contentType = response.headers.get('content-type')
-      if (contentType && contentType.includes('application/json')) {
-        return await response.json()
-      } else if (contentType && contentType.includes('application/octet-stream')) {
-        return await response.blob()
-      } else {
-        return await response.text()
-      }
+      
+      return response
     } catch (error) {
       if (error instanceof NASAPIError) {
         throw error
       }
       
-      // Handle network errors
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new NASAPIError('Network error - check if backend is running', 0, 'NETWORK_ERROR')
+      // Handle httpClient errors (which are already transformed)
+      if (error.status) {
+        if (error.status === 401) {
+          localStorage.removeItem('token')
+          window.location.href = '/login'
+          throw new NASAPIError('Authentication required', 401, 'AUTH_REQUIRED')
+        }
+        
+        throw new NASAPIError(
+          error.message || `HTTP ${error.status}`,
+          error.status,
+          error.code
+        )
+      } else {
+        // Network or other error
+        throw new NASAPIError(`Request failed: ${error.message}`, 0, 'REQUEST_ERROR')
       }
-      
-      throw new NASAPIError(`Request failed: ${error.message}`, 0, 'REQUEST_ERROR')
     }
   }
 

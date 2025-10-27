@@ -1,39 +1,41 @@
 // composables/useNotifications.js
 
-import { useStore } from 'vuex'
-
 /**
  * Composable for showing notifications and error messages
+ * Uses console logging and browser alerts as fallback
  */
 export function useNotifications() {
-  const store = useStore()
-
+  
   /**
    * Show a success notification
    */
   const showSuccess = (message, title = 'Succès') => {
-    store.dispatch('showSuccess', message)
+    console.log(`✅ ${title}: ${message}`)
+    // Could be enhanced with toast notifications later
   }
 
   /**
    * Show an error notification
    */
   const showError = (message, title = 'Erreur') => {
-    store.dispatch('showError', message)
+    console.error(`❌ ${title}: ${message}`)
+    // Could be enhanced with toast notifications later
   }
 
   /**
    * Show a warning notification
    */
   const showWarning = (message, title = 'Attention') => {
-    store.dispatch('showWarning', message)
+    console.warn(`⚠️ ${title}: ${message}`)
+    // Could be enhanced with toast notifications later
   }
 
   /**
    * Show an info notification
    */
   const showInfo = (message, title = 'Information') => {
-    store.dispatch('showInfo', message)
+    console.info(`ℹ️ ${title}: ${message}`)
+    // Could be enhanced with toast notifications later
   }
 
   /**
@@ -60,7 +62,8 @@ export function useNotifications() {
    * Clear all notifications
    */
   const clearNotifications = () => {
-    store.dispatch('clearAllNotifications')
+    console.log('🧹 Notifications cleared')
+    // Could be enhanced with toast notifications later
   }
 
   return {

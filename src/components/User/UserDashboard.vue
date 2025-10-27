@@ -92,19 +92,16 @@
             <i class="fas fa-history mr-2"></i>
             Recent Files
           </h2>
-          
+
           <div v-if="recentFiles.length === 0" class="text-center py-8 opacity-70">
             <i class="fas fa-file text-4xl mb-4"></i>
             <p>No recent files</p>
           </div>
-          
+
           <div v-else class="space-y-3">
-            <div 
-              v-for="file in recentFiles.slice(0, 5)" 
-              :key="file.path"
+            <div v-for="file in recentFiles.slice(0, 5)" :key="file.path"
               class="flex items-center justify-between p-3 bg-base-200 rounded-lg hover:bg-base-300 cursor-pointer"
-              @click="openFile(file)"
-            >
+              @click="openFile(file)">
               <div class="flex items-center">
                 <i :class="getFileIcon(file.name)" class="mr-3 text-lg" :style="{ color: getFileColor(file.name) }"></i>
                 <div>
@@ -117,7 +114,7 @@
               </div>
             </div>
           </div>
-          
+
           <div v-if="recentFiles.length > 5" class="text-center mt-4">
             <button class="btn btn-sm btn-outline" @click="navigateToActivity">
               View All Activity
@@ -136,39 +133,25 @@
             <i class="fas fa-times"></i>
           </button>
         </div>
-        
+
         <div class="space-y-4">
           <div class="form-control">
             <label class="label">
               <span class="label-text">Select files to upload</span>
             </label>
-            <input 
-              type="file" 
-              multiple 
-              class="file-input file-input-bordered w-full"
-              @change="handleFileSelect"
-            />
+            <input type="file" multiple class="file-input file-input-bordered w-full" @change="handleFileSelect" />
           </div>
-          
+
           <div class="form-control">
             <label class="label">
               <span class="label-text">Upload to folder</span>
             </label>
-            <input 
-              type="text" 
-              v-model="uploadPath"
-              placeholder="/my-folder"
-              class="input input-bordered w-full"
-            />
+            <input type="text" v-model="uploadPath" placeholder="/my-folder" class="input input-bordered w-full" />
           </div>
-          
+
           <div class="flex justify-end gap-2">
             <button class="btn btn-outline" @click="showUploadModal = false">Cancel</button>
-            <button 
-              class="btn btn-primary" 
-              @click="uploadFiles"
-              :disabled="!selectedFiles.length || uploading"
-            >
+            <button class="btn btn-primary" @click="uploadFiles" :disabled="!selectedFiles.length || uploading">
               <i class="fas fa-upload mr-2" :class="{ 'animate-spin': uploading }"></i>
               {{ uploading ? 'Uploading...' : 'Upload' }}
             </button>
@@ -246,9 +229,9 @@ const handleFileSelect = (event) => {
 
 const uploadFiles = async () => {
   if (!selectedFiles.value.length) return
-  
+
   uploading.value = true
-  
+
   try {
     for (const file of selectedFiles.value) {
       await nasAPI.uploadFile(file, uploadPath.value, false, (progress) => {
@@ -256,14 +239,14 @@ const uploadFiles = async () => {
         console.log(`Upload progress: ${progress}%`)
       })
     }
-    
+
     store.dispatch('showSuccess', `Successfully uploaded ${selectedFiles.value.length} file(s)`)
     showUploadModal.value = false
     selectedFiles.value = []
-    
+
     // Refresh dashboard data
     loadDashboardData()
-    
+
   } catch (error) {
     console.error('Upload error:', error)
     store.dispatch('showError', `Upload failed: ${error.message}`)
@@ -278,7 +261,7 @@ const loadDashboardData = async () => {
     const user = store.state.user
     if (user) {
       storageQuota.value = (user.quota_mb || 2048) * 1024 * 1024 // Convert MB to bytes
-      
+
       // Try to get actual storage usage from API
       try {
         const storageInfo = await store.dispatch('fetchStorageInfo')
@@ -292,14 +275,14 @@ const loadDashboardData = async () => {
         storageUsed.value = Math.floor(storageQuota.value * 0.15) // Estimate 15% usage
       }
     }
-    
+
     // Load recent files from root directory and count them
     try {
       const response = await nasAPI.browse('/')
       if (response.success) {
         const allFiles = response.items.filter(item => !item.is_directory)
         fileCount.value = allFiles.length
-        
+
         recentFiles.value = allFiles
           .sort((a, b) => {
             const dateA = new Date(a.modified_time || a.modified || 0)
@@ -307,7 +290,7 @@ const loadDashboardData = async () => {
             return dateB - dateA
           })
           .slice(0, 10)
-          
+
         // Set last activity to the most recent file modification
         if (recentFiles.value.length > 0) {
           lastActivity.value = new Date(recentFiles.value[0].modified_time || recentFiles.value[0].modified)
@@ -320,7 +303,7 @@ const loadDashboardData = async () => {
       recentFiles.value = []
       lastActivity.value = new Date()
     }
-    
+
   } catch (error) {
     console.error('Error loading dashboard data:', error)
   }

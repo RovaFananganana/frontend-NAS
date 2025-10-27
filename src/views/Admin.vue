@@ -37,6 +37,12 @@
         <div v-else-if="activeTab === 'perms'">
           <PermissionManager />
         </div>
+        <div v-else-if="activeTab === 'file-types'">
+          <FileTypeConfigManager />
+        </div>
+        <div v-else-if="activeTab === 'cache'">
+          <CacheManager />
+        </div>
         <div v-else-if="activeTab === 'logs'">
           <AccessLogs />
         </div>
@@ -60,6 +66,8 @@ import UserManagement from '@/components/Admin/UserManagement.vue'
 import GroupManagement from '@/components/Admin/GroupManagement.vue'
 import FileExplorer from '@/components/Shared/FileExplorer.vue'
 import PermissionManager from '@/components/Admin/PermissionManager.vue'
+import FileTypeConfigManager from '@/components/Admin/FileTypeConfigManager.vue'
+import CacheManager from '@/components/Admin/CacheManager.vue'
 import AccessLogs from '@/components/Admin/AccessLogs.vue'
 
 // Tabs configuration
@@ -69,6 +77,8 @@ const tabs = [
   { key: 'groups', label: 'Gestion des groupes', comp: GroupManagement },
   { key: 'explorer', label: 'Explorateur de fichiers', comp: FileExplorer },
   { key: 'perms', label: 'Gestionnaire de permissions', comp: PermissionManager },
+  { key: 'file-types', label: 'Configuration des types de fichiers', comp: FileTypeConfigManager },
+  { key: 'cache', label: 'Gestionnaire de cache', comp: CacheManager },
   { key: 'logs', label: 'Journaux d\'accès', comp: AccessLogs },
 ]
 

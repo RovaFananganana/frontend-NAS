@@ -118,18 +118,12 @@ class PerformanceTracker {
         url: metric.url || 'unknown'
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/metrics/frontend`, {
-        method: 'POST',
+      const axios = (await import('axios')).default
+      await axios.post(`${API_BASE_URL}/api/metrics/frontend`, cleanMetric, {
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${getToken() || ''}`
-        },
-        body: JSON.stringify(cleanMetric)
-      });
-
-      if (!response.ok) {
-        console.debug(`Metrics API returned ${response.status}: ${response.statusText}`);
-      }
+        }
+      })
     } catch (error) {
       // Silently fail - don't break the app for metrics
       console.debug('Failed to send frontend metric:', error.message);
