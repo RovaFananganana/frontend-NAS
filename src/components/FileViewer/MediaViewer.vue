@@ -697,7 +697,7 @@ export default {
       }
       
       // Clean up object URLs if needed
-      if (this.mediaUrl && this.mediaUrl.startsWith('blob:')) {
+      if (this.mediaUrl && typeof this.mediaUrl === 'string' && this.mediaUrl.startsWith('blob:')) {
         URL.revokeObjectURL(this.mediaUrl)
       }
     }

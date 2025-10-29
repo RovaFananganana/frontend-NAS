@@ -186,6 +186,7 @@ const fileIcon = computed(() => {
     'doc': 'fas fa-file-word', 'docx': 'fas fa-file-word',
     'xls': 'fas fa-file-excel', 'xlsx': 'fas fa-file-excel',
     'ppt': 'fas fa-file-powerpoint', 'pptx': 'fas fa-file-powerpoint',
+    'mdb': 'fas fa-database', 'accdb': 'fas fa-database',
     'jpg': 'fas fa-file-image', 'jpeg': 'fas fa-file-image', 'png': 'fas fa-file-image',
     'gif': 'fas fa-file-image', 'svg': 'fas fa-file-image', 'bmp': 'fas fa-file-image',
     'webp': 'fas fa-file-image',
@@ -208,10 +209,64 @@ const fileIcon = computed(() => {
 })
 
 const fileIconColor = computed(() => {
-  if (props.file.icon_info && props.file.icon_info.color) {
-    return props.file.icon_info.color
+  if (props.file.is_directory) {
+    return 'text-blue-500'
   }
-  return props.file.is_directory ? 'text-blue-500' : 'text-base-content/70'
+  
+  const ext = getFileExtension(props.file.name)?.toLowerCase()
+  
+  // Image files
+  if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'bmp', 'webp'].includes(ext)) {
+    return 'text-purple-500'
+  }
+  
+  // Video files
+  if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv'].includes(ext)) {
+    return 'text-red-500'
+  }
+  
+  // Audio files
+  if (['mp3', 'wav', 'flac', 'ogg', 'aac', 'm4a'].includes(ext)) {
+    return 'text-green-500'
+  }
+  
+  // Document files - couleurs spécifiques Microsoft Office
+  if (['doc', 'docx', 'txt', 'md'].includes(ext)) {
+    return 'text-blue-600' // Word en bleu
+  }
+  
+  // Excel files - vert
+  if (['xls', 'xlsx'].includes(ext)) {
+    return 'text-green-600'
+  }
+  
+  // PowerPoint files - rouge/orange
+  if (['ppt', 'pptx'].includes(ext)) {
+    return 'text-red-600'
+  }
+  
+  // Access database files - rouge
+  if (['mdb', 'accdb'].includes(ext)) {
+    return 'text-red-600'
+  }
+  
+  // PDF files - rouge
+  if (['pdf'].includes(ext)) {
+    return 'text-red-500'
+  }
+  
+  // Archive files
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
+    return 'text-orange-500'
+  }
+  
+  // Code files
+  if (['js', 'ts', 'html', 'css', 'json', 'xml', 'py', 'php', 'java', 'cpp', 'c', 'vue', 'jsx', 'tsx'].includes(ext)) {
+    return 'text-yellow-500'
+  }
+  
+  // Default for other files
+  return 'text-gray-500'
 })
 
 const fileType = computed(() => {

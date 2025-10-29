@@ -25,8 +25,8 @@ export class AudioHandler extends MediaHandler {
   async process(file) {
     const result = await super.process(file)
     
-    // Ensure type is set to audio
-    if (result.type !== 'audio' && !result.error) {
+    // Ensure type is set to audio, but preserve SMB media type
+    if (result.type !== 'audio' && result.type !== 'smb-media' && !result.error) {
       result.type = 'audio'
       if (result.metadata) {
         result.metadata.mediaType = 'audio'

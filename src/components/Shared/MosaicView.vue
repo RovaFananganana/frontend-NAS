@@ -42,12 +42,18 @@
         <!-- Icône du fichier -->
         <div class="p-4 text-center">
           <div class="text-4xl mb-2">
-            <i v-if="file.is_directory" class="fas fa-folder text-yellow-500"></i>
-            <i v-else-if="isImageFile(file)" class="fas fa-image text-blue-500"></i>
+            <i v-if="file.is_directory" class="fas fa-folder text-blue-500"></i>
+            <i v-else-if="isImageFile(file)" class="fas fa-image text-purple-500"></i>
             <i v-else-if="isVideoFile(file)" class="fas fa-video text-red-500"></i>
-            <i v-else-if="isAudioFile(file)" class="fas fa-music text-purple-500"></i>
-            <i v-else-if="isDocumentFile(file)" class="fas fa-file-alt text-green-500"></i>
+            <i v-else-if="isAudioFile(file)" class="fas fa-music text-green-500"></i>
+            <i v-else-if="isPdfFile(file)" class="fas fa-file-pdf text-red-500"></i>
+            <i v-else-if="isWordFile(file)" class="fas fa-file-word text-blue-600"></i>
+            <i v-else-if="isExcelFile(file)" class="fas fa-file-excel text-green-600"></i>
+            <i v-else-if="isPowerPointFile(file)" class="fas fa-file-powerpoint text-red-600"></i>
+            <i v-else-if="isAccessFile(file)" class="fas fa-database text-red-600"></i>
+            <i v-else-if="isDocumentFile(file)" class="fas fa-file-alt text-blue-600"></i>
             <i v-else-if="isArchiveFile(file)" class="fas fa-file-archive text-orange-500"></i>
+            <i v-else-if="isCodeFile(file)" class="fas fa-file-code text-yellow-500"></i>
             <i v-else class="fas fa-file text-gray-500"></i>
           </div>
           
@@ -259,9 +265,45 @@ const isAudioFile = (file) => {
 }
 
 const isDocumentFile = (file) => {
-  const docExtensions = ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt']
+  const docExtensions = ['txt', 'rtf', 'odt', 'md']
   const ext = file.name.split('.').pop()?.toLowerCase()
   return docExtensions.includes(ext)
+}
+
+// Fonctions spécifiques pour Microsoft Office
+const isPdfFile = (file) => {
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  return ext === 'pdf'
+}
+
+const isWordFile = (file) => {
+  const wordExtensions = ['doc', 'docx']
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  return wordExtensions.includes(ext)
+}
+
+const isExcelFile = (file) => {
+  const excelExtensions = ['xls', 'xlsx', 'csv']
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  return excelExtensions.includes(ext)
+}
+
+const isPowerPointFile = (file) => {
+  const pptExtensions = ['ppt', 'pptx']
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  return pptExtensions.includes(ext)
+}
+
+const isAccessFile = (file) => {
+  const accessExtensions = ['mdb', 'accdb']
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  return accessExtensions.includes(ext)
+}
+
+const isCodeFile = (file) => {
+  const codeExtensions = ['js', 'ts', 'html', 'css', 'json', 'xml', 'py', 'php', 'java', 'cpp', 'c', 'vue', 'jsx', 'tsx']
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  return codeExtensions.includes(ext)
 }
 
 const isArchiveFile = (file) => {

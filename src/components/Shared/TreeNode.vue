@@ -50,6 +50,11 @@
         <i v-else-if="isImageFile(file.name)" class="fas fa-image text-purple-500"></i>
         <i v-else-if="isVideoFile(file.name)" class="fas fa-video text-red-500"></i>
         <i v-else-if="isAudioFile(file.name)" class="fas fa-music text-green-500"></i>
+        <i v-else-if="isWordFile(file.name)" class="fas fa-file-word text-blue-600"></i>
+        <i v-else-if="isExcelFile(file.name)" class="fas fa-file-excel text-green-600"></i>
+        <i v-else-if="isPowerPointFile(file.name)" class="fas fa-file-powerpoint text-red-600"></i>
+        <i v-else-if="isAccessFile(file.name)" class="fas fa-database text-red-600"></i>
+        <i v-else-if="isPdfFile(file.name)" class="fas fa-file-pdf text-red-500"></i>
         <i v-else-if="isDocumentFile(file.name)" class="fas fa-file-alt text-blue-600"></i>
         <i v-else-if="isArchiveFile(file.name)" class="fas fa-file-archive text-orange-500"></i>
         <i v-else-if="isCodeFile(file.name)" class="fas fa-file-code text-yellow-500"></i>
@@ -116,6 +121,32 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { formatBytes, formatDate, getFileType, isImageFile, isVideoFile, isAudioFile, isDocumentFile, isArchiveFile, isCodeFile } from '@/utils/fileUtils.js'
+
+// Fonctions de détection spécifiques pour les couleurs
+const isWordFile = (filename) => {
+  const ext = filename?.split('.').pop()?.toLowerCase()
+  return ['doc', 'docx', 'odt', 'rtf'].includes(ext)
+}
+
+const isExcelFile = (filename) => {
+  const ext = filename?.split('.').pop()?.toLowerCase()
+  return ['xls', 'xlsx', 'ods', 'csv'].includes(ext)
+}
+
+const isPowerPointFile = (filename) => {
+  const ext = filename?.split('.').pop()?.toLowerCase()
+  return ['ppt', 'pptx', 'odp'].includes(ext)
+}
+
+const isAccessFile = (filename) => {
+  const ext = filename?.split('.').pop()?.toLowerCase()
+  return ['mdb', 'accdb'].includes(ext)
+}
+
+const isPdfFile = (filename) => {
+  const ext = filename?.split('.').pop()?.toLowerCase()
+  return ext === 'pdf'
+}
 
 // Props
 const props = defineProps({

@@ -150,13 +150,7 @@ const selectedDestination = ref('')
 const loading = ref(false)
 const recentFolders = ref([])
 const favorites = ref([])
-const commonFolders = ref([
-  { name: 'Documents', path: '/Documents' },
-  { name: 'Images', path: '/Images' },
-  { name: 'Vidéos', path: '/Videos' },
-  { name: 'Archives', path: '/Archives' },
-  { name: 'Partage', path: '/Partage' }
-])
+const commonFolders = ref([])
 
 // Methods
 const selectDestination = (path) => {
@@ -188,6 +182,24 @@ const moveItems = async () => {
     // Handle error - could show toast notification
   } finally {
     loading.value = false
+  }
+}
+
+const loadCommonFolders = async () => {
+  try {
+    const { nasAPI } = await import('@/services/nasAPI.js')
+    const files = await nasAPI.listFiles('/')
+    
+    // Get only directories from root
+    commonFolders.value = files
+      .filter(item => item.is_directory)
+      .slice(0, 5) // Limit to first 5 folders
+      .map(folder => ({
+        name: folder.name,
+        path: folder.path
+      }))
+  } catch (err) {
+    console.error('Error loading common folders:', err)
   }
 }
 
@@ -313,5 +325,6 @@ const getItemColor = (item) => {
 onMounted(() => {
   loadRecentFolders()
   loadFavorites()
+  loadCommonFolders()
 })
 </script>

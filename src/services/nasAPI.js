@@ -215,7 +215,12 @@ class NASAPIService {
           response = await httpClient.put(url, data, axiosConfig)
           break
         case 'delete':
-          response = await httpClient.delete(url, axiosConfig)
+          // For DELETE requests with body, pass data as second parameter
+          if (data) {
+            response = await httpClient.delete(url, { ...axiosConfig, data })
+          } else {
+            response = await httpClient.delete(url, axiosConfig)
+          }
           break
         default:
           response = await httpClient.get(url, axiosConfig)

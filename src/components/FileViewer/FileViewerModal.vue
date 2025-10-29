@@ -440,6 +440,82 @@
             @metadata-changed="(metadata) => handleGenericContentChange({ type: 'metadata', metadata })"
             class="flex-1"
           />
+
+          <!-- SMB Media Content (videos/audio on network share) -->
+          <div
+            v-else-if="content.type === 'smb-media'"
+            class="flex-1 flex items-center justify-center p-8"
+          >
+            {{ console.log('🎬 FileViewer: Displaying SMB media interface for:', content) }}
+            <div class="text-center max-w-md">
+              <div class="text-6xl mb-4 text-primary">
+                <i class="fas" :class="content.metadata?.mediaType === 'video' ? 'fa-video' : 'fa-music'"></i>
+              </div>
+              <h3 class="text-xl font-semibold mb-4">
+                {{ content.metadata?.mediaType === 'video' ? 'Vidéo' : 'Audio' }} sur partage réseau
+              </h3>
+              <p class="text-base-content/70 mb-6">
+                Ce fichier multimédia est stocké sur le partage réseau NAS. 
+                {{ content.metadata?.mediaType === 'video' ? 'La vidéo' : 'L\'audio' }} ne peut pas être lu directement dans le navigateur.
+                <br><br>
+                <strong>Utilisez les options ci-dessous pour y accéder :</strong>
+              </p>
+              
+              <!-- File info -->
+              <div class="bg-base-200 rounded-lg p-4 mb-6 text-left">
+                <h4 class="font-semibold mb-2">Informations:</h4>
+                <ul class="text-sm space-y-1">
+                  <li><strong>Nom:</strong> {{ content.metadata?.filename || props.file?.name }}</li>
+                  <li><strong>Type:</strong> {{ content.metadata?.mediaType || 'Média' }}</li>
+                  <li><strong>Format:</strong> {{ content.metadata?.mimeType || 'N/A' }}</li>
+                  <li v-if="content.content?.file_info?.extension">
+                    <strong>Extension:</strong> {{ content.content.file_info.extension }}
+                  </li>
+                </ul>
+              </div>
+              
+              <!-- Actions -->
+              <div class="space-y-3">
+                <button 
+                  @click="openSMBPath(content.content.smb_path)" 
+                  class="btn btn-primary w-full"
+                >
+                  <i class="fas fa-external-link-alt mr-2"></i>
+                  Ouvrir avec l'application locale
+                </button>
+                
+                <button 
+                  @click="copySMBPath(content.content.smb_path)" 
+                  class="btn btn-outline w-full"
+                >
+                  <i class="fas fa-copy mr-2"></i>
+                  Copier le chemin SMB
+                </button>
+                
+                <button 
+                  v-if="content.content.actions?.download_url"
+                  @click="downloadFile(content.content.actions.download_url)" 
+                  class="btn btn-outline w-full"
+                >
+                  <i class="fas fa-download mr-2"></i>
+                  Télécharger
+                </button>
+              </div>
+              
+              <div class="mt-4 text-xs text-base-content/50">
+                Chemin SMB: {{ content.content.smb_path }}
+              </div>
+              
+              <div class="mt-4 text-xs text-info bg-info/10 p-3 rounded-lg">
+                <div class="font-semibold mb-2">💡 Comment utiliser le chemin copié :</div>
+                <ul class="text-left space-y-1">
+                  <li>• <strong>Explorateur Windows :</strong> Ctrl+L puis Ctrl+V</li>
+                  <li>• <strong>VLC :</strong> Ctrl+N puis Ctrl+V</li>
+                  <li>• <strong>Lecteur Windows :</strong> Ctrl+U puis Ctrl+V</li>
+                </ul>
+              </div>
+            </div>
+          </div>
           
           <!-- Document Content (Word, Excel, PowerPoint) -->
           <DocumentViewer
@@ -897,41 +973,106 @@ const handleDownload = () => {
 // SMB file handling methods
 const openSMBPath = (smbPath) => {
   try {
-    // Try to open SMB path directly
-    window.open(smbPath, '_blank')
+    // Convert SMB path to Windows UNC path
+    const uncPath = smbPath.replace('smb://', '\\\\').replace(/\//g, '\\')
+    
+    // Create a comprehensive instruction dialog
+    const instructions = `
+🎬 Ouverture du fichier multimédia
+
+Le navigateur ne peut pas ouvrir directement les fichiers réseau.
+Voici comment procéder :
+
+📋 CHEMIN COPIÉ : ${uncPath}
+
+🎯 MÉTHODES D'OUVERTURE :
+
+1️⃣ EXPLORATEUR WINDOWS :
+   • Appuyez sur Windows + R
+   • Collez le chemin (Ctrl+V)
+   • Appuyez sur Entrée
+
+2️⃣ VLC MEDIA PLAYER :
+   • Ouvrez VLC
+   • Ctrl+N (Ouvrir un flux réseau)
+   • Collez le chemin (Ctrl+V)
+   • Cliquez sur Lire
+
+3️⃣ LECTEUR WINDOWS MEDIA :
+   • Ouvrez le Lecteur Windows Media
+   • Ctrl+U (Ouvrir une URL)
+   • Collez le chemin (Ctrl+V)
+
+4️⃣ NAVIGATEUR DE FICHIERS :
+   • Ouvrez l'Explorateur Windows
+   • Cliquez dans la barre d'adresse (Ctrl+L)
+   • Collez le chemin (Ctrl+V)
+
+Le chemin a été automatiquement copié dans votre presse-papiers !
+    `
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(uncPath).then(() => {
+      // Show instructions in a more user-friendly way
+      if (confirm(instructions + '\n\n✅ Chemin copié ! Cliquez OK pour continuer.')) {
+        // User acknowledged
+        console.log('User acknowledged SMB path instructions')
+      }
+    }).catch(() => {
+      // Fallback if clipboard fails
+      alert(instructions)
+    })
+    
   } catch (error) {
     console.warn('Error opening SMB path:', error)
-    // Fallback: copy to clipboard
     copySMBPath(smbPath)
   }
 }
 
 const copySMBPath = async (smbPath) => {
   try {
-    await navigator.clipboard.writeText(smbPath)
-    // Show success notification (you might want to use your notification system)
+    // Convert to Windows UNC path for easier use
+    const uncPath = smbPath.replace('smb://', '\\\\').replace(/\//g, '\\')
+    await navigator.clipboard.writeText(uncPath)
+    
     console.log('SMB path copied to clipboard:', smbPath)
-    alert('Chemin SMB copié dans le presse-papiers')
+    alert(`Chemin réseau copié dans le presse-papiers !\n\n${uncPath}\n\n💡 Comment l'utiliser :\n• Explorateur Windows : Ctrl+L puis Ctrl+V\n• VLC : Ctrl+N puis Ctrl+V\n• Lecteur Windows Media : Ctrl+U puis Ctrl+V`)
   } catch (error) {
     console.warn('Error copying SMB path:', error)
     // Fallback: show path in alert
-    alert(`Chemin SMB: ${smbPath}`)
+    const uncPath = smbPath.replace('smb://', '\\\\').replace(/\//g, '\\')
+    alert(`Chemin réseau :\n${uncPath}\n\nCopiez ce chemin manuellement`)
   }
 }
 
 const downloadFile = async (downloadUrl) => {
   try {
-    // Use fetch with authentication headers
-    const response = await fetch(downloadUrl, {
-      method: 'GET',
+    // Import axios dynamically
+    const axios = (await import('axios')).default
+    
+    // Build proper download URL
+    let finalUrl = downloadUrl
+    if (!downloadUrl.startsWith('http')) {
+      // Build the correct URL based on current server
+      const baseUrl = window.location.origin.replace(':5173', ':5001') // Dev server adjustment
+      finalUrl = `${baseUrl}${downloadUrl}`
+    }
+    
+    console.log('Attempting download from:', finalUrl)
+    
+    // Use axios with authentication headers
+    const response = await axios.get(finalUrl, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Accept': 'application/octet-stream'
+      },
+      responseType: 'blob',
+      timeout: 30000 // 30 seconds timeout
     })
     
-    if (response.ok) {
+    if (response.status === 200) {
       // Get the blob and create download
-      const blob = await response.blob()
+      const blob = response.data
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -940,12 +1081,17 @@ const downloadFile = async (downloadUrl) => {
       a.click()
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
+      
+      alert('Téléchargement démarré !')
     } else {
       throw new Error(`Download failed: ${response.status}`)
     }
   } catch (error) {
     console.warn('Error downloading file:', error)
-    alert('Erreur lors du téléchargement du fichier')
+    
+    // Provide alternative download suggestion
+    const uncPath = content.value?.content?.smb_path?.replace('smb://', '\\\\').replace(/\//g, '\\')
+    alert(`Erreur lors du téléchargement.\n\nAlternative : Copiez le fichier manuellement depuis :\n${uncPath}`)
   }
 }
 
@@ -987,8 +1133,11 @@ const showSupportedTypes = () => {
 
 const checkConnection = async () => {
   try {
-    const response = await fetch('/api/health', { method: 'HEAD' })
-    if (response.ok) {
+    // Import axios dynamically
+    const axios = (await import('axios')).default
+    
+    const response = await axios.head('/api/health')
+    if (response.status === 200) {
       alert('Connexion OK - Vous pouvez réessayer')
     } else {
       alert('Problème de connexion détecté')
@@ -1030,6 +1179,12 @@ const getActionDescription = (action) => {
 
 // Performance optimization helper functions
 const processLargeFile = async (file, mimeType) => {
+  // Verify it's a real File object
+  if (!(file instanceof File)) {
+    console.warn('processLargeFile called with non-File object, falling back to regular processing')
+    return await fileHandlerService.processFile(file, mimeType)
+  }
+  
   const chunkSize = perfUtils.getOptimalChunkSize(file.size)
   
   // For very large files, process in chunks to avoid memory issues
@@ -1041,6 +1196,12 @@ const processLargeFile = async (file, mimeType) => {
 }
 
 const processFileInChunks = async (file, mimeType, chunkSize) => {
+  // Verify it's a real File object
+  if (!(file instanceof File)) {
+    console.warn('processFileInChunks called with non-File object, falling back to regular processing')
+    return await fileHandlerService.processFile(file, mimeType)
+  }
+  
   // This is a simplified implementation
   // In a real scenario, you'd need handler-specific chunked processing
   const chunks = []
@@ -1216,6 +1377,90 @@ const loadFileContent = async () => {
     loadingMessage.value = 'Validation du fichier...'
     progressIndicator.updateProgress(progressId, { current: 10, stage: 'validating' })
     
+    // Check if this might be a NAS file first (bypass size validation for large media files or any file that might be on NAS)
+    const detectedFileType = detectFileType(props.file.name)
+    const isLargeMediaFile = (detectedFileType.mimeType?.startsWith('video/') || detectedFileType.mimeType?.startsWith('audio/')) && 
+                            props.file.size > 500 * 1024 * 1024 // > 500MB
+    
+    // Try NAS detection for large media files OR if we suspect it might be a NAS file
+    const shouldTryNASDetection = isLargeMediaFile || true // Try for all files initially
+    
+    if (shouldTryNASDetection) {
+      console.log('🎬 Attempting NAS detection for file:', props.file.name)
+      // Skip validation for large media files - they're likely on NAS
+      processingStage.value = 'nas_detection'
+      loadingMessage.value = 'Détection de fichier réseau...'
+      progressIndicator.updateProgress(progressId, { current: 15, stage: 'nas_detection' })
+      
+      // Try to detect if it's a NAS file by attempting a quick request
+      try {
+        const axios = (await import('axios')).default
+        await axios.head(`/files/${encodeURIComponent(props.file.path || props.file.name)}/content`, {
+          timeout: 2000 // Quick timeout
+        })
+      } catch (error) {
+        if (error.response?.status === 401 || error.response?.status === 422) {
+          // This is likely a NAS file, create appropriate SMB result based on file type
+          console.log('🎬 NAS file detected, creating SMB result for:', detectedFileType.mimeType)
+          
+          // Determine the appropriate SMB content type
+          let smbType = 'smb-file' // Default for documents, text, etc.
+          let mediaType = 'file'
+          
+          if (detectedFileType.mimeType?.startsWith('video/')) {
+            smbType = 'smb-media'
+            mediaType = 'video'
+          } else if (detectedFileType.mimeType?.startsWith('audio/')) {
+            smbType = 'smb-media'
+            mediaType = 'audio'
+          } else if (detectedFileType.mimeType?.startsWith('image/')) {
+            smbType = 'smb-file'
+            mediaType = 'image'
+          } else if (detectedFileType.mimeType?.includes('document') || detectedFileType.mimeType?.includes('word') || detectedFileType.mimeType?.includes('text')) {
+            smbType = 'local-application'
+            mediaType = 'document'
+          }
+          
+          const smbContent = {
+            type: smbType,
+            content: smbType === 'local-application' ? null : {
+              smb_path: `smb://10.61.17.33/NAS${props.file.path || '/' + props.file.name}`,
+              file_info: {
+                name: props.file.name,
+                path: props.file.path,
+                extension: detectedFileType.extension
+              },
+              actions: {
+                download_url: `/files/download?path=${encodeURIComponent(props.file.path || '/' + props.file.name)}`
+              }
+            },
+            url: smbType === 'local-application' ? `smb://10.61.17.33/NAS${props.file.path || '/' + props.file.name}` : undefined,
+            metadata: {
+              filename: props.file.name,
+              mediaType: mediaType,
+              mimeType: detectedFileType.mimeType,
+              loadedAt: new Date().toISOString(),
+              handlerUsed: 'NAS Detection',
+              canSwitchModes: false
+            },
+            editable: smbType === 'local-application'
+          }
+          
+          content.value = smbContent
+          console.log('🎬 FileViewerModal: Content assigned:', smbContent.type, smbContent)
+          emit('content-loaded', smbContent)
+          
+          progressIndicator.completeProgress(progressId, {
+            contentType: smbContent.type,
+            fileSize: props.file.size
+          })
+          
+          return // Exit early with SMB content
+        }
+      }
+    }
+    
+    // Normal validation for other files
     const validation = fileHandlerService.validateFile(props.file)
     if (!validation.valid) {
       throw new FileViewerError(validation.message, validation.reason, {
@@ -1277,8 +1522,8 @@ const loadFileContent = async () => {
         })
         retryCount.value++
         
-        // Use performance-optimized processing for large files
-        if (props.file.size > 10 * 1024 * 1024) { // 10MB
+        // Check if it's a real File object (has slice method) before using chunked processing
+        if (props.file instanceof File && props.file.size > 10 * 1024 * 1024) { // 10MB
           return await processLargeFile(props.file, fileType.mimeType)
         } else {
           return await fileHandlerService.processFile(props.file, fileType.mimeType)
@@ -1322,6 +1567,7 @@ const loadFileContent = async () => {
     }
     
     content.value = enhancedContent
+    console.log('🎬 FileViewerModal: Content assigned:', enhancedContent.type, enhancedContent)
     emit('content-loaded', enhancedContent)
     
     // Complete progress

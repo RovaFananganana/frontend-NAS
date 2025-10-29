@@ -127,7 +127,7 @@ class LazyLoadingService {
 
     try {
       const axios = (await import('axios')).default
-      const response = await axios.post(`/api/files/thumbnail`, {
+      const response = await axios.post(`/files/thumbnail`, {
         file_path: filePath,
         width: size.width,
         height: size.height
@@ -176,7 +176,7 @@ class LazyLoadingService {
 
     try {
       const axios = (await import('axios')).default
-      const response = await axios.get(`/api/files/${encodeURIComponent(filePath)}/preview`, {
+      const response = await axios.get(`/files/${encodeURIComponent(filePath)}/preview`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -215,7 +215,7 @@ class LazyLoadingService {
 
     try {
       const axios = (await import('axios')).default
-      const response = await axios.get(`/api/files/${encodeURIComponent(filePath)}/metadata`, {
+      const response = await axios.get(`/files/${encodeURIComponent(filePath)}/metadata`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

@@ -227,8 +227,78 @@ export class MediaHandler {
       } else if (file.url) {
         url = file.url
       } else if (file.path) {
-        // Construct URL from path (assuming API endpoint)
-        url = `/api/files/${encodeURIComponent(file.path)}`
+        // For files on NAS, we need to check if they're accessible via HTTP
+        // First try to get file info to see if it's an SMB file
+        try {
+          const axios = (await import('axios')).default
+          const response = await axios.get(`/files/${encodeURIComponent(file.path)}/content`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          })
+          
+          if (response.data.type === 'smb_file') {
+            // For SMB files, we can't stream directly - return SMB info
+            return {
+              type: 'smb-media',
+              content: response.data,
+              metadata: {
+                filename,
+                mimeType,
+                mediaType: this.getMediaType(filename, mimeType),
+                smbPath: response.data.smb_path,
+                fileInfo: response.data.file_info
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('Error checking file type:', error)
+          
+          // If we get an auth error or network error, assume it's an SMB file
+          // since we're dealing with NAS storage
+          if (error.response?.status === 401 || error.code === 'ERR_NETWORK') {
+            console.log('🎬 MediaHandler: Assuming SMB file due to auth/network error')
+            console.log('🎬 Error details:', { status: error.response?.status, code: error.code })
+            
+            // Construct SMB path manually
+            const nasServer = '10.61.17.33'
+            const nasShare = 'NAS'
+            const cleanPath = file.path.startsWith('/') ? file.path.substring(1) : file.path
+            const smbPath = `smb://${nasServer}/${nasShare}/${cleanPath}`
+            
+            const result = {
+              type: 'smb-media',
+              content: {
+                type: 'smb_file',
+                smb_path: smbPath,
+                file_info: {
+                  name: filename,
+                  extension: filename.split('.').pop(),
+                  path: file.path
+                },
+                actions: {
+                  download_url: `/files/download?path=${encodeURIComponent(file.path)}`
+                }
+              },
+              metadata: {
+                filename,
+                mimeType,
+                mediaType: this.getMediaType(filename, mimeType),
+                smbPath: smbPath,
+                fileInfo: {
+                  name: filename,
+                  extension: filename.split('.').pop()
+                }
+              }
+            }
+            
+            console.log('🎬 MediaHandler: Returning SMB media result:', result)
+            return result
+          }
+        }
+        
+        // Fallback: try direct URL (might not work for SMB files)
+        url = `/files/${encodeURIComponent(file.path)}/raw`
       } else {
         throw new Error('No valid file source available')
       }

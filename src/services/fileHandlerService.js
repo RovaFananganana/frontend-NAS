@@ -58,40 +58,46 @@ export async function processFileSimple(file) {
     // --- Ouvrir PDF dans le navigateur ---
     case 'open-in-browser': {
       try {
+        // Import axios dynamically
+        const axios = (await import('axios')).default
+        
         // First, get a temporary URL for the file
         const filePath = file.path || file.full_path
-        const tempUrlResponse = await fetch(`${backendUrl}/files/temp-url?path=${encodeURIComponent(filePath)}`, {
-          method: 'GET',
+        const tempUrlResponse = await axios.get(`${backendUrl}/files/temp-url?path=${encodeURIComponent(filePath)}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         })
         
-        if (tempUrlResponse.ok) {
-          const tempUrlData = await tempUrlResponse.json()
+        if (tempUrlResponse.status === 200) {
+          const tempUrlData = tempUrlResponse.data
           const tempUrl = `${backendUrl}${tempUrlData.temp_url}`
           
           // Now try to check if it's an SMB file
-          const contentResponse = await fetch(`${backendUrl}/files/${encodeURIComponent(file.path || file.full_path)}/content`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          })
-          
-          if (contentResponse.ok) {
-            const data = await contentResponse.json()
+          try {
+            const contentResponse = await axios.get(`${backendUrl}/files/${encodeURIComponent(file.path || file.full_path)}/content`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            })
             
-            // If it's an SMB file, handle differently
-            if (data.type === 'smb_file') {
-              // For PDFs on SMB, try to open SMB path directly
-              window.open(data.smb_path, '_blank')
-              return {
-                type: 'smb-redirect',
-                content: `Fichier ouvert via SMB: ${data.smb_path}`,
-                metadata: { smbPath: data.smb_path }
+            if (contentResponse.status === 200) {
+              const data = contentResponse.data
+              
+              // If it's an SMB file, handle differently
+              if (data.type === 'smb_file') {
+                // For PDFs on SMB, try to open SMB path directly
+                window.open(data.smb_path, '_blank')
+                return {
+                  type: 'smb-redirect',
+                  content: `Fichier ouvert via SMB: ${data.smb_path}`,
+                  metadata: { smbPath: data.smb_path }
+                }
               }
             }
+          } catch (contentError) {
+            console.warn('Error checking content type:', contentError)
+            // Continue with temp URL anyway
           }
           
           // Open with temporary URL
@@ -155,16 +161,18 @@ export async function processFileSimple(file) {
       const contentUrl = `${backendUrl}/files/${encodeURIComponent(file.path || file.full_path)}/content`
       
       try {
+        // Import axios dynamically
+        const axios = (await import('axios')).default
+        
         // Check if file is on SMB
-        const response = await fetch(contentUrl, { 
-          method: 'GET',
+        const response = await axios.get(contentUrl, { 
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         })
         
-        if (response.ok) {
-          const data = await response.json()
+        if (response.status === 200) {
+          const data = response.data
           
           // If it's an SMB file, return SMB info
           if (data.type === 'smb_file') {

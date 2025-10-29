@@ -25,8 +25,8 @@ export class VideoHandler extends MediaHandler {
   async process(file) {
     const result = await super.process(file)
     
-    // Ensure type is set to video
-    if (result.type !== 'video' && !result.error) {
+    // Ensure type is set to video, but preserve SMB media type
+    if (result.type !== 'video' && result.type !== 'smb-media' && !result.error) {
       result.type = 'video'
       if (result.metadata) {
         result.metadata.mediaType = 'video'

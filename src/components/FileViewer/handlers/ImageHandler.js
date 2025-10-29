@@ -180,7 +180,7 @@ export class ImageHandler {
         }
       } else if (file.url || file.path) {
         // Use provided URL or construct from path
-        imageUrl = file.url || `/api/files/${encodeURIComponent(file.path)}`
+        imageUrl = file.url || `/files/${encodeURIComponent(file.path)}/raw`
         metadata = {
           size: file.size || 0,
           type: file.type || file.mimeType || 'image/unknown',
