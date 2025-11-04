@@ -359,7 +359,11 @@ const performanceIssues = computed(() => {
 })
 
 const totalUsed = computed(() => {
-  // Calcul approximatif basé sur les stats
+  // Utiliser la taille réelle depuis le backend si disponible
+  if (stats.value?.total_size_bytes) {
+    return stats.value.total_size_bytes
+  }
+  // Sinon, calcul approximatif basé sur les stats
   return (stats.value?.total_files || 0) * 1024 * 1024 // Estimation
 })
 
