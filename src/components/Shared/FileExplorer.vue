@@ -245,6 +245,16 @@
     @error="handleViewerError"
   />
 
+  <!-- Text Editor Modal -->
+<TextEditorModal
+  v-if="showTextEditor && fileToEdit"
+  :is-open="showTextEditor"
+  :file="fileToEdit"
+  :mode="textEditorMode"
+  @close="closeTextEditor"
+  @save="handleFileSave"
+/>
+
 </template>
 
 <script setup>
@@ -291,6 +301,8 @@ import DragDropZone from './DragDropZone.vue'
 import UploadProgressPanel from './UploadProgressPanel.vue'
 import UploadProgressModal from './UploadProgressModal.vue'
 import { FileViewerModal } from '@/components/FileViewer/index.js'
+import TextEditorModal from '@/components/FileViewer/TextEditorModal.vue'
+import SimpleTextEditor from '@/components/FileViewer/SimpleTextEditor.vue'
 
 // Props
 const props = defineProps({
@@ -435,13 +447,17 @@ const fileToView = ref(null)
 const fileViewerMode = ref('view')
 const showUploadProgress = ref(false)
 const currentUploads = ref([])
+
+// Text editor modal state - AJOUTEZ CES 3 LIGNES
+const showTextEditor = ref(false)
+const fileToEdit = ref(null)
+const textEditorMode = ref('view')
+
 // const selectedItemForPermissions = ref(null)
 const selectedItemForProperties = ref(null)
 const itemToRename = ref(null)
 const itemsToMove = ref([])
 const itemsToDelete = ref([])
-
-// Notification state removed
 
 // File operations composable for copy/cut/paste
 const {
@@ -801,7 +817,25 @@ const handleFileDoubleClick = async (event) => {
 
   console.log(`FileExplorer: File double-clicked: ${file.name}`, file)
 
-  // Utiliser la nouvelle logique simplifiée
+  // Check if it's a text file that can be edited with the new system
+  const textExtensions = ['.txt', '.md', '.json', '.xml', '.csv', '.log', '.ini', '.conf', '.yaml', '.yml']
+  const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
+  
+  if (textExtensions.includes(fileExtension)) {
+    // Use the new file session system for text files
+    console.log('📝 Opening text file with new editor system:', file.path)
+    fileToEdit.value = file
+    textEditorMode.value = 'edit'
+    showTextEditor.value = true
+        console.log('🔍 Debug:', { 
+      fileToEdit: fileToEdit.value, 
+      showTextEditor: showTextEditor.value,
+      textEditorMode: textEditorMode.value 
+    })
+    return
+  }
+
+  // For other file types, use the existing logic
   try {
     const { processFileSimple } = await import('@/services/fileHandlerService.js')
     const result = await processFileSimple(file)
@@ -1439,6 +1473,12 @@ const closeFileViewer = () => {
   showFileViewer.value = false
   fileToView.value = null
   fileViewerMode.value = 'view'
+}
+
+const closeTextEditor = () => {
+  showTextEditor.value = false
+  fileToEdit.value = null
+  textEditorMode.value = 'view'
 }
 
 const handleFileSave = async (content) => {

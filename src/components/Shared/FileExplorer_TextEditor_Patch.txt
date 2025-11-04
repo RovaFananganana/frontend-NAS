@@ -1,0 +1,36 @@
+=== PATCH POUR FileExplorer.vue ===
+
+1. AJOUTER APRÈS LES IMPORTS (ligne ~1050):
+
+import TextEditorModal from '@/components/FileViewer/TextEditorModal.vue'
+import SimpleTextEditor from '@/components/FileViewer/SimpleTextEditor.vue'
+
+2. AJOUTER CES VARIABLES RÉACTIVES (après les autres ref):
+
+const showTextEditor = ref(false)
+const fileToEdit = ref(null)
+const textEditorMode = ref('edit')
+
+3. AJOUTER CES FONCTIONS:
+
+const closeTextEditor = () => {
+  showTextEditor.value = false
+  fileToEdit.value = null
+}
+
+const handleTextEditorSaved = () => {
+  store.dispatch('showSuccess', 'Fichier sauvegardé avec succès!')
+}
+
+4. AJOUTER CE MODAL AVANT </template>:
+
+<!-- Text Editor Modal (New System) -->
+<TextEditorModal
+  :is-open="showTextEditor"
+  :file="fileToEdit"
+  :mode="textEditorMode"
+  @close="closeTextEditor"
+  @saved="handleTextEditorSaved"
+/>
+
+=== FIN DU PATCH ===

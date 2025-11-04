@@ -219,5 +219,44 @@ const permissionAPI = {
 // Étendez votre adminAPI existant
 Object.assign(adminAPI, permissionAPI)
 
+// ========== FILE SESSION API ==========
+export const fileSessionAPI = {
+  // Open file for editing (creates cache session)
+  openFile: (filePath, mode = 'edit') =>
+    api.post('/api/files/open', { file_path: filePath, mode }),
+
+  // Get file content from cache session
+  getFileContent: (sessionId) =>
+    api.get(`/api/files/session/${sessionId}/content`, {
+      responseType: 'blob'
+    }),
+
+  // Update file content in cache session
+  updateFileContent: (sessionId, content) =>
+    api.put(`/api/files/session/${sessionId}/content`, content, {
+      headers: { 'Content-Type': 'application/octet-stream' }
+    }),
+
+  // Manually sync file to NAS
+  syncToNas: (sessionId) =>
+    api.post(`/api/files/session/${sessionId}/sync`),
+
+  // Close file editing session
+  closeSession: (sessionId, syncBeforeClose = true) =>
+    api.post(`/api/files/session/${sessionId}/close`, { sync_before_close: syncBeforeClose }),
+
+  // Get session information
+  getSessionInfo: (sessionId) =>
+    api.get(`/api/files/session/${sessionId}/info`),
+
+  // Get all user sessions
+  getUserSessions: (activeOnly = true) =>
+    api.get('/api/files/sessions', { params: { active_only: activeOnly } }),
+
+  // Cleanup inactive sessions (admin)
+  cleanupSessions: (inactivityMinutes = 60) =>
+    api.post('/api/files/cleanup', { inactivity_minutes: inactivityMinutes })
+}
+
 export { permissionAPI }
 export default adminAPI
