@@ -61,15 +61,16 @@
 
     <!-- Permission cards view -->
     <div v-else class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-      <div v-for="folder in paginatedFolders" :key="folder.id"
+      <div v-for="folder in paginatedVisibleFolders" :key="folder.id"
         class="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow">
-        <div class="card-body">
+        <div class="card-body" @dblclick="navigateInto(folder)">
           <!-- Folder header -->
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center">
               <i class="fas fa-folder text-primary text-xl mr-3"></i>
               <div>
                 <h3 class="font-semibold text-lg">{{ folder.name }}</h3>
+                <p v-if="folder.path" class="text-xs text-base-content/60 truncate max-w-[240px]">{{ folder.path }}</p>
                 <p class="text-sm text-base-content/70">{{ folder.permissions.length }} permission(s)</p>
               </div>
             </div>
@@ -140,13 +141,25 @@
             <!-- Empty permissions state -->
             <div v-if="folder.permissions.length === 0" class="text-center py-6 text-base-content/50">
               <i class="fas fa-lock text-2xl mb-2"></i>
-              <p class="text-sm">No permissions set</p>
+              <p class="text-sm">Aucune permission définie</p>
               <button class="btn btn-xs btn-primary mt-2" @click="openAddPermissionModal(folder)">
-                Add Permission
+                Ajouter permission
               </button>
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Breadcrumbs for folder navigation -->
+    <div v-if="hasHierarchy" class="mt-4">
+      <div class="breadcrumbs text-sm">
+        <ul>
+          <li><a @click.prevent="goToPath('/')">Racine</a></li>
+          <li v-for="(seg, idx) in breadcrumbSegments" :key="idx">
+            <a @click.prevent="goToPath(breadcrumbPathUpTo(idx))">{{ seg }}</a>
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -343,10 +356,6 @@
           <i class="fas fa-lock text-6xl text-gray-300 mb-4"></i>
           <h4 class="text-lg font-semibold text-gray-600 mb-2">Aucune permission définie</h4>
           <p class="text-gray-500 mb-4">Ce dossier n'a pas encore de permissions accordées.</p>
-          <button class="btn btn-primary" @click="openAddPermissionModal(detailsModal.folder)">
-            <i class="fas fa-plus mr-2"></i>
-            Ajouter une permission
-          </button>
         </div>
 
         <div v-else class="space-y-4">
@@ -414,10 +423,6 @@
 
         <div class="flex justify-end gap-2 mt-6">
           <button class="btn btn-outline" @click="closeDetailsModal">Fermer</button>
-          <button class="btn btn-primary" @click="openAddPermissionModal(detailsModal.folder)">
-            <i class="fas fa-plus mr-2"></i>
-            Ajouter permission
-          </button>
         </div>
       </div>
     </div>
@@ -551,12 +556,13 @@
               <span class="label-text font-semibold">Sélectionner les dossiers :</span>
             </div>
             <div class="max-h-48 overflow-y-auto border border-base-300 rounded-lg p-3 space-y-2">
-              <label v-for="folder in folders" :key="folder.id" class="cursor-pointer label justify-start gap-3">
+              <label v-for="folder in assignableFolders" :key="folder.id" class="cursor-pointer label justify-start gap-3">
                 <input type="checkbox" :value="folder.id" v-model="bulkModal.selectedFolders"
                   class="checkbox checkbox-primary" />
                 <div class="flex items-center">
                   <i class="fas fa-folder text-primary mr-2"></i>
                   <span class="label-text">{{ folder.name }}</span>
+                  <span v-if="folder.path" class="ml-2 text-xs text-base-content/60 truncate max-w-[220px]">({{ folder.path }})</span>
                 </div>
               </label>
             </div>
@@ -738,6 +744,8 @@ const filterPermission = ref('all')
 const currentPage = ref(1)
 const itemsPerPage = ref(9)
 
+// Hierarchical navigation
+const currentPath = ref('/')
 // Cached API calls
 const cachedGetAllResources = createCachedApiCall(
   permissionAPI.getAllResources,
@@ -825,6 +833,10 @@ const removeSuccessModal = ref({
 const filteredFolders = computed(() => {
   let filtered = folders.value
 
+  // Exclure dossiers spéciaux: #recycle / #recycler (ou recycle/recycler)
+  const excluded = ['recycle', 'recycler', '#recycle', '#recycler']
+  filtered = filtered.filter(f => !excluded.includes((f.name || '').toLowerCase()))
+
   // Apply search filter
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
@@ -855,14 +867,28 @@ const filteredFolders = computed(() => {
 })
 
 const totalPages = computed(() => {
-  return Math.ceil(filteredFolders.value.length / itemsPerPage.value)
+  return Math.ceil(visibleFolders.value.length / itemsPerPage.value)
 })
 
 const paginatedFolders = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage.value
   const end = start + itemsPerPage.value
-  return filteredFolders.value.slice(start, end)
+  return visibleFolders.value.slice(start, end)
 })
+
+// Hierarchy
+const hasHierarchy = computed(() => filteredFolders.value.some(f => !!(f.path && normalizePath(f.path) !== '')))
+const visibleFolders = computed(() => {
+  if (!hasHierarchy.value) return filteredFolders.value
+  const path = normalizePath(currentPath.value)
+  const depth = pathDepth(path)
+  return filteredFolders.value.filter(f => {
+    const fpath = normalizePath(f.path || '')
+    return fpath.startsWith(path) && pathDepth(fpath) === depth + 1
+  })
+})
+
+const paginatedVisibleFolders = computed(() => paginatedFolders.value)
 
 const availableTargets = computed(() => {
   if (modal.value.targetType === 'user') {
@@ -893,6 +919,8 @@ const loadFolders = async () => {
       id: f.id,
       name: f.name,
       type: 'folder',
+      // Support multiple possible path fields from backend
+      path: f.path || f.full_path || f.absolute_path || f.folder_path || null,
       permissions: (f.permissions || []).map(p => ({
         id: p.id,
         target_name: p.target_name,
@@ -1163,6 +1191,14 @@ const getTotalOperations = () => {
   return bulkModal.value.selectedFolders.length * totalTargets
 }
 
+// Folders available for permission assignment (exclude recycle/recycler)
+const assignableFolders = computed(() => {
+  const excluded = ['recycle', 'recycler', '#recycle', '#recycler']
+  return folders.value
+    .filter(f => !excluded.includes((f.name || '').toLowerCase()))
+    .sort((a, b) => (a.path || a.name || '').localeCompare(b.path || b.name || ''))
+})
+
 const hasBulkPermissions = computed(() => {
   return bulkModal.value.permissions.can_read ||
     bulkModal.value.permissions.can_write ||
@@ -1240,6 +1276,44 @@ const applyBulkPermissions = async () => {
 const getFolderName = (folderId) => {
   const folder = folders.value.find(f => f.id === folderId)
   return folder ? folder.name : `Folder ${folderId}`
+}
+
+// Breadcrumb helpers and navigation
+const breadcrumbSegments = computed(() => {
+  const path = normalizePath(currentPath.value)
+  const segments = path.split('/').filter(Boolean)
+  return segments
+})
+
+const breadcrumbPathUpTo = (idx) => {
+  const segs = breadcrumbSegments.value.slice(0, idx + 1)
+  return '/' + segs.join('/')
+}
+
+const goToPath = (path) => {
+  currentPath.value = normalizePath(path)
+  currentPage.value = 1
+}
+
+const navigateInto = (folder) => {
+  if (folder && folder.path) {
+    currentPath.value = normalizePath(folder.path)
+    currentPage.value = 1
+  }
+}
+
+const normalizePath = (p) => {
+  if (!p) return '/'
+  let np = p.replace(/\\/g, '/')
+  if (!np.startsWith('/')) np = '/' + np
+  if (np.length > 1 && np.endsWith('/')) np = np.slice(0, -1)
+  return np
+}
+
+const pathDepth = (p) => {
+  const np = normalizePath(p)
+  if (np === '/') return 0
+  return np.split('/').filter(Boolean).length
 }
 
 // Watchers

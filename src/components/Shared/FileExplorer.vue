@@ -814,44 +814,10 @@ const handleFileSelected = (event) => {
 
 const handleFileDoubleClick = async (event) => {
   const { file } = event
-
   console.log(`FileExplorer: File double-clicked: ${file.name}`, file)
-
-  // Check if it's a text file that can be edited with the new system
-  const textExtensions = ['.txt', '.md', '.json', '.xml', '.csv', '.log', '.ini', '.conf', '.yaml', '.yml']
-  const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
-  
-  if (textExtensions.includes(fileExtension)) {
-    // Use the new file session system for text files
-    console.log('📝 Opening text file with new editor system:', file.path)
-    fileToEdit.value = file
-    textEditorMode.value = 'edit'
-    showTextEditor.value = true
-        console.log('🔍 Debug:', { 
-      fileToEdit: fileToEdit.value, 
-      showTextEditor: showTextEditor.value,
-      textEditorMode: textEditorMode.value 
-    })
-    return
-  }
-
-  // For other file types, use the existing logic
-  try {
-    const { processFileSimple } = await import('@/services/fileHandlerService.js')
-    const result = await processFileSimple(file)
-    
-    // Si le résultat nécessite l'ouverture du viewer, l'ouvrir
-    if (result && result.type === 'viewer') {
-      await openFileViewer(file, 'view')
-    } else if (result && result.type === 'local-application') {
-      // Afficher un message de confirmation
-      console.log('Document ouvert localement:', result.metadata?.smbPath)
-    }
-  } catch (error) {
-    console.error('Erreur lors du traitement du fichier:', error)
-    // Fallback vers l'ancienne méthode
-    handleKeyboardDoubleClick(file, event)
-  }
+  // Ouvre toujours dans le viewer (streaming/caching)
+  await openFileViewer(file)
+  emit('file-double-click', { file, currentPath: currentPath.value, timestamp: Date.now() })
 }
 
 const handleSortChanged = (event) => {

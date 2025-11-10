@@ -929,3 +929,18 @@ class NASAPIService {
 export const nasAPI = new NASAPIService()
 export { NASAPIError }
 export default nasAPI
+
+/**
+ * Helper: build authenticated streaming URL for media/PDF/image/text preview.
+ * Uses Bearer token in query to work with <video>/<audio>/<img>/<iframe>.
+ */
+export function getStreamUrl(path) {
+  const base = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001')
+  const token = TokenService.getToken()
+  const encodedPath = encodeURIComponent(path)
+  const params = new URLSearchParams()
+  params.set('path', encodedPath)
+  if (token) params.set('token', token) // optional: backend can read Authorization header; query token helps for media tags
+  // Prefer header auth; keep token in query only if your CORS forbids header for tags. You can remove if not needed.
+  return `${base}/nas/stream?${params.toString()}`
+}
