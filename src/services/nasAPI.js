@@ -916,6 +916,73 @@ class NASAPIService {
   }
 
   /**
+   * Get file content (text / markdown / office preview helpers)
+   * Uses axios via this.request (keeps consistent error handling and auth)
+   * Returns the response (already normalized by httpClient to data)
+   */
+  async getFileContent(path) {
+    // Use existing download endpoint (axios via httpClient) to fetch file as Blob
+    // then convert to text. This avoids calling a non-existent /file-content route.
+    const normalizedPath = path.startsWith('/') ? path.slice(1) : path
+    const encodedPath = normalizedPath.split('/').map(s => encodeURIComponent(s)).join('/')
+
+    try {
+      const blob = await httpClient.downloadFile(`/nas/download/${encodedPath}`, null, {
+        timeout: 30000,
+        headers: { 'Authorization': `Bearer ${TokenService.getToken()}` }
+      })
+
+      // Try to read blob as text
+      const text = await blob.text()
+
+      // Log file read activity for analytics
+      simpleActivityLogger.log('FILE_READ', { path, type: 'file', action: 'read' })
+
+      return { success: true, content: text, mime_type: blob.type, encoding: 'utf-8' }
+    } catch (error) {
+      simpleActivityLogger.logError('FILE_READ', path, error, { isFolder: false })
+
+      // Return an API-like error object so callers like FileViewerModal can check .success
+      const message = error?.message || (error?.originalError && error.originalError.message) || 'Erreur de chargement du contenu'
+      const status = error?.status || (error?.originalError?.response?.status) || 0
+      return { success: false, error: message, status }
+    }
+  }
+
+  /**
+   * Update file content for editable files.
+   * Uses the backend file endpoint: PUT /files/<path>/content
+   * Returns an API-like object { success: true, ... } or { success: false, error, status }
+   */
+  async updateFileContent(path, content, encoding = 'utf-8') {
+    // Build API base (files endpoints are registered under /files)
+    const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001')
+    const normalizedPath = path.startsWith('/') ? path.slice(1) : path
+    const encodedPath = normalizedPath.split('/').map(s => encodeURIComponent(s)).join('/')
+    const url = `${apiBase}/files/${encodedPath}/content`
+
+    try {
+      const payload = { content, encoding }
+
+      const res = await httpClient.put(url, payload, {
+        headers: { 'Authorization': `Bearer ${TokenService.getToken()}` }
+      })
+
+      // Log activity
+      simpleActivityLogger.log('FILE_WRITE', { path, action: 'update' })
+
+      // Normalize response to expected shape
+      return { success: true, ...(res || {}) }
+    } catch (error) {
+      simpleActivityLogger.logError('FILE_WRITE', path, error, { isFolder: false })
+
+      const message = error?.message || (error?.originalError && error.originalError.message) || 'Erreur lors de la sauvegarde du fichier'
+      const status = error?.status || (error?.originalError?.response?.status) || 0
+      return { success: false, error: message, status }
+    }
+  }
+
+  /**
    * Download file as blob for clipboard operations
    * This is an alias for downloadFile that returns the blob directly
    */

@@ -1,637 +1,220 @@
 <template>
-  <div
-    v-if="isOpen"
-    class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50"
-    :class="{ 'fullscreen-modal': isFullscreen }"
-    tabindex="0"
-    ref="modalContainer"
-    :role="ARIA_ROLES.FILE_VIEWER"
-    :aria-label="`Visualiseur de fichier: ${file?.name || 'Fichier'}`"
-    :aria-describedby="content ? 'file-content-description' : undefined"
-    aria-modal="true"
-  >
-    <!-- Skip Links for Accessibility -->
-    <div class="skip-links" style="position: absolute; top: -40px; left: 6px; z-index: 1001;">
-      <a 
-        href="#file-content" 
-        class="skip-link"
-        style="position: absolute; left: -10000px; background: #000; color: #fff; padding: 8px 16px; text-decoration: none; border-radius: 4px;"
-        @focus="$event.target.style.position = 'static'; $event.target.style.left = 'auto'"
-        @blur="$event.target.style.position = 'absolute'; $event.target.style.left = '-10000px'"
-      >
-        Aller au contenu du fichier
-      </a>
-      <a 
-        href="#file-actions" 
-        class="skip-link"
-        style="position: absolute; left: -10000px; background: #000; color: #fff; padding: 8px 16px; text-decoration: none; border-radius: 4px; margin-left: 8px;"
-        @focus="$event.target.style.position = 'static'; $event.target.style.left = 'auto'"
-        @blur="$event.target.style.position = 'absolute'; $event.target.style.left = '-10000px'"
-      >
-        Aller aux actions
-      </a>
-    </div>
-
-    <!-- Modal Container -->
-    <div
-      class="bg-base-100 rounded-lg shadow-2xl w-full h-full max-w-7xl max-h-[95vh] flex flex-col relative animate-fade-in"
-      :class="{ 'rounded-none max-w-none max-h-none': isFullscreen }"
-      @click.stop
-    >
+  <div v-if="isOpen" class="modal modal-open" @click.self="handleClose">
+    <div class="modal-box max-w-7xl w-full h-[90vh] p-0 flex flex-col">
       <!-- Header -->
-      <header 
-        class="flex items-center justify-between p-4 border-b border-base-300 bg-base-200"
-        :class="{ 'rounded-t-lg': !isFullscreen }"
-        role="banner"
-      >
-        <div class="flex items-center space-x-3 flex-1 min-w-0">
-          <!-- File Icon -->
-          <div class="flex-shrink-0">
-            <i 
-              :class="fileIcon" 
-              class="text-2xl"
-              :style="{ color: fileIconColor }"
-              aria-hidden="true"
-            ></i>
-          </div>
-          
-          <!-- File Info -->
-          <div class="flex-1 min-w-0">
-            <h1 
-              class="text-lg font-semibold truncate" 
-              :title="file?.name"
-              id="file-title"
-            >
-              {{ file?.name || 'Fichier' }}
-            </h1>
-            <div 
-              class="text-sm text-base-content/70 flex items-center space-x-2"
-              id="file-metadata"
-              :aria-label="`Taille: ${formatFileSize(file?.size)}${file?.lastModified ? ', modifié le ' + formatDate(file.lastModified) : ''}`"
-            >
-              <span>{{ formatFileSize(file?.size) }}</span>
-              <span v-if="file?.lastModified" aria-hidden="true">•</span>
-              <span v-if="file?.lastModified">{{ formatDate(file.lastModified) }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div 
-          class="flex items-center space-x-2 flex-shrink-0"
-          :role="ARIA_ROLES.TOOLBAR"
-          aria-label="Actions du fichier"
-          id="file-actions"
-        >
-          <!-- Help Button -->
-          <button
-            @click="toggleHelp"
-            class="btn btn-sm btn-ghost"
-            :class="{ 'btn-active': showHelp }"
-            :aria-label="showHelp ? 'Masquer l\'aide' : 'Afficher l\'aide'"
-            :aria-expanded="showHelp"
-            title="Aide (F1)"
-          >
-            <i class="fas fa-question-circle"></i>
+      <div class="flex items-center justify-between p-4 border-b border-base-300">
+        <div class="flex items-center gap-3">
+          <button @click="handleClose" class="btn btn-sm btn-circle btn-ghost">
+            <i class="fas fa-times"></i>
           </button>
-
-          <!-- Fullscreen Button -->
-          <button
-            @click="toggleFullscreen"
-            class="btn btn-sm btn-ghost"
-            :class="{ 'btn-active': isFullscreen }"
-            :aria-label="isFullscreen ? 'Quitter le plein écran' : 'Mode plein écran'"
-            title="Plein écran (F11)"
-          >
-            <i :class="isFullscreen ? 'fas fa-compress' : 'fas fa-expand'"></i>
-          </button>
-
-          <!-- Edit/View Toggle -->
-          <button
-            v-if="canEdit && !isLoading"
-            @click="toggleEditMode"
-            class="btn btn-sm btn-ghost"
-            :class="{ 'btn-active': props.mode === 'edit' }"
-            :aria-label="props.mode === 'edit' ? 'Passer en mode lecture' : 'Passer en mode édition'"
-            :aria-pressed="props.mode === 'edit'"
-            :title="`${props.mode === 'edit' ? 'Mode lecture' : 'Mode édition'} (Tab)`"
-          >
-            <i :class="props.mode === 'edit' ? 'fas fa-eye' : 'fas fa-edit'" class="mr-1" aria-hidden="true"></i>
-            {{ props.mode === 'edit' ? 'Lecture' : 'Éditer' }}
-          </button>
-
-          <!-- Save Button -->
-          <button
-            v-if="props.mode === 'edit' && hasUnsavedChanges"
-            @click="handleSave"
-            class="btn btn-sm btn-primary"
-            :disabled="isSaving"
-            :aria-label="isSaving ? 'Sauvegarde en cours...' : 'Sauvegarder le fichier'"
-            title="Sauvegarder (Ctrl+S)"
-          >
-            <span v-if="isSaving" class="loading loading-spinner loading-xs mr-1" aria-hidden="true"></span>
-            <i v-else class="fas fa-save mr-1" aria-hidden="true"></i>
-            {{ isSaving ? 'Sauvegarde...' : 'Sauvegarder' }}
-          </button>
-
-          <!-- Download Button -->
-          <button
-            v-if="!isLoading && file"
-            @click="handleDownload"
-            class="btn btn-sm btn-ghost"
-            aria-label="Télécharger le fichier"
-            title="Télécharger (Ctrl+D)"
-          >
-            <i class="fas fa-download" aria-hidden="true"></i>
-          </button>
-
-          <!-- Close Button -->
-          <button
-            @click="handleClose"
-            class="btn btn-sm btn-ghost"
-            aria-label="Fermer le visualiseur"
-            title="Fermer (Échap)"
-          >
-            <i class="fas fa-times" aria-hidden="true"></i>
-          </button>
-        </div>
-      </header>
-
-      <!-- Help Panel -->
-      <div
-        v-if="showHelp"
-        class="bg-base-200 border-b border-base-300 p-4"
-        role="region"
-        aria-labelledby="help-title"
-        id="help-panel"
-      >
-        <h2 id="help-title" class="text-lg font-semibold mb-3">Raccourcis clavier</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
           <div>
-            <h3 class="font-medium mb-2">Actions générales</h3>
-            <ul class="space-y-1">
-              <li><kbd class="kbd kbd-sm">Échap</kbd> Fermer</li>
-              <li><kbd class="kbd kbd-sm">Ctrl+S</kbd> Sauvegarder</li>
-              <li><kbd class="kbd kbd-sm">Ctrl+D</kbd> Télécharger</li>
-              <li><kbd class="kbd kbd-sm">Tab</kbd> Changer de mode</li>
-              <li><kbd class="kbd kbd-sm">F11</kbd> Plein écran</li>
-            </ul>
+            <h3 class="font-bold text-lg">{{ file?.name || 'Fichier' }}</h3>
+            <p class="text-sm text-base-content/60">{{ formatFileSize(file?.size) }}</p>
           </div>
-          <div v-if="currentContext === 'text'">
-            <h3 class="font-medium mb-2">Éditeur de texte</h3>
-            <ul class="space-y-1">
-              <li><kbd class="kbd kbd-sm">Ctrl+F</kbd> Rechercher</li>
-              <li><kbd class="kbd kbd-sm">Ctrl+H</kbd> Remplacer</li>
-              <li><kbd class="kbd kbd-sm">Ctrl+G</kbd> Aller à la ligne</li>
-              <li><kbd class="kbd kbd-sm">Ctrl+Z</kbd> Annuler</li>
-              <li><kbd class="kbd kbd-sm">Ctrl+Y</kbd> Rétablir</li>
-            </ul>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Mode Selector -->
+          <div class="btn-group">
+            <button 
+              @click="setMode('view')" 
+              :class="['btn btn-sm', currentMode === 'view' ? 'btn-active' : '']"
+              title="Mode visualisation"
+            >
+              <i class="fas fa-eye"></i>
+            </button>
+            <button 
+              v-if="canEdit"
+              @click="setMode('edit')" 
+              :class="['btn btn-sm', currentMode === 'edit' ? 'btn-active' : '']"
+              title="Mode édition"
+            >
+              <i class="fas fa-edit"></i>
+            </button>
           </div>
-          <div v-if="currentContext === 'image'">
-            <h3 class="font-medium mb-2">Visualiseur d'images</h3>
-            <ul class="space-y-1">
-              <li><kbd class="kbd kbd-sm">+</kbd> Zoomer</li>
-              <li><kbd class="kbd kbd-sm">-</kbd> Dézoomer</li>
-              <li><kbd class="kbd kbd-sm">0</kbd> Ajuster</li>
-              <li><kbd class="kbd kbd-sm">1</kbd> Taille réelle</li>
-              <li><kbd class="kbd kbd-sm">H</kbd> Retourner H</li>
-            </ul>
-          </div>
-          <div v-if="currentContext === 'pdf'">
-            <h3 class="font-medium mb-2">Visualiseur PDF</h3>
-            <ul class="space-y-1">
-              <li><kbd class="kbd kbd-sm">Page ↑/↓</kbd> Navigation</li>
-              <li><kbd class="kbd kbd-sm">Ctrl++/-</kbd> Zoom</li>
-              <li><kbd class="kbd kbd-sm">Ctrl+F</kbd> Rechercher</li>
-              <li><kbd class="kbd kbd-sm">Ctrl+Home</kbd> Première page</li>
-              <li><kbd class="kbd kbd-sm">Ctrl+End</kbd> Dernière page</li>
-            </ul>
-          </div>
-          <div v-if="currentContext === 'media'">
-            <h3 class="font-medium mb-2">Lecteur multimédia</h3>
-            <ul class="space-y-1">
-              <li><kbd class="kbd kbd-sm">Espace</kbd> Lecture/Pause</li>
-              <li><kbd class="kbd kbd-sm">M</kbd> Muet</li>
-              <li><kbd class="kbd kbd-sm">↑/↓</kbd> Volume</li>
-              <li><kbd class="kbd kbd-sm">←/→</kbd> Navigation</li>
-              <li><kbd class="kbd kbd-sm">F</kbd> Plein écran</li>
-            </ul>
-          </div>
+
+          <!-- Actions -->
+          <button @click="handleDownload" class="btn btn-sm btn-ghost" title="Télécharger">
+            <i class="fas fa-download"></i>
+          </button>
+          
+          <button 
+            v-if="currentMode === 'edit' && hasChanges"
+            @click="handleSave" 
+            class="btn btn-sm btn-primary"
+            :disabled="saving"
+          >
+            <span v-if="saving" class="loading loading-spinner loading-xs"></span>
+            <i v-else class="fas fa-save"></i>
+            Enregistrer
+          </button>
         </div>
       </div>
 
       <!-- Content Area -->
-      <main 
-        class="flex-1 flex flex-col min-h-0 relative"
-        role="main"
-        aria-labelledby="file-title"
-        id="file-content"
-      >
+      <div class="flex-1 overflow-hidden bg-base-200">
         <!-- Loading State -->
-        <div
-          v-if="isLoading"
-          class="flex-1 flex items-center justify-center"
-          role="status"
-          aria-live="polite"
-          aria-label="Chargement en cours"
-        >
-          <div class="text-center max-w-md">
-            <div 
-              class="loading loading-spinner loading-lg mb-4"
-              aria-hidden="true"
-            ></div>
-            <p 
-              class="text-base-content/70 mb-2"
-              id="loading-message"
-            >
-              {{ loadingMessage }}
-            </p>
-            
-            <!-- Progress Bar -->
-            <div 
-              v-if="progressOperations.length > 0"
-              class="w-full bg-base-300 rounded-full h-2 mb-3"
-              role="progressbar"
-              :aria-valuenow="progressOperations[0]?.current || 0"
-              :aria-valuemax="progressOperations[0]?.total || 100"
-              :aria-label="`Progression: ${progressOperations[0]?.current || 0}%`"
-            >
-              <div 
-                class="bg-primary h-2 rounded-full transition-all duration-300"
-                :style="{ width: `${progressOperations[0]?.current || 0}%` }"
-              ></div>
-            </div>
-            
-            <div class="text-sm text-base-content/50 space-y-1">
-              <div>
-                Étape: {{ processingStage }}
-                <span v-if="retryCount > 0"> (tentative {{ retryCount }}/{{ maxRetries }})</span>
-              </div>
-              <div v-if="isLowEndDevice" class="text-warning">
-                <i class="fas fa-mobile-alt mr-1" aria-hidden="true"></i>
-                Mode optimisé pour appareil limité
-              </div>
-              <div v-if="performanceMetrics.lastLoad?.duration">
-                Temps de traitement: {{ Math.round(performanceMetrics.lastLoad.duration) }}ms
-              </div>
-            </div>
+        <div v-if="loading" class="flex items-center justify-center h-full">
+          <div class="text-center">
+            <div class="loading loading-spinner loading-lg"></div>
+            <p class="mt-4 text-base-content/60">Chargement du contenu...</p>
           </div>
         </div>
 
         <!-- Error State -->
-        <div
-          v-else-if="error"
-          class="flex-1 flex items-center justify-center p-8"
-          role="alert"
-          aria-live="assertive"
-          aria-labelledby="error-title"
-          aria-describedby="error-description"
-        >
-          <div class="text-center max-w-lg">
-            <div class="text-6xl mb-4 text-error" aria-hidden="true">
-              <i class="fas fa-exclamation-triangle"></i>
-            </div>
-            <h2 id="error-title" class="text-xl font-semibold mb-2">Erreur de chargement</h2>
-            <p id="error-description" class="text-base-content/70 mb-4">{{ error }}</p>
-            
-            <!-- Error details (collapsible) -->
-            <div v-if="errorDetails" class="mb-4">
-              <details class="text-left bg-base-200 rounded-lg p-3">
-                <summary 
-                  class="cursor-pointer text-sm font-medium"
-                  aria-label="Afficher ou masquer les détails techniques"
-                >
-                  Détails techniques
-                </summary>
-                <div class="mt-2 text-xs text-base-content/60" role="group" aria-label="Détails de l'erreur">
-                  <p><strong>Code:</strong> {{ errorDetails.code }}</p>
-                  <p><strong>Étape:</strong> {{ processingStage }}</p>
-                  <p v-if="errorDetails.details.handlerName"><strong>Gestionnaire:</strong> {{ errorDetails.details.handlerName }}</p>
-                  <p><strong>Timestamp:</strong> {{ errorDetails.timestamp }}</p>
-                  <div v-if="errorDetails.details" class="mt-2">
-                    <strong>Détails:</strong>
-                    <pre 
-                      class="text-xs bg-base-300 p-2 rounded mt-1 overflow-auto"
-                      role="log"
-                      aria-label="Détails techniques de l'erreur"
-                    >{{ JSON.stringify(errorDetails.details, null, 2) }}</pre>
-                  </div>
-                </div>
-              </details>
-            </div>
-            
-            <!-- Suggested actions -->
-            <div 
-              class="flex flex-wrap justify-center gap-2"
-              role="group"
-              aria-label="Actions suggérées"
-            >
-              <button 
-                v-for="action in supportedActions" 
-                :key="action.action"
-                @click="handleErrorAction(action.action)" 
-                class="btn btn-sm"
-                :class="action.action === 'retry' ? 'btn-outline' : action.action === 'download' ? 'btn-primary' : 'btn-ghost'"
-                :aria-label="`${action.label} - ${getActionDescription(action.action)}`"
-              >
-                <i :class="getActionIcon(action.action)" class="mr-1" aria-hidden="true"></i>
-                {{ action.label }}
-              </button>
-            </div>
-            
-            <!-- Retry information -->
-            <div 
-              v-if="retryCount > 0" 
-              class="mt-3 text-sm text-base-content/50"
-              role="status"
-              aria-label="`${retryCount} tentatives sur ${maxRetries} effectuées`"
-            >
-              Tentatives: {{ retryCount }}/{{ maxRetries }}
+        <div v-else-if="error" class="flex items-center justify-center h-full">
+          <div class="alert alert-error max-w-md">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+              <h3 class="font-bold">Erreur de chargement</h3>
+              <div class="text-sm">{{ error }}</div>
             </div>
           </div>
         </div>
 
-        <!-- File Content -->
-        <div
-          v-else-if="content"
-          class="flex-1 flex flex-col min-h-0"
-        >
+        <!-- Content Display -->
+        <div v-else-if="content" class="h-full">
           <!-- Text Content -->
-          <TextViewer
-            v-if="content.type === 'text' && props.mode === 'view'"
-            :content="content.content"
-            :metadata="content.metadata"
-            :editable="content.editable"
-            mode="view"
-            @edit="toggleEditMode"
-            @content-changed="handleGenericContentChange"
-            class="flex-1"
-          />
-          
-          <TextEditor
-            v-else-if="content.type === 'text' && props.mode === 'edit'"
-            :file="props.file"
-            :initial-content="content.content"
-            :metadata="content.metadata"
-            @save="handleSaveContent"
-            @content-changed="(newContent) => handleGenericContentChange({ type: 'text-edit', content: newContent })"
-            @encoding-changed="handleEncodingChanged"
-            @language-changed="handleLanguageChanged"
-            @cancel="toggleEditMode"
-            class="flex-1"
-          />
-          
+          <div v-if="isTextContent" class="h-full">
+            <!-- View Mode -->
+            <div v-if="currentMode === 'view'" class="h-full overflow-auto">
+              <pre class="p-4 text-sm font-mono whitespace-pre-wrap">{{ content.text }}</pre>
+            </div>
+
+            <!-- Edit Mode -->
+            <textarea
+              v-else
+              v-model="editableContent"
+              class="textarea w-full h-full resize-none font-mono text-sm p-4 rounded-none border-0 focus:outline-none"
+              :readonly="currentMode === 'view'"
+              @input="markAsChanged"
+            ></textarea>
+          </div>
+
           <!-- Image Content -->
-          <ImageViewer
-            v-else-if="content.type === 'image' && props.mode === 'view'"
-            :image-url="content.url"
-            :filename="props.file?.name || 'Image'"
-            :metadata="content.metadata"
-            :editable="content.editable"
-            @edit="toggleEditMode"
-            @download="handleDownload"
-            @error="handleImageError"
-            class="flex-1"
-          />
-          
-          <ImageEditor
-            v-else-if="content.type === 'image' && props.mode === 'edit'"
-            :image-url="content.url"
-            :filename="props.file?.name || 'Image'"
-            :metadata="content.metadata"
-            @save="handleImageSave"
-            @export="handleImageExport"
-            @content-changed="(changeData) => handleGenericContentChange({ type: 'image-edit', ...changeData })"
-            @cancel="toggleEditMode"
-            @error="handleImageError"
-            class="flex-1"
-          />
-          
+          <div v-else-if="isImageContent" class="h-full flex items-center justify-center p-4">
+            <img 
+              :src="content.url" 
+              :alt="file?.name"
+              class="max-w-full max-h-full object-contain"
+            />
+          </div>
+
           <!-- PDF Content -->
-          <PDFViewer
-            v-else-if="content.type === 'pdf'"
-            :pdf-url="content.url"
-            :filename="props.file?.name || 'Document PDF'"
-            :metadata="content.metadata"
-            :mode="props.mode"
-            @error="handlePDFError"
-            @loaded="handlePDFLoaded"
-            @page-changed="handlePDFPageChanged"
-            @annotation-changed="(changeData) => handleGenericContentChange({ type: 'pdf-annotation', ...changeData })"
-            class="flex-1"
-          />
-          
+          <div v-else-if="isPdfContent" class="h-full">
+            <iframe 
+              :src="content.url" 
+              class="w-full h-full border-0"
+              title="PDF Viewer"
+            ></iframe>
+          </div>
+
           <!-- Video Content -->
-          <MediaViewer
-            v-else-if="content.type === 'video'"
-            :content="content"
-            :filename="props.file?.name || 'Vidéo'"
-            @error="handleMediaError"
-            @metadata-changed="(metadata) => handleGenericContentChange({ type: 'metadata', metadata })"
-            class="flex-1"
-          />
-          
+          <div v-else-if="isVideoContent" class="h-full flex items-center justify-center p-4 bg-black">
+            <video 
+              :src="content.url" 
+              controls
+              class="max-w-full max-h-full"
+            >
+              Votre navigateur ne supporte pas la lecture vidéo.
+            </video>
+          </div>
+
           <!-- Audio Content -->
-          <MediaViewer
-            v-else-if="content.type === 'audio'"
-            :content="content"
-            :filename="props.file?.name || 'Audio'"
-            @error="handleMediaError"
-            @metadata-changed="(metadata) => handleGenericContentChange({ type: 'metadata', metadata })"
-            class="flex-1"
-          />
+          <div v-else-if="isAudioContent" class="h-full flex items-center justify-center p-4">
+            <audio 
+              :src="content.url" 
+              controls
+              class="w-full max-w-2xl"
+            >
+              Votre navigateur ne supporte pas la lecture audio.
+            </audio>
+          </div>
 
-          <!-- Document Content (Word, Excel, PowerPoint) -->
-          <DocumentViewer
-            v-else-if="['word', 'excel', 'powerpoint', 'document'].includes(content.type)"
-            :document-data="content"
-            :mode="props.mode"
-            :filename="props.file?.name || 'Document'"
-            @save="handleDocumentSave"
-            @content-changed="(changeData) => handleGenericContentChange({ type: 'document-edit', ...changeData })"
-            @mode-change="toggleEditMode"
-            @error="handleDocumentError"
-            class="flex-1"
-          />
-
-
-          <!-- Download Required Viewer (fallback for local opening) -->
-          <div
-            v-else-if="content.type === 'download-required'"
-            class="flex-1 flex items-center justify-center"
-            v-html="content.content"
-          ></div>
-          
-          <!-- Fallback for unsupported content with degraded functionality -->
-          <div
-            v-else-if="content.metadata?.degraded"
-            class="flex-1 p-4 overflow-auto"
-          >
-            <div class="text-center text-base-content/50">
-              <i class="fas fa-file-alt text-4xl mb-2"></i>
-              <h3 class="text-lg font-semibold mb-2">Prévisualisation limitée</h3>
-              <p class="mb-2">Le fichier ne peut pas être affiché complètement.</p>
-              <p class="text-sm mb-4">Type: {{ content.type }} | Handler: {{ handlerName || 'Aucun' }}</p>
-              
-              <!-- Basic file information -->
-              <div class="bg-base-200 rounded-lg p-4 text-left max-w-md mx-auto">
-                <h4 class="font-semibold mb-2">Informations du fichier:</h4>
-                <ul class="text-sm space-y-1">
-                  <li><strong>Nom:</strong> {{ props.file?.name || 'Inconnu' }}</li>
-                  <li><strong>Taille:</strong> {{ formatFileSize(props.file?.size) }}</li>
-                  <li><strong>Type:</strong> {{ props.file?.type || 'Inconnu' }}</li>
-                  <li v-if="content.metadata?.lastModified"><strong>Modifié:</strong> {{ formatDate(content.metadata.lastModified) }}</li>
-                </ul>
-              </div>
-              
-              <div class="mt-4">
+          <!-- Office Documents -->
+          <div v-else-if="isOfficeContent" class="h-full flex items-center justify-center p-4">
+            <div class="text-center max-w-md">
+              <i class="fas fa-file-alt text-6xl text-primary mb-4"></i>
+              <h3 class="font-bold text-lg mb-2">Document {{ content.officeType }}</h3>
+              <p class="text-base-content/60 mb-4">
+                Les fichiers Microsoft Office ne peuvent pas être visualisés directement dans le navigateur.
+              </p>
+              <div class="flex flex-col gap-2">
                 <button @click="handleDownload" class="btn btn-primary">
                   <i class="fas fa-download mr-2"></i>
                   Télécharger le fichier
                 </button>
+                <a 
+                  :href="`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(getFileUrl())}`"
+                  target="_blank"
+                  class="btn btn-outline btn-sm"
+                >
+                  <i class="fas fa-external-link-alt mr-2"></i>
+                  Ouvrir avec Office Online
+                </a>
               </div>
+              <p class="text-xs text-base-content/40 mt-4">
+                Type: {{ content.type }}
+              </p>
             </div>
           </div>
-          
-          <!-- Unknown content type -->
-          <div
-            v-else
-            class="flex-1 p-4 overflow-auto"
-          >
-            <div class="text-center text-base-content/50">
-              <i class="fas fa-question-circle text-4xl mb-2"></i>
-              <h3 class="text-lg font-semibold mb-2">Type de contenu inconnu</h3>
-              <p class="mb-2">Impossible de déterminer comment afficher ce contenu.</p>
-              <p class="text-sm mb-4">Type détecté: {{ content.type }} | Handler: {{ handlerName || 'Aucun' }}</p>
-              
-              <div v-if="content.error" class="mt-4 p-3 bg-error/10 border border-error/20 rounded-lg text-error">
-                <i class="fas fa-exclamation-triangle mr-2"></i>
-                {{ content.error }}
-              </div>
-              
-              <div class="mt-4">
-                <button @click="handleRetry" class="btn btn-outline mr-2">
-                  <i class="fas fa-redo mr-2"></i>
-                  Réessayer
-                </button>
-                <button @click="handleDownload" class="btn btn-primary">
-                  <i class="fas fa-download mr-2"></i>
-                  Télécharger
-                </button>
-              </div>
+
+          <!-- Unknown Content Type -->
+          <div v-else class="h-full flex items-center justify-center p-4">
+            <div class="text-center">
+              <i class="fas fa-file text-6xl text-base-content/20 mb-4"></i>
+              <h3 class="font-bold text-lg mb-2">Type de contenu inconnu</h3>
+              <p class="text-base-content/60 mb-4">
+                Impossible de déterminer comment afficher ce contenu.
+              </p>
+              <p class="text-sm text-base-content/40">
+                Type détecté: {{ content?.type || 'inconnu' }} | 
+                Handler: {{ contentHandler || 'Aucun' }}
+              </p>
+              <button @click="handleDownload" class="btn btn-primary mt-4">
+                <i class="fas fa-download mr-2"></i>
+                Télécharger le fichier
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- Unsupported File Type -->
-        <div
-          v-else
-          class="flex-1 flex items-center justify-center p-8"
-        >
-          <div class="text-center max-w-md">
-            <div class="text-6xl mb-4 text-warning">
-              <i class="fas fa-file-alt"></i>
-            </div>
-            <h3 class="text-xl font-semibold mb-2">Type de fichier non supporté</h3>
-            <p class="text-base-content/70 mb-4">
-              Ce type de fichier ne peut pas être prévisualisé dans le navigateur.
-            </p>
-            <button @click="handleDownload" class="btn btn-primary">
-              <i class="fas fa-download mr-1"></i>
-              Télécharger le fichier
-            </button>
+        <!-- No Content -->
+        <div v-else class="h-full flex items-center justify-center p-4">
+          <div class="text-center text-base-content/60">
+            <i class="fas fa-file text-6xl mb-4"></i>
+            <p>Aucun contenu à afficher</p>
           </div>
-        </div>
-      </main>
-
-      <!-- Footer -->
-      <div
-        v-if="!isLoading && !error"
-        class="flex items-center justify-between p-3 border-t border-base-300 bg-base-50 rounded-b-lg text-sm text-base-content/70"
-      >
-        <div class="flex items-center space-x-4">
-          <span v-if="content?.type">
-            Type: {{ content.type }}
-          </span>
-          <span v-if="handlerName">
-            Gestionnaire: {{ handlerName }}
-          </span>
-          <span v-if="props.mode === 'edit' && hasUnsavedChanges" class="text-warning">
-            <i class="fas fa-circle text-xs mr-1"></i>
-            Modifications non sauvegardées
-          </span>
-          <span v-if="content?.metadata?.canSwitchModes" class="text-info">
-            <i class="fas fa-exchange-alt text-xs mr-1"></i>
-            Mode commutable
-          </span>
-        </div>
-        
-        <div class="flex items-center space-x-4">
-          <!-- Processing info -->
-          <span v-if="content?.metadata?.processingTime" class="text-xs">
-            Traité en {{ Math.round(content.metadata.processingTime) }}ms
-          </span>
-          
-          <!-- Keyboard shortcuts -->
-          <span class="text-xs">
-            Raccourcis: Échap (fermer)
-            <span v-if="canEdit">, Ctrl+S (sauvegarder)</span>
-            <span v-if="content?.metadata?.canSwitchModes">, Tab (changer mode)</span>
-          </span>
         </div>
       </div>
-      
-      <!-- Hidden content description for screen readers -->
-      <div 
-        id="file-content-description" 
-        class="sr-only"
-        aria-hidden="true"
-      >
-        <span v-if="content">
-          {{ accessibilityManager.createContentDescription(content, file) }}
-        </span>
+
+      <!-- Footer with metadata -->
+      <div v-if="content" class="p-3 border-t border-base-300 bg-base-100">
+        <div class="flex items-center justify-between text-xs text-base-content/60">
+          <div class="flex items-center gap-4">
+            <span v-if="detectionMethod">
+              <i class="fas fa-info-circle mr-1"></i>
+              Méthode: {{ detectionMethod }}
+            </span>
+            <span v-if="content.type">
+              <i class="fas fa-file-code mr-1"></i>
+              Type: {{ content.type }}
+            </span>
+          </div>
+          <div v-if="hasChanges" class="text-warning">
+            <i class="fas fa-exclamation-circle mr-1"></i>
+            Modifications non enregistrées
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { fileHandlerService } from '@/services/fileHandlerService.js'
-import { detectFileType, getFileTypeIcon } from '@/utils/fileTypeDetection.js'
-import { getStreamUrl } from '@/services/nasAPI.js'
-import { 
-  FileViewerError, 
-  createFileViewerError, 
-  ErrorRecoveryStrategies 
-} from '@/utils/fileViewerErrors.js'
-import { 
-  keyboardShortcuts, 
-  initializeFileViewerShortcuts,
-  formatKeyString 
-} from '@/utils/keyboardShortcuts.js'
-import { 
-  accessibilityManager, 
-  a11yUtils,
-  ARIA_ROLES 
-} from '@/utils/accessibility.js'
-import {
-  performanceMonitor,
-  memoryManager,
-  componentLoader,
-  progressIndicator,
-  perfUtils,
-  debounce
-} from '@/utils/performanceOptimization.js'
-import TextViewer from './TextViewer.vue'
-import TextEditor from './TextEditor.vue'
-import ImageViewer from './ImageViewer.vue'
-import ImageEditor from './ImageEditor.vue'
-import PDFViewer from './PDFViewer.vue'
-import MediaViewer from './MediaViewer.vue'
-import DocumentViewer from './DocumentViewer.vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { nasAPI } from '@/services/nasAPI.js'
 
-// Props
 const props = defineProps({
   isOpen: {
     type: Boolean,
@@ -643,12 +226,11 @@ const props = defineProps({
   },
   mode: {
     type: String,
-    default: 'view',
+    default: 'edit',
     validator: (value) => ['view', 'edit'].includes(value)
   }
 })
 
-// Emits
 const emit = defineEmits([
   'close',
   'save',
@@ -658,1508 +240,418 @@ const emit = defineEmits([
   'error'
 ])
 
-// Refs
-const modalContainer = ref(null)
-
 // State
-const isLoading = ref(false)
-const isSaving = ref(false)
+const loading = ref(false)
 const error = ref(null)
 const content = ref(null)
-const hasUnsavedChanges = ref(false)
-const handlerName = ref(null)
-const loadingMessage = ref('Chargement du fichier...')
-const retryCount = ref(0)
-const maxRetries = ref(3)
-const processingStage = ref('initializing')
-const errorDetails = ref(null)
-const supportedActions = ref([])
-const currentHandler = ref(null)
-const isFullscreen = ref(false)
-const showHelp = ref(false)
-const keyboardShortcutsEnabled = ref(true)
-const accessibilityAnnouncements = ref([])
-const currentContext = ref('global')
-const performanceMetrics = ref({})
-const progressOperations = ref([])
-const memoryStats = ref({})
-const isLowEndDevice = ref(false)
+const currentMode = ref(props.mode)
+const editableContent = ref('')
+const originalContent = ref('')
+const hasChanges = ref(false)
+const saving = ref(false)
+const detectionMethod = ref(null)
+const contentHandler = ref(null)
 
 // Computed
 const canEdit = computed(() => {
-  return content.value?.editable === true
+  if (!content.value) return false
+  return isTextContent.value
 })
 
-const fileIcon = computed(() => {
-  if (!props.file) return 'fas fa-file'
-  const fileType = detectFileType(props.file.name)
-  return getFileTypeIcon(fileType.mimeType)
+const isTextContent = computed(() => {
+  if (!content.value) return false
+  const type = content.value.type
+  return type?.startsWith('text/') || 
+         type === 'application/json' ||
+         type === 'application/xml'
 })
 
-const fileIconColor = computed(() => {
-  if (!props.file) return '#6b7280'
-  const fileType = detectFileType(props.file.name)
-  
-  const colorMap = {
-    'text': '#10b981',
-    'image': '#f59e0b',
-    'video': '#ef4444',
-    'audio': '#8b5cf6',
-    'pdf': '#dc2626'
-  }
-  
-  return colorMap[fileType.category] || '#6b7280'
+const isImageContent = computed(() => {
+  if (!content.value) return false
+  return content.value.type?.startsWith('image/')
+})
+
+const isPdfContent = computed(() => {
+  if (!content.value) return false
+  return content.value.type === 'application/pdf'
+})
+
+const isVideoContent = computed(() => {
+  if (!content.value) return false
+  return content.value.type?.startsWith('video/')
+})
+
+const isAudioContent = computed(() => {
+  if (!content.value) return false
+  return content.value.type?.startsWith('audio/')
+})
+
+const isOfficeContent = computed(() => {
+  if (!content.value) return false
+  return content.value.isOfficeDocument === true
 })
 
 // Methods
-const handleClose = () => {
-  if (hasUnsavedChanges.value) {
-    if (!confirm('Vous avez des modifications non sauvegardées. Voulez-vous vraiment fermer ?')) {
-      return
-    }
-  }
-  emit('close')
+const getOfficeType = (mimeType) => {
+  if (mimeType.includes('word') || mimeType.includes('document')) return 'Word'
+  if (mimeType.includes('excel') || mimeType.includes('sheet')) return 'Excel'
+  if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'PowerPoint'
+  if (mimeType.includes('access')) return 'Access'
+  return 'Office'
 }
 
-const handleSave = async () => {
-  if (!canEdit.value || !hasUnsavedChanges.value) return
-  
-  isSaving.value = true
+const formatFileSize = (bytes) => {
+  if (!bytes) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
+}
+
+const loadContent = async () => {
+  if (!props.file) {
+    error.value = 'Aucun fichier spécifié'
+    return
+  }
+
+  loading.value = true
+  error.value = null
+  content.value = null
+  detectionMethod.value = null
+  contentHandler.value = null
+
   try {
-    // Prepare save data based on content type
-    const saveData = prepareSaveData()
+    console.log('🎬 Attempting NAS detection for file:', props.file.name)
     
-    // Use handler-specific save method if available
-    if (currentHandler.value?.saveContent && typeof currentHandler.value.saveContent === 'function') {
-      const savedContent = await currentHandler.value.saveContent(props.file, saveData.content, saveData.options)
+    let result = null
+    
+    // Detect if this is a NAS file based on the file path
+    const isNasFile = props.file?.path && !props.file.path.startsWith('http')
+    
+    if (isNasFile) {
+      // Determine content type from file extension if not provided
+      let contentType = props.file.mime_type || 'application/octet-stream'
       
-      // Update content with saved version if handler returns new content
-      if (savedContent) {
-        content.value = {
-          ...content.value,
-          content: savedContent,
-          metadata: {
-            ...content.value.metadata,
-            lastSaved: new Date().toISOString(),
-            savedBy: currentHandler.value.name
-          }
+      // Map common file extensions to proper MIME types
+      const fileName = props.file.name.toLowerCase()
+      const mimeTypeMap = {
+        // Text files
+        '.txt': 'text/plain',
+        '.md': 'text/markdown',
+        '.json': 'application/json',
+        '.xml': 'text/xml',
+        '.csv': 'text/csv',
+        '.log': 'text/plain',
+        '.ini': 'text/plain',
+        '.conf': 'text/plain',
+        '.yaml': 'text/plain',
+        '.yml': 'text/plain',
+        
+        // Images
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.bmp': 'image/bmp',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        
+        // PDF
+        '.pdf': 'application/pdf',
+        
+        // Video
+        '.mp4': 'video/mp4',
+        '.mov': 'video/quicktime',
+        '.avi': 'video/x-msvideo',
+        '.mkv': 'video/x-matroska',
+        '.webm': 'video/webm',
+        '.wmv': 'video/x-ms-wmv',
+        '.flv': 'video/x-flv',
+        
+        // Audio
+        '.mp3': 'audio/mpeg',
+        '.wav': 'audio/wav',
+        '.ogg': 'audio/ogg',
+        '.m4a': 'audio/mp4',
+        '.flac': 'audio/flac',
+        '.aac': 'audio/aac',
+        
+        // Microsoft Office
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xls': 'application/vnd.ms-excel',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.ppt': 'application/vnd.ms-powerpoint',
+        '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        '.accdb': 'application/msaccess',
+        '.mdb': 'application/msaccess',
+        
+        // OpenOffice/LibreOffice
+        '.odt': 'application/vnd.oasis.opendocument.text',
+        '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+        '.odp': 'application/vnd.oasis.opendocument.presentation',
+        
+        // Archives
+        '.zip': 'application/zip',
+        '.rar': 'application/x-rar-compressed',
+        '.7z': 'application/x-7z-compressed',
+        '.tar': 'application/x-tar',
+        '.gz': 'application/gzip'
+      }
+      
+      for (const [ext, mimeType] of Object.entries(mimeTypeMap)) {
+        if (fileName.endsWith(ext)) {
+          contentType = mimeType
+          break
         }
+      }
+      
+      console.log('🎬 NAS file detected, content type:', contentType)
+      
+      // Create a result object similar to what the API would return
+      result = {
+        success: true,
+        content_type: contentType,
+        method: 'smb',
+        size: props.file.size || 0,
+        metadata: {
+          filename: props.file.name,
+          path: props.file.path
+        }
+      }
+      
+      detectionMethod.value = result.method
+      console.log('🎬 Created NAS result:', result)
+    }
+
+    if (!result || !result.success) {
+      throw new Error('Impossible de détecter le type de contenu')
+    }
+
+    // Determine the best handler for this content type
+    const contentType = result.content_type
+    console.log('🎬 FileViewerModal: Detected content type:', contentType)
+
+    // Load content based on type
+    if (contentType.startsWith('text/') || 
+        contentType === 'application/json' ||
+        contentType === 'application/xml') {
+      
+      contentHandler.value = 'text'
+      console.log('🎬 Using text handler')
+      
+      // Load text content via NAS API
+      const textResult = await nasAPI.getFileContent(props.file.path)
+      
+      if (!textResult.success) {
+        throw new Error(textResult.error || 'Erreur de chargement du contenu')
+      }
+
+      content.value = {
+        type: contentType,
+        text: textResult.content || '',
+        encoding: textResult.encoding || 'utf-8'
+      }
+      
+      originalContent.value = content.value.text
+      editableContent.value = content.value.text
+      
+    } else if (contentType.startsWith('image/') || 
+               contentType === 'application/pdf' ||
+               contentType.startsWith('video/') ||
+               contentType.startsWith('audio/')) {
+      
+      contentHandler.value = contentType.split('/')[0]
+      console.log('🎬 Using', contentHandler.value, 'handler')
+      
+      // For media files, create a blob URL
+      const blob = await nasAPI.downloadFile(props.file.path)
+      const url = URL.createObjectURL(blob)
+      
+      content.value = {
+        type: contentType,
+        url: url,
+        blob: blob
+      }
+      
+    } else if (contentType.startsWith('application/vnd.') || 
+               contentType.startsWith('application/msword') ||
+               contentType.startsWith('application/vnd.ms-') ||
+               contentType === 'application/msaccess') {
+      
+      // Microsoft Office and other application files
+      contentHandler.value = 'office'
+      console.log('🎬 Using office handler for:', contentType)
+      
+      // For Office files, we'll show a preview option or download
+      const blob = await nasAPI.downloadFile(props.file.path)
+      const url = URL.createObjectURL(blob)
+      
+      content.value = {
+        type: contentType,
+        url: url,
+        blob: blob,
+        isOfficeDocument: true,
+        officeType: getOfficeType(contentType)
+      }
+      
+    } else {
+      contentHandler.value = 'unknown'
+      console.log('🎬 Unknown content type, no handler available')
+      
+      content.value = {
+        type: contentType
       }
     }
-    
-    // Emit save event with prepared data
-    emit('save', saveData)
-    hasUnsavedChanges.value = false
-    
-    // Show success feedback
-    showSaveSuccess()
-    
+
+    console.log('🎬 FileViewerModal: Content assigned:', contentHandler.value, content.value)
+    emit('content-loaded', content.value)
+
   } catch (err) {
-    console.error('Error saving file:', err)
-    const saveError = createFileViewerError(err, 'save_operation')
-    error.value = saveError.toUserMessage()
-    
-    // Show error feedback
-    showSaveError(saveError)
+    console.error('🎬 FileViewerModal: Error loading content:', err)
+    error.value = err.message || 'Erreur lors du chargement du contenu'
+    emit('error', err)
   } finally {
-    isSaving.value = false
+    loading.value = false
   }
 }
 
-const prepareSaveData = () => {
-  if (!content.value) {
-    throw new Error('No content to save')
+const handleClose = () => {
+  if (hasChanges.value) {
+    const confirm = window.confirm('Vous avez des modifications non enregistrées. Voulez-vous vraiment fermer ?')
+    if (!confirm) return
   }
   
-  const baseData = {
-    file: props.file,
-    content: content.value.content,
-    type: content.value.type,
-    metadata: content.value.metadata
+  // Clean up blob URLs
+  if (content.value?.url) {
+    URL.revokeObjectURL(content.value.url)
   }
   
-  // Add type-specific save options
-  switch (content.value.type) {
-    case 'text':
-      return {
-        ...baseData,
-        options: {
-          encoding: content.value.metadata?.encoding || 'utf-8',
-          language: content.value.metadata?.language || 'plaintext'
-        }
-      }
-    case 'image':
-      return {
-        ...baseData,
-        options: {
-          format: content.value.metadata?.format || 'png',
-          quality: content.value.metadata?.quality || 0.9
-        }
-      }
-    case 'document':
-      return {
-        ...baseData,
-        options: {
-          documentType: content.value.metadata?.documentType || 'unknown',
-          preserveFormatting: true
-        }
-      }
-    default:
-      return baseData
-  }
-}
-
-const showSaveSuccess = () => {
-  announceSaveStatus(true)
-  // In a real implementation, this would show a toast notification
-  console.log('File saved successfully')
-}
-
-const showSaveError = (error) => {
-  announceSaveStatus(false, error.toUserMessage())
-  // In a real implementation, this would show a toast notification
-  console.error('Save failed:', error.toUserMessage())
+  emit('close')
 }
 
 const handleDownload = () => {
   emit('download', props.file)
 }
 
-// SMB/local application flows removed (clean up)
-
-const handleRetry = () => {
-  retryCount.value = 0
-  loadFileContent()
+const setMode = (mode) => {
+  if (mode === 'edit' && !canEdit.value) {
+    return
+  }
+  
+  currentMode.value = mode
+  emit('mode-changed', mode)
 }
 
-const handleErrorAction = (action) => {
-  switch (action) {
-    case 'retry':
-      handleRetry()
-      break
-    case 'download':
-      handleDownload()
-      break
-    case 'show_supported_types':
-      showSupportedTypes()
-      break
-    case 'check_connection':
-      checkConnection()
-      break
-    default:
-      console.warn('Unknown error action:', action)
-  }
+const markAsChanged = () => {
+  hasChanges.value = editableContent.value !== originalContent.value
 }
 
-const showSupportedTypes = () => {
-  const supportedTypes = fileHandlerService.getSupportedMimeTypes()
-  const supportedExtensions = fileHandlerService.getSupportedExtensions()
+const handleSave = async () => {
+  if (!hasChanges.value) return
   
-  // This could open a modal or show a tooltip with supported types
-  console.info('Supported MIME types:', supportedTypes)
-  console.info('Supported extensions:', supportedExtensions)
-  
-  // For now, just show an alert - in a real implementation this would be a proper modal
-  alert(`Types de fichiers supportés:\n\nExtensions: ${supportedExtensions.join(', ')}\n\nTypes MIME: ${supportedTypes.slice(0, 10).join(', ')}${supportedTypes.length > 10 ? '...' : ''}`)
-}
-
-const checkConnection = async () => {
-  try {
-    // Import axios dynamically
-    const axios = (await import('axios')).default
-    
-    const response = await axios.head('/api/health')
-    if (response.status === 200) {
-      alert('Connexion OK - Vous pouvez réessayer')
-    } else {
-      alert('Problème de connexion détecté')
-    }
-  } catch (error) {
-    alert('Impossible de vérifier la connexion')
-  }
-}
-
-const getActionIcon = (action) => {
-  const icons = {
-    'retry': 'fas fa-redo',
-    'download': 'fas fa-download',
-    'show_supported_types': 'fas fa-info-circle',
-    'check_connection': 'fas fa-wifi',
-    'request_access': 'fas fa-key',
-    'login': 'fas fa-sign-in-alt',
-    'compress_file': 'fas fa-compress',
-    'redownload': 'fas fa-cloud-download-alt',
-    'check_source': 'fas fa-search'
-  }
-  return icons[action] || 'fas fa-question-circle'
-}
-
-const getActionDescription = (action) => {
-  const descriptions = {
-    'retry': 'Réessayer de charger le fichier',
-    'download': 'Télécharger le fichier original',
-    'show_supported_types': 'Voir la liste des types de fichiers supportés',
-    'check_connection': 'Vérifier la connexion réseau',
-    'request_access': 'Demander l\'accès au fichier',
-    'login': 'Se connecter pour accéder au fichier',
-    'compress_file': 'Réduire la taille du fichier',
-    'redownload': 'Télécharger à nouveau le fichier',
-    'check_source': 'Vérifier le fichier source'
-  }
-  return descriptions[action] || 'Action disponible'
-}
-
-// Performance optimization helper functions
-const processLargeFile = async (file, mimeType) => {
-  // Verify it's a real File object
-  if (!(file instanceof File)) {
-    console.warn('processLargeFile called with non-File object, falling back to regular processing')
-    return await fileHandlerService.processFile(file, mimeType)
-  }
-  
-  const chunkSize = perfUtils.getOptimalChunkSize(file.size)
-  
-  // For very large files, process in chunks to avoid memory issues
-  if (file.size > 50 * 1024 * 1024) { // 50MB
-    return await processFileInChunks(file, mimeType, chunkSize)
-  }
-  
-  return await fileHandlerService.processFile(file, mimeType)
-}
-
-const processFileInChunks = async (file, mimeType, chunkSize) => {
-  // Verify it's a real File object
-  if (!(file instanceof File)) {
-    console.warn('processFileInChunks called with non-File object, falling back to regular processing')
-    return await fileHandlerService.processFile(file, mimeType)
-  }
-  
-  // This is a simplified implementation
-  // In a real scenario, you'd need handler-specific chunked processing
-  const chunks = []
-  let offset = 0
-  
-  while (offset < file.size) {
-    const chunk = file.slice(offset, offset + chunkSize)
-    chunks.push(chunk)
-    offset += chunkSize
-    
-    // Yield control to prevent blocking
-    await new Promise(resolve => setTimeout(resolve, 0))
-  }
-  
-  // Process chunks (simplified - actual implementation would depend on file type)
-  return await fileHandlerService.processFile(file, mimeType)
-}
-
-const optimizeContentForLowEndDevice = async (content) => {
-  if (!content) return content
-  
-  const optimized = { ...content }
-  
-  switch (content.type) {
-    case 'image':
-      // Reduce image quality for low-end devices
-      if (content.metadata?.width > 1920) {
-        optimized.metadata = {
-          ...content.metadata,
-          optimized: true,
-          originalWidth: content.metadata.width,
-          originalHeight: content.metadata.height
-        }
-      }
-      break
-      
-    case 'text':
-      // Limit syntax highlighting for very large text files
-      if (content.metadata?.lineCount > 10000) {
-        optimized.metadata = {
-          ...content.metadata,
-          syntaxHighlighting: false,
-          optimized: true
-        }
-      }
-      break
-      
-    case 'pdf':
-      // Limit initial page rendering
-      if (content.metadata?.pageCount > 100) {
-        optimized.metadata = {
-          ...content.metadata,
-          lazyPageLoading: true,
-          optimized: true
-        }
-      }
-      break
-  }
-  
-  return optimized
-}
-
-// Debounced content change handler to improve performance
-const debouncedContentChange = debounce((changeData) => {
-  handleGenericContentChange(changeData)
-}, 300)
-
-// Memory cleanup function
-const performCleanup = () => {
-  // Clean up object URLs
-  if (content.value?.url && content.value.url.startsWith('blob:')) {
-    memoryManager.registerObjectUrl(content.value.url)
-  }
-  
-  // Clean up any intervals or timeouts
-  memoryManager.cleanup()
-  
-  // Clear old performance metrics
-  performanceMonitor.clearOldMetrics()
-  
-  // Clear progress operations
-  progressIndicator.clear()
-  
-  // Force garbage collection if available (development only)
-  if (window.gc && process.env.NODE_ENV === 'development') {
-    window.gc()
-  }
-}
-
-const toggleEditMode = async () => {
-  if (!canEdit.value) return
-  
-  // Check for unsaved changes before switching to view mode
-  if (props.mode === 'edit' && hasUnsavedChanges.value) {
-    const confirmSwitch = confirm('Vous avez des modifications non sauvegardées. Voulez-vous les perdre ?')
-    if (!confirmSwitch) {
-      return
-    }
-  }
-  
-  const newMode = props.mode === 'edit' ? 'view' : 'edit'
-  
-  // Emit mode change
-  emit('mode-changed', newMode)
-  
-  // Reset unsaved changes flag when switching to view mode
-  if (newMode === 'view') {
-    hasUnsavedChanges.value = false
-  }
-  
-  // For some file types, we might need to refresh content when switching modes
-  if (content.value?.metadata?.canSwitchModes && newMode === 'edit') {
-    // Ensure edit mode has the latest content
-    await refreshContentForEditMode()
-  }
-}
-
-const refreshContentForEditMode = async () => {
-  if (!content.value || !currentHandler.value) return
+  saving.value = true
   
   try {
-    // Some handlers might need to prepare content differently for edit mode
-    if (currentHandler.value.prepareForEdit && typeof currentHandler.value.prepareForEdit === 'function') {
-      const editContent = await currentHandler.value.prepareForEdit(content.value, props.file)
-      if (editContent) {
-        content.value = { ...content.value, ...editContent }
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to refresh content for edit mode:', error)
-    // Don't block mode switching if refresh fails
-  }
-}
-
-const handlePreviousFile = () => {
-  // Will be implemented when navigation is added
-  console.log('Previous file navigation')
-}
-
-const handleNextFile = () => {
-  // Will be implemented when navigation is added
-  console.log('Next file navigation')
-}
-
-const loadFileContent = async () => {
-  if (!props.file) return
-  
-  // Start performance monitoring
-  const performanceMeasurement = performanceMonitor.startMeasurement('file-loading')
-  const progressId = `load-${Date.now()}`
-  
-  // Reset state
-  isLoading.value = true
-  error.value = null
-  errorDetails.value = null
-  content.value = null
-  handlerName.value = null
-  currentHandler.value = null
-  supportedActions.value = []
-  processingStage.value = 'initializing'
-  loadingMessage.value = 'Initialisation...'
-  
-  // Start progress tracking
-  progressIndicator.startProgress(progressId, {
-    label: `Chargement de ${props.file.name}`,
-    total: 100,
-    stage: 'initializing'
-  })
-  
-  try {
-    // Stage 1: File validation (10%)
-    processingStage.value = 'validating'
-    loadingMessage.value = 'Validation du fichier...'
-    progressIndicator.updateProgress(progressId, { current: 10, stage: 'validating' })
-    
-    // Check if this might be a NAS file first (bypass size validation for large media files or any file that might be on NAS)
-    const detectedFileType = detectFileType(props.file.name)
-    const isLargeMediaFile = (detectedFileType.mimeType?.startsWith('video/') || detectedFileType.mimeType?.startsWith('audio/')) && 
-                            props.file.size > 500 * 1024 * 1024 // > 500MB
-    
-    // Try NAS detection for large media files OR if we suspect it might be a NAS file
-    const shouldTryNASDetection = isLargeMediaFile || true // Try for all files initially
-    
-    if (shouldTryNASDetection) {
-      console.log('🎬 Attempting NAS detection for file:', props.file.name)
-      // Skip validation for large media files - they're likely on NAS
-      processingStage.value = 'nas_detection'
-      loadingMessage.value = 'Détection de fichier réseau...'
-      progressIndicator.updateProgress(progressId, { current: 15, stage: 'nas_detection' })
-      
-      // Try to detect if it's a NAS file by attempting a quick request
-      try {
-        const axios = (await import('axios')).default
-        await axios.head(`/files/${encodeURIComponent(props.file.path || props.file.name)}/content`, {
-          timeout: 2000 // Quick timeout
-        })
-      } catch (error) {
-        if (error.response?.status === 401 || error.response?.status === 422) {
-          // This is likely a NAS file, create appropriate SMB result based on file type
-          console.log('🎬 NAS file detected, creating SMB result for:', detectedFileType.mimeType)
-          
-          // Determine the appropriate SMB content type
-          let smbType = 'smb-file' // Default for documents, text, etc.
-          let mediaType = 'file'
-          
-          if (detectedFileType.mimeType?.startsWith('video/')) {
-            smbType = 'smb-media'
-            mediaType = 'video'
-          } else if (detectedFileType.mimeType?.startsWith('audio/')) {
-            smbType = 'smb-media'
-            mediaType = 'audio'
-          } else if (detectedFileType.mimeType?.startsWith('image/')) {
-            smbType = 'smb-file'
-            mediaType = 'image'
-          } else if (detectedFileType.mimeType?.includes('document') || detectedFileType.mimeType?.includes('word') || detectedFileType.mimeType?.includes('text')) {
-            smbType = 'local-application'
-            mediaType = 'document'
-          }
-          
-          const smbContent = {
-            type: smbType,
-            content: smbType === 'local-application' ? null : {
-              smb_path: `smb://10.61.17.33/NAS${props.file.path || '/' + props.file.name}`,
-              file_info: {
-                name: props.file.name,
-                path: props.file.path,
-                extension: detectedFileType.extension
-              },
-              actions: {
-                download_url: `/files/download?path=${encodeURIComponent(props.file.path || '/' + props.file.name)}`
-              }
-            },
-            url: smbType === 'local-application' ? `smb://10.61.17.33/NAS${props.file.path || '/' + props.file.name}` : undefined,
-            metadata: {
-              filename: props.file.name,
-              mediaType: mediaType,
-              mimeType: detectedFileType.mimeType,
-              loadedAt: new Date().toISOString(),
-              handlerUsed: 'NAS Detection',
-              canSwitchModes: false
-            },
-            editable: smbType === 'local-application'
-          }
-          
-          content.value = smbContent
-          console.log('🎬 FileViewerModal: Content assigned:', smbContent.type, smbContent)
-          emit('content-loaded', smbContent)
-          
-          progressIndicator.completeProgress(progressId, {
-            contentType: smbContent.type,
-            fileSize: props.file.size
-          })
-          
-          return // Exit early with SMB content
-        }
-      }
-    }
-    
-    // Normal validation for other files
-    const validation = fileHandlerService.validateFile(props.file)
-    if (!validation.valid) {
-      throw new FileViewerError(validation.message, validation.reason, {
-        filename: props.file.name,
-        size: props.file.size
-      })
-    }
-    
-    // Stage 2: File type detection (20%)
-    processingStage.value = 'detecting'
-    loadingMessage.value = 'Détection du type de fichier...'
-    progressIndicator.updateProgress(progressId, { current: 20, stage: 'detecting' })
-    
-    const fileType = detectFileType(props.file.name)
-    
-    // Stage 3: Streaming path for NAS-backed previews (30%)
-    processingStage.value = 'handler_selection'
-    loadingMessage.value = 'Préparation du flux...'
-    progressIndicator.updateProgress(progressId, { current: 30, stage: 'handler_selection' })
-    
-    // If file has a path (NAS), prefer streaming preview for common types
-    const isNasFile = !!props.file?.path
-    if (isNasFile) {
-      const streamUrl = getStreamUrl(props.file.path)
-      // Images
-      if (fileType.mimeType?.startsWith('image/')) {
-        const streamed = {
-          type: 'image',
-          url: streamUrl,
-          metadata: { mimeType: fileType.mimeType, streamed: true },
-          editable: false
-        }
-        content.value = streamed
-        emit('content-loaded', streamed)
-        // Complete progress for streamed type
-        progressIndicator.completeProgress(progressId, { contentType: streamed.type, fileSize: props.file.size })
-        return
-      }
-      // PDF
-      if (fileType.mimeType === 'application/pdf') {
-        const streamed = {
-          type: 'pdf',
-          url: streamUrl,
-          metadata: { mimeType: fileType.mimeType, streamed: true },
-          editable: false
-        }
-        content.value = streamed
-        emit('content-loaded', streamed)
-        progressIndicator.completeProgress(progressId, { contentType: streamed.type, fileSize: props.file.size })
-        return
-      }
-      // Video
-      if (fileType.mimeType?.startsWith('video/')) {
-        const streamed = {
-          type: 'video',
-          url: streamUrl,
-          metadata: { mimeType: fileType.mimeType, streamed: true },
-          editable: false
-        }
-        content.value = streamed
-        emit('content-loaded', streamed)
-        progressIndicator.completeProgress(progressId, { contentType: streamed.type, fileSize: props.file.size })
-        return
-      }
-      // Audio
-      if (fileType.mimeType?.startsWith('audio/')) {
-        const streamed = {
-          type: 'audio',
-          url: streamUrl,
-          metadata: { mimeType: fileType.mimeType, streamed: true },
-          editable: false
-        }
-        content.value = streamed
-        emit('content-loaded', streamed)
-        progressIndicator.completeProgress(progressId, { contentType: streamed.type, fileSize: props.file.size })
-        return
-      }
-      // Text: load via axios and cache (no full download)
-      if (fileType.mimeType?.startsWith('text/') || ['.md','.txt','.json','.csv','.xml','.yaml','.yml','.log','.ini','.conf'].some(ext => props.file.name.toLowerCase().endsWith(ext))) {
-        try {
-          const axios = (await import('axios')).default
-          const resp = await axios.get(streamUrl, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-            responseType: 'text',
-            timeout: 30000
-          })
-          const streamed = {
-            type: 'text',
-            content: resp.data,
-            metadata: { mimeType: fileType.mimeType || 'text/plain', streamed: true, encoding: 'utf-8' },
-            editable: true
-          }
-          content.value = streamed
-          emit('content-loaded', streamed)
-          progressIndicator.completeProgress(progressId, { contentType: streamed.type, fileSize: props.file.size })
-          return
-        } catch (e) {
-          console.warn('Text streaming failed, fallback to handlers:', e)
-        }
-      }
-    }
-
-    // Fallback: Handler selection
-    loadingMessage.value = 'Sélection du gestionnaire...'
-    const handler = fileHandlerService.getHandlerForFile(props.file.name, fileType.mimeType)
-    
-    if (!handler) {
-      // Try fallback handlers
-      const fallbackHandlers = fileHandlerService.getFallbackHandlers(props.file.name, fileType.mimeType)
-      if (fallbackHandlers.length === 0) {
-        throw new FileViewerError(
-          'Aucun gestionnaire disponible pour ce type de fichier',
-          'HANDLER_NOT_FOUND',
-          { 
-            fileType: fileType.mimeType,
-            extension: fileType.extension,
-            supportedTypes: fileHandlerService.getSupportedMimeTypes()
-          }
-        )
-      }
-      
-      // Use first available fallback handler
-      currentHandler.value = fallbackHandlers[0]
-    } else {
-      currentHandler.value = handler
-    }
-    
-    handlerName.value = currentHandler.value.name
-    loadingMessage.value = `Traitement avec ${currentHandler.value.name}...`
-    
-    // Stage 4: File processing with retry logic (40-80%)
-    processingStage.value = 'processing'
-    progressIndicator.updateProgress(progressId, { current: 40, stage: 'processing' })
-    
-    const processedContent = await ErrorRecoveryStrategies.retryWithBackoff(
-      async () => {
-        const currentProgress = 40 + (retryCount.value * 10)
-        loadingMessage.value = `Traitement du fichier... (tentative ${retryCount.value + 1}/${maxRetries.value})`
-        progressIndicator.updateProgress(progressId, { 
-          current: Math.min(currentProgress, 80), 
-          stage: 'processing',
-          label: `Traitement avec ${currentHandler.value.name} (tentative ${retryCount.value + 1})`
-        })
-        retryCount.value++
-        
-        // Check if it's a real File object (has slice method) before using chunked processing
-        if (props.file instanceof File && props.file.size > 10 * 1024 * 1024) { // 10MB
-          return await processLargeFile(props.file, fileType.mimeType)
-        } else {
-          return await fileHandlerService.processFile(props.file, fileType.mimeType)
-        }
-      },
-      maxRetries.value - 1,
-      1000
+    // Call NAS API to save content
+    const result = await nasAPI.updateFileContent(
+      props.file.path, 
+      editableContent.value
     )
     
-    // Stage 5: Content validation and optimization (90%)
-    processingStage.value = 'finalizing'
-    loadingMessage.value = 'Finalisation...'
-    progressIndicator.updateProgress(progressId, { current: 90, stage: 'finalizing' })
-    
-    if (processedContent.error) {
-      throw new FileViewerError(processedContent.error, 'PROCESSING_ERROR', {
-        handlerName: currentHandler.value.name,
-        stage: 'content_processing'
-      })
+    if (!result.success) {
+      throw new Error(result.error || 'Erreur lors de la sauvegarde')
     }
     
-    // Optimize content for low-end devices
-    const optimizedContent = isLowEndDevice.value 
-      ? await optimizeContentForLowEndDevice(processedContent)
-      : processedContent
+    originalContent.value = editableContent.value
+    hasChanges.value = false
     
-    // Enhance content with additional metadata
-    const performanceMetric = performanceMonitor.endMeasurement(performanceMeasurement)
-    const enhancedContent = {
-      ...optimizedContent,
-      metadata: {
-        ...optimizedContent.metadata,
-        loadedAt: new Date().toISOString(),
-        processingTime: performanceMetric?.duration || 0,
-        handlerUsed: currentHandler.value.name,
-        retryCount: retryCount.value,
-        canSwitchModes: optimizedContent.editable && ['text', 'image', 'document'].includes(optimizedContent.type),
-        optimizedForLowEnd: isLowEndDevice.value,
-        memoryUsage: performanceMetric?.memoryDelta || 0
-      }
-    }
-    
-    content.value = enhancedContent
-    console.log('🎬 FileViewerModal: Content assigned:', enhancedContent.type, enhancedContent)
-    emit('content-loaded', enhancedContent)
-    
-    // Complete progress
-    progressIndicator.completeProgress(progressId, {
-      contentType: enhancedContent.type,
-      processingTime: performanceMetric?.duration,
-      fileSize: props.file.size
+    emit('save', {
+      file: props.file,
+      content: editableContent.value
     })
-    
-    // Reset retry count on success
-    retryCount.value = 0
-    
-    // Update performance metrics
-    performanceMetrics.value = {
-      ...performanceMetrics.value,
-      lastLoad: performanceMetric
-    }
     
   } catch (err) {
-    console.error('Error loading file content:', err)
-    
-    const fileViewerError = createFileViewerError(err, processingStage.value)
-    error.value = fileViewerError.toUserMessage()
-    errorDetails.value = fileViewerError
-    supportedActions.value = fileViewerError.getSuggestedActions()
-    
-    // Fail progress
-    progressIndicator.failProgress(progressId, fileViewerError)
-    
-    // End performance measurement
-    performanceMonitor.endMeasurement(performanceMeasurement)
-    
-    // Try graceful degradation for some error types
-    if (fileViewerError.code === 'PROCESSING_ERROR' && currentHandler.value) {
-      try {
-        content.value = ErrorRecoveryStrategies.gracefulDegradation(props.file, err)
-      } catch (degradationError) {
-        console.warn('Graceful degradation failed:', degradationError)
-      }
-    }
-    
-    emit('error', fileViewerError)
+    console.error('Error saving file:', err)
+    error.value = err.message
+    emit('error', err)
   } finally {
-    isLoading.value = false
-    processingStage.value = 'complete'
-    
-    // Update memory stats
-    memoryStats.value = memoryManager.getMemoryStats()
+    saving.value = false
   }
 }
 
-const formatFileSize = (bytes) => {
-  if (!bytes) return '0 B'
-  
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`
-}
-
-const formatDate = (date) => {
-  if (!date) return ''
-  
-  const d = new Date(date)
-  return d.toLocaleDateString('fr-FR', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-const handleSaveContent = async (saveData) => {
-  try {
-    // Emit save event with the content data
-    emit('save', {
-      file: props.file,
-      content: saveData.content,
-      encoding: saveData.encoding,
-      language: saveData.language
-    })
-  } catch (error) {
-    console.error('Error saving content:', error)
-    error.value = `Erreur lors de la sauvegarde: ${error.message}`
-  }
-}
-
-const handleContentChanged = (newContent, changeType = 'content') => {
-  if (!content.value) return
-  
-  // Detect changes based on content type and change type
-  let hasChanges = false
-  
-  switch (changeType) {
-    case 'content':
-      hasChanges = content.value.content !== newContent
-      break
-    case 'metadata':
-      hasChanges = JSON.stringify(content.value.metadata) !== JSON.stringify(newContent)
-      break
-    case 'structure':
-      // For complex documents with structure changes
-      hasChanges = true
-      break
-    default:
-      hasChanges = content.value.content !== newContent
-  }
-  
-  if (hasChanges) {
-    hasUnsavedChanges.value = true
-    
-    // Update content with new data
-    if (changeType === 'content') {
-      content.value.content = newContent
-    } else if (changeType === 'metadata') {
-      content.value.metadata = { ...content.value.metadata, ...newContent }
-    }
-    
-    // Update last modified timestamp
-    content.value.metadata = {
-      ...content.value.metadata,
-      lastModified: new Date().toISOString()
-    }
-  }
-}
-
-// Generic content change handler for different file types
-const handleGenericContentChange = (changeData) => {
-  const { type, content: newContent, metadata } = changeData
-  
-  switch (type) {
-    case 'text-edit':
-      handleContentChanged(newContent, 'content')
-      break
-    case 'image-edit':
-      handleContentChanged(newContent, 'content')
-      if (metadata) {
-        handleContentChanged(metadata, 'metadata')
-      }
-      break
-    case 'document-edit':
-      handleContentChanged(newContent, 'structure')
-      break
-    case 'cell-edit':
-      // For Excel-like documents
-      handleContentChanged(newContent, 'structure')
-      break
-    case 'slide-edit':
-      // For PowerPoint-like documents
-      handleContentChanged(newContent, 'structure')
-      break
-    default:
-      handleContentChanged(newContent, 'content')
-  }
-}
-
-const handleEncodingChanged = (newEncoding) => {
-  if (content.value && content.value.metadata) {
-    content.value.metadata.encoding = newEncoding
-  }
-}
-
-const handleLanguageChanged = (newLanguage) => {
-  if (content.value && content.value.metadata) {
-    content.value.metadata.language = newLanguage
-  }
-}
-
-const handleImageError = (imageError) => {
-  console.error('Image viewer error:', imageError)
-  error.value = `Erreur d'affichage de l'image: ${imageError.message}`
-}
-
-const handleImageSave = async (saveData) => {
-  try {
-    // Emit save event with the image blob
-    emit('save', {
-      file: props.file,
-      blob: saveData.blob,
-      filename: saveData.filename
-    })
-    hasUnsavedChanges.value = false
-  } catch (error) {
-    console.error('Error saving image:', error)
-    error.value = `Erreur lors de la sauvegarde: ${error.message}`
-  }
-}
-
-const handleImageExport = (exportData) => {
-  try {
-    // Create download link for the exported image
-    const url = URL.createObjectURL(exportData.blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = exportData.filename
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  } catch (error) {
-    console.error('Error exporting image:', error)
-    error.value = `Erreur lors de l'export: ${error.message}`
-  }
-}
-
-const handlePDFError = (pdfError) => {
-  console.error('PDF viewer error:', pdfError)
-  error.value = `Erreur d'affichage du PDF: ${pdfError.message}`
-}
-
-const handlePDFLoaded = (pdfData) => {
-  console.log('PDF loaded successfully:', pdfData)
-  // Update metadata if needed
-  if (content.value && pdfData.metadata) {
-    content.value.metadata = {
-      ...content.value.metadata,
-      ...pdfData.metadata
-    }
-  }
-}
-
-const handlePDFPageChanged = (pageNum) => {
-  console.log('PDF page changed to:', pageNum)
-  // Could emit event or update state if needed
-}
-
-const handleMediaError = (mediaError) => {
-  console.error('Media viewer error:', mediaError)
-  error.value = `Erreur de lecture du média: ${mediaError.message || mediaError}`
-}
-
-const handleDocumentSave = async (saveData) => {
-  try {
-    // Emit save event with the document content
-    emit('save', {
-      file: props.file,
-      content: saveData.content,
-      documentType: saveData.type,
-      originalFile: saveData.originalFile
-    })
-    hasUnsavedChanges.value = false
-  } catch (error) {
-    console.error('Error saving document:', error)
-    error.value = `Erreur lors de la sauvegarde du document: ${error.message}`
-  }
-}
-
-const handleDocumentError = (documentError) => {
-  console.error('Document viewer error:', documentError)
-  error.value = `Erreur d'affichage du document: ${documentError.message || documentError}`
-}
-
-// Removed local application error handler (unused)
-
-// Keyboard event handler
-const handleKeydown = (event) => {
-  if (!props.isOpen) return
-  
-  switch (event.key) {
-    case 'Escape':
-      handleClose()
-      break
-    case 'ArrowLeft':
-      if (!event.ctrlKey && !event.altKey) {
-        handlePreviousFile()
-      }
-      break
-    case 'ArrowRight':
-      if (!event.ctrlKey && !event.altKey) {
-        handleNextFile()
-      }
-      break
-    case 's':
-      if (event.ctrlKey) {
-        event.preventDefault()
-        handleSave()
-      }
-      break
-    case 'Tab':
-      if (content.value?.metadata?.canSwitchModes && canEdit.value) {
-        event.preventDefault()
-        toggleEditMode()
-      }
-      break
-    case 'r':
-      if (event.ctrlKey && error.value) {
-        event.preventDefault()
-        handleRetry()
-      }
-      break
-    case 'd':
-      if (event.ctrlKey) {
-        event.preventDefault()
-        handleDownload()
-      }
-      break
-  }
+const getFileUrl = () => {
+  // Generate a public URL for the file (for Office Online viewer)
+  // This would need to be a publicly accessible URL
+  // For now, return the blob URL (won't work for Office Online)
+  return content.value?.url || ''
 }
 
 // Watchers
-watch(() => props.isOpen, async (newValue) => {
-  if (newValue) {
-    await nextTick()
-    
-    // Set focus and announce opening
-    accessibilityManager.setFocus(modalContainer.value, { announce: true })
-    accessibilityManager.announce('Visualiseur de fichiers ouvert', 'polite')
-    
-    if (props.file) {
-      loadFileContent()
-    }
-  } else {
-    // Announce closing
-    accessibilityManager.announce('Visualiseur de fichiers fermé', 'polite')
-    
-    // Reset state when closing
-    content.value = null
-    error.value = null
-    hasUnsavedChanges.value = false
-    handlerName.value = null
-    showHelp.value = false
-    currentContext.value = 'global'
-    
-    // Restore focus
-    accessibilityManager.restoreFocus()
+watch(() => props.isOpen, (newVal) => {
+  if (newVal && props.file) {
+    loadContent()
   }
 })
 
-watch(() => props.file, (newFile) => {
-  if (newFile && props.isOpen) {
-    loadFileContent()
+watch(() => props.file, (newVal) => {
+  if (newVal && props.isOpen) {
+    loadContent()
   }
 })
 
-watch(() => props.mode, (newMode) => {
-  if (newMode) {
-    announceMode(newMode)
-  }
+watch(() => props.mode, (newVal) => {
+  currentMode.value = newVal
 })
 
-watch(() => content.value, (newContent) => {
-  if (newContent) {
-    announceContentLoaded(newContent)
-  }
-})
-
-watch(() => error.value, (newError) => {
-  if (newError) {
-    announceError(newError)
-  }
-})
-
-watch(() => hasUnsavedChanges.value, (hasChanges) => {
-  if (hasChanges) {
-    accessibilityManager.announce('Modifications non sauvegardées détectées', 'polite')
-  }
-})
-
-// Initialize keyboard shortcuts and accessibility
-const initializeAccessibility = () => {
-  // Initialize keyboard shortcuts
-  initializeFileViewerShortcuts({
-    close: handleClose,
-    save: handleSave,
-    download: handleDownload,
-    retry: handleRetry,
-    toggleMode: toggleEditMode,
-    showHelp: toggleHelp,
-    toggleFullscreen: toggleFullscreen,
-    previousFile: handlePreviousFile,
-    nextFile: handleNextFile,
-    firstFile: () => console.log('First file - not implemented'),
-    lastFile: () => console.log('Last file - not implemented')
-  })
-
-  // Set up accessibility announcements
-  accessibilityManager.announce('Visualiseur de fichiers ouvert', 'polite')
-}
-
-const toggleHelp = () => {
-  showHelp.value = !showHelp.value
+// Keyboard shortcuts
+const handleKeydown = (e) => {
+  if (!props.isOpen) return
   
-  if (showHelp.value) {
-    accessibilityManager.announce('Aide des raccourcis clavier affichée', 'polite')
-  } else {
-    accessibilityManager.announce('Aide des raccourcis clavier fermée', 'polite')
-  }
-}
-
-const toggleFullscreen = () => {
-  if (!document.fullscreenElement) {
-    modalContainer.value?.requestFullscreen?.()
-    isFullscreen.value = true
-    accessibilityManager.announce('Mode plein écran activé', 'polite')
-  } else {
-    document.exitFullscreen?.()
-    isFullscreen.value = false
-    accessibilityManager.announce('Mode plein écran désactivé', 'polite')
-  }
-}
-
-const updateAccessibilityContext = (newContext) => {
-  currentContext.value = newContext
-  keyboardShortcuts.setContext(newContext)
-  
-  // Announce context change
-  const contextNames = {
-    'global': 'général',
-    'text': 'éditeur de texte',
-    'image': 'visualiseur d\'images',
-    'pdf': 'visualiseur PDF',
-    'media': 'lecteur multimédia',
-    'document': 'visualiseur de documents'
+  // Escape to close
+  if (e.key === 'Escape') {
+    handleClose()
   }
   
-  const contextName = contextNames[newContext] || newContext
-  accessibilityManager.announce(`Contexte ${contextName}`, 'polite')
-}
-
-const announceContentLoaded = (content) => {
-  if (!content) return
-  
-  const description = accessibilityManager.createContentDescription(content, props.file)
-  accessibilityManager.announce(`Fichier chargé: ${description}`, 'polite')
-  
-  // Update context based on content type
-  const contextMap = {
-    'text': 'text',
-    'image': 'image',
-    'pdf': 'pdf',
-    'video': 'media',
-    'audio': 'media',
-    'document': 'document',
-    'word': 'document',
-    'excel': 'document',
-    'powerpoint': 'document'
-  }
-  
-  const newContext = contextMap[content.type] || 'global'
-  updateAccessibilityContext(newContext)
-}
-
-const announceError = (error) => {
-  if (!error) return
-  
-  const errorMessage = error instanceof FileViewerError 
-    ? error.toUserMessage() 
-    : error.toString()
-  
-  accessibilityManager.announce(`Erreur: ${errorMessage}`, 'assertive')
-}
-
-const announceSaveStatus = (success, message = '') => {
-  if (success) {
-    accessibilityManager.announce('Fichier sauvegardé avec succès', 'polite')
-  } else {
-    accessibilityManager.announce(`Erreur de sauvegarde: ${message}`, 'assertive')
-  }
-}
-
-const announceMode = (mode) => {
-  const modeNames = {
-    'view': 'lecture',
-    'edit': 'édition'
-  }
-  
-  const modeName = modeNames[mode] || mode
-  accessibilityManager.announce(`Mode ${modeName} activé`, 'polite')
-}
-
-// Enhanced keyboard event handler with accessibility
-const handleKeyboardEvent = (event) => {
-  if (!props.isOpen || !keyboardShortcutsEnabled.value) return
-  
-  // Let the keyboard shortcuts manager handle the event
-  const handled = keyboardShortcuts.handleKeyEvent(event)
-  
-  if (!handled) {
-    // Handle additional accessibility-specific shortcuts
-    switch (event.key) {
-      case 'F1':
-        if (!event.ctrlKey && !event.altKey) {
-          event.preventDefault()
-          toggleHelp()
-        }
-        break
-      case 'F11':
-        if (!event.ctrlKey && !event.altKey) {
-          event.preventDefault()
-          toggleFullscreen()
-        }
-        break
+  // Ctrl+S to save
+  if (e.ctrlKey && e.key === 's') {
+    e.preventDefault()
+    if (currentMode.value === 'edit' && hasChanges.value) {
+      handleSave()
     }
   }
 }
 
-// Lifecycle
 onMounted(() => {
-  // Detect device capabilities
-  isLowEndDevice.value = perfUtils.isLowEndDevice()
-  
-  // Set up event listeners
-  document.addEventListener('keydown', handleKeyboardEvent)
-  memoryManager.registerEventListener(document, 'keydown', handleKeyboardEvent)
-  
-  // Initialize accessibility features
-  initializeAccessibility()
-  
-  // Listen for fullscreen changes
-  const fullscreenHandler = () => {
-    isFullscreen.value = !!document.fullscreenElement
+  document.addEventListener('keydown', handleKeydown)
+  if (props.isOpen && props.file) {
+    loadContent()
   }
-  document.addEventListener('fullscreenchange', fullscreenHandler)
-  memoryManager.registerEventListener(document, 'fullscreenchange', fullscreenHandler)
-  
-  // Set up performance monitoring
-  const performanceUpdateInterval = setInterval(() => {
-    memoryStats.value = memoryManager.getMemoryStats()
-    progressOperations.value = progressIndicator.getActiveOperations()
-  }, 5000)
-  memoryManager.registerInterval(performanceUpdateInterval)
-  
-  // Set up progress indicator callback
-  const progressUnsubscribe = progressIndicator.onProgress((event, progress) => {
-    if (event === 'update') {
-      loadingMessage.value = progress.label || loadingMessage.value
-    }
-  })
-  memoryManager.registerCleanupCallback(progressUnsubscribe)
-  
-  // Preload components for better performance
-  if (!isLowEndDevice.value) {
-    componentLoader.preloadComponents([
-      { name: 'TextEditor', importFunction: () => import('./TextEditor.vue') },
-      { name: 'ImageEditor', importFunction: () => import('./ImageEditor.vue') }
-    ]).catch(error => {
-      console.warn('Failed to preload components:', error)
-    })
-  }
-  
-  // Set up focus management
-  if (props.isOpen) {
-    nextTick(() => {
-      modalContainer.value?.focus()
-    })
-  }
-  
-  // Monitor memory usage and warn if high
-  const memoryCheckInterval = setInterval(() => {
-    const stats = memoryManager.getMemoryStats()
-    if (stats.jsHeapSize > stats.jsHeapSizeLimit * 0.8) {
-      console.warn('High memory usage detected:', stats)
-      // Could trigger cleanup or show warning to user
-    }
-  }, 30000) // Check every 30 seconds
-  memoryManager.registerInterval(memoryCheckInterval)
 })
 
 onUnmounted(() => {
-  // Perform comprehensive cleanup
-  performCleanup()
+  document.removeEventListener('keydown', handleKeydown)
   
-  // Clean up accessibility
-  accessibilityManager.clearAnnouncements()
-  
-  // Restore focus if needed
-  accessibilityManager.restoreFocus()
-  
-  // Clear component cache if needed
-  if (isLowEndDevice.value) {
-    componentLoader.clearCache()
+  // Clean up blob URLs
+  if (content.value?.url) {
+    URL.revokeObjectURL(content.value.url)
   }
 })
 </script>
 
 <style scoped>
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.modal-box {
+  background: var(--fallback-b1, oklch(var(--b1)));
 }
 
-.animate-fade-in {
-  animation: fade-in 0.2s ease-out;
+textarea.textarea {
+  background: var(--fallback-b1, oklch(var(--b1)));
+  color: var(--fallback-bc, oklch(var(--bc)));
 }
 
-/* Respect reduced motion preference */
-@media (prefers-reduced-motion: reduce) {
-  .animate-fade-in {
-    animation: none;
-  }
-}
-
-/* Ensure modal takes full viewport */
-.fixed.inset-0 {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-}
-
-/* Fullscreen modal styles */
-.fullscreen-modal {
-  background: rgba(0, 0, 0, 1) !important;
-}
-
-/* Focus styles for accessibility */
-.modal-container:focus {
-  outline: 2px solid hsl(var(--primary));
-  outline-offset: 2px;
-}
-
-/* Enhanced focus styles for interactive elements */
-button:focus-visible,
-a:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid hsl(var(--primary));
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-/* Skip links styling */
-.skip-link:focus {
-  position: static !important;
-  left: auto !important;
-  width: auto !important;
-  height: auto !important;
-  overflow: visible !important;
-  clip: auto !important;
-  white-space: normal !important;
-}
-
-/* Screen reader only content */
-.sr-only {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
-}
-
-/* Keyboard shortcut styling */
-.kbd {
-  display: inline-block;
-  padding: 0.125rem 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1;
-  color: hsl(var(--base-content));
-  background-color: hsl(var(--base-200));
-  border: 1px solid hsl(var(--base-300));
-  border-radius: 0.25rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .modal-container:focus {
-    outline: 3px solid;
-  }
-  
-  button:focus-visible,
-  a:focus-visible,
-  [tabindex]:focus-visible {
-    outline: 3px solid;
-  }
-  
-  .kbd {
-    border-width: 2px;
-  }
-}
-
-/* Scrollbar styling for content area */
-.overflow-auto::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.overflow-auto::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.overflow-auto::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-}
-
-.overflow-auto::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-/* Ensure proper color contrast for text */
-.text-base-content\/70 {
-  color: hsl(var(--base-content) / 0.7);
-}
-
-.text-base-content\/50 {
-  color: hsl(var(--base-content) / 0.5);
-}
-
-/* Loading spinner accessibility */
-.loading {
-  pointer-events: none;
-}
-
-/* Error state styling */
-[role="alert"] {
-  border: 1px solid hsl(var(--error));
-  border-radius: 0.5rem;
-  background-color: hsl(var(--error) / 0.1);
-}
-
-/* Status message styling */
-[role="status"] {
-  border: 1px solid hsl(var(--info));
-  border-radius: 0.5rem;
-  background-color: hsl(var(--info) / 0.1);
-}
-
-/* Toolbar styling */
-[role="toolbar"] {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* Help panel styling */
-#help-panel {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-#help-panel h3 {
-  color: hsl(var(--primary));
-  font-weight: 600;
-}
-
-#help-panel ul {
-  list-style: none;
-  padding: 0;
-}
-
-#help-panel li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.125rem 0;
-}
-
-/* Responsive design for help panel */
-@media (max-width: 768px) {
-  #help-panel .grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Print styles */
-@media print {
-  .skip-links,
-  [role="toolbar"],
-  #help-panel {
-    display: none !important;
-  }
-  
-  .fullscreen-modal {
-    background: white !important;
-  }
+pre {
+  background: var(--fallback-b1, oklch(var(--b1)));
+  color: var(--fallback-bc, oklch(var(--bc)));
 }
 </style>
