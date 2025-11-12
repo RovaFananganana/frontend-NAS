@@ -220,8 +220,7 @@ const adminTabs = [
   { key: 'groups', label: 'Groupes', icon: 'fas fa-layer-group' },
   { key: 'explorer', label: 'Explorateur', icon: 'fas fa-folder-tree' },
   { key: 'perms', label: 'Permissions', icon: 'fas fa-key' },
-  { key: 'file-types', label: 'Types de fichiers', icon: 'fas fa-file-alt' },
-  { key: 'cache', label: 'Cache', icon: 'fas fa-database' },
+  // 'file-types' and 'cache' temporarily removed from admin sidebar (non-functional)
   { key: 'logs', label: 'Journaux', icon: 'fas fa-list' }
 ]
 

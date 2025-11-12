@@ -326,6 +326,11 @@ const props = defineProps({
     type: String,
     default: null
   }
+  ,
+  externalOpenFile: {
+    type: String,
+    default: null
+  }
 })
 
 // Émissions
@@ -343,7 +348,9 @@ const emit = defineEmits([
   'navigate',
   'info',
   'success',
-  'download-progress'
+  'download-progress',
+  // Emit total visible storage (sum of sizes of visible files)
+  'visible-storage-updated'
 ])
 
 // Composables
@@ -565,9 +572,34 @@ const loadFiles = async (path = currentPath.value) => {
 
     currentPath.value = path
 
+    // Compute and emit visible storage (sum of file sizes visible in this folder)
+    try {
+      const totalVisibleBytes = (allFiles.value || []).filter(f => !f.is_directory).reduce((sum, f) => sum + (f.size || 0), 0)
+      emit('visible-storage-updated', totalVisibleBytes)
+    } catch (e) {
+      console.debug('Could not compute visible storage:', e)
+    }
+
     // Charger les permissions pour chaque fichier si nécessaire
     if (files.value.length > 0) {
       await loadFilePermissions()
+    }
+
+    // If a file was requested to open after navigation, try to find it in the loaded items
+    try {
+      if (pendingOpenFilePath) {
+        const target = (allFiles.value || []).find(f => f.path === pendingOpenFilePath)
+        if (target) {
+          // Open the file viewer for the requested file
+          await openFileViewer(target)
+        } else {
+          console.debug('Requested file to open not found in current folder:', pendingOpenFilePath)
+        }
+        pendingOpenFilePath = null
+      }
+    } catch (e) {
+      console.warn('Error while opening requested file after navigation:', e)
+      pendingOpenFilePath = null
     }
 
   } catch (err) {
@@ -731,6 +763,16 @@ watch(() => props.externalPath, (newPath, oldPath) => {
     handlePathSelected(newPath)
   }
 }, { immediate: true })
+
+// Listen for requests to open a file after navigation (sent via window event)
+let pendingOpenFilePath = null
+const onOpenFileAfterNav = (e) => {
+  const p = e?.detail?.path
+  if (p) {
+    pendingOpenFilePath = p
+  }
+}
+window.addEventListener('open-file-after-nav', onOpenFileAfterNav)
 
 const handleBreadcrumbNavigation = async (path) => {
   // Normaliser le chemin
@@ -1943,6 +1985,13 @@ onUnmounted(() => {
   
   // Cleanup upload polling
   stopUploadPolling()
+  
+  // Remove global open-file listener if present
+  try {
+    window.removeEventListener('open-file-after-nav', onOpenFileAfterNav)
+  } catch (e) {
+    // ignore
+  }
 })
 </script>
 

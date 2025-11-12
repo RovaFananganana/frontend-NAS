@@ -23,8 +23,10 @@
         <!-- Dynamic component -->
         <component 
           :is="currentComponent" 
-          :user-role="'user'" 
+          :user-role="'user'"
           :external-path="activeTab === 'files' ? currentPath : null"
+          @visible-storage-updated="handleVisibleStorageUpdated"
+          :visible-bytes="visibleStorageBytes"
           :key="activeTab === 'files' ? `files-${componentKey}` : activeTab"
           @path-changed="handlePathChanged"
           @error="handleFileExplorerError"
@@ -93,17 +95,46 @@ const handlePathChanged = (event) => {
   currentPath.value = event.newPath
 }
 
+// Visible storage bytes reported by FileExplorer (sum of visible file sizes)
+const visibleStorageBytes = ref(null)
+
+const handleVisibleStorageUpdated = (bytes) => {
+  visibleStorageBytes.value = bytes
+}
+
+// Debug watcher to help confirm the visible storage flow
+import { watch } from 'vue'
+watch(visibleStorageBytes, (v) => {
+  console.debug('User.vue: visibleStorageBytes updated ->', v)
+})
+
 const handleFavoriteNavigation = (event) => {
-  // Les favoris ne fonctionnent que dans le contexte FileExplorer
-  // On doit basculer vers l'onglet "files" et mettre à jour le chemin
+  // If the favorite indicates an openFile, open that file directly via FileExplorer
   activeTab.value = 'files'
-  
-  // Utiliser nextTick pour s'assurer que le composant FileExplorer est monté
-  // avant de changer le chemin
+
+  // Use nextTick to ensure FileExplorer is mounted before interacting with it
   nextTick(() => {
-    currentPath.value = event.path
-    // Forcer le re-render du composant pour s'assurer que le changement est pris en compte
-    componentKey.value++
+    // If event.openFile is provided (favorite was a file), set externalPath to the parent folder and
+    // request opening the file afterwards via emitting a custom prop on FileExplorer
+    if (event.openFile) {
+      const filePath = event.openFile
+      const parent = filePath.split('/').slice(0, -1).join('/') || '/'
+      currentPath.value = parent
+      componentKey.value++
+
+      // After a short delay to allow FileExplorer to load, emit a navigation event that parents can use
+      setTimeout(() => {
+        // Emit an event upward to indicate we want to open a file after navigation
+        // Parent FileExplorer listens to 'navigate' and should handle opening if openFile is present
+        // We reuse the existing 'navigate' contract
+        // Note: emit from this view to higher-level components listening
+        // Using window event as a simple cross-component signal
+        window.dispatchEvent(new CustomEvent('open-file-after-nav', { detail: { path: filePath } }))
+      }, 300)
+    } else {
+      currentPath.value = event.path
+      componentKey.value++
+    }
   })
 }
 

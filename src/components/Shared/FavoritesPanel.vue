@@ -234,12 +234,23 @@ const refresh = async () => {
 const navigateToFavorite = (favorite) => {
   try {
     console.log('🔄 Navigating to favorite:', favorite)
+
+    // If the favorite is a file, navigate to its parent folder (open location)
+    let targetPath = favorite.item_path || favorite.path || '/'
+    if (favorite.item_type === 'file' || favorite.type === 'file') {
+      const parts = (targetPath || '').split('/')
+      parts.pop()
+      targetPath = parts.join('/') || '/'
+    }
+
     emit('navigate', {
-      path: favorite.item_path,
+      path: targetPath,
       source: 'favorite',
-      favorite: favorite
+      favorite: favorite,
+      openFile: (favorite.item_type === 'file' || favorite.type === 'file') ? (favorite.item_path || favorite.path) : null
     })
-    console.log(`Navigation vers ${favorite.item_name}`, 'info')
+
+    console.log(`Navigation vers ${targetPath} (from favorite ${favorite.item_name})`, 'info')
   } catch (error) {
     console.error('Erreur lors de la navigation:', error)
     console.log('Erreur lors de la navigation', 'error')

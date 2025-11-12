@@ -31,7 +31,15 @@ const stats = ref({})
 const error = ref('')
 const loading = ref(false)
 
-const used = computed(() => stats.value.used_bytes ?? 0)
+// Accept visibleBytes from parent (sum of sizes of files currently visible)
+const props = defineProps({
+  visibleBytes: {
+    type: Number,
+    default: null
+  }
+})
+
+const used = computed(() => props.visibleBytes !== null ? props.visibleBytes : (stats.value.used_bytes ?? 0))
 const total = computed(() => stats.value.total_bytes ?? 0)
 const quota = computed(() => stats.value.quota_bytes ?? total.value)
 
