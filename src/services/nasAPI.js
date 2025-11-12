@@ -12,6 +12,8 @@ import httpClient from './httpClient.js'
 const simpleActivityLogger = {
   logs: [],
   maxLogs: 100,
+  // Dedupe window in milliseconds to avoid duplicate logs for the same action
+  dedupeWindowMs: 2000,
   
   log(operation, context) {
     const logEntry = {
@@ -20,7 +22,28 @@ const simpleActivityLogger = {
       operation,
       ...context
     }
-    
+    // Deduplicate recent identical operations to avoid double-reporting (e.g., preview + download)
+    const newest = this.logs[0]
+    const nowMs = Date.now()
+    const getPath = (ctx) => ctx?.path || ctx?.source_path || ctx?.destination_path || 'unknown'
+    try {
+      if (newest) {
+        const newestTime = new Date(newest.timestamp).getTime()
+        const sameOp = newest.operation === operation
+        const samePath = getPath(newest) === getPath(context)
+        if (sameOp && samePath && (nowMs - newestTime) < this.dedupeWindowMs) {
+          // Skip duplicate: don't add or send to backend
+          if (import.meta.env.DEV) {
+            console.debug(`📁 [NAS_ACTIVITY] Skipping duplicate ${operation} for ${getPath(context)}`)
+          }
+          return
+        }
+      }
+
+    } catch (e) {
+      if (import.meta.env.DEV) console.debug('📁 [NAS_ACTIVITY] dedupe check error', e)
+    }
+
     this.logs.unshift(logEntry)
     if (this.logs.length > this.maxLogs) {
       this.logs = this.logs.slice(0, this.maxLogs)
@@ -517,14 +540,26 @@ class NASAPIService {
         downloadSpeed = (downloadSize / 1024 / 1024) / (duration / 1000) // MB/s
       }
       
-      // Log download activity
-      simpleActivityLogger.logFileDownload(filePath, {
-        size: downloadSize,
-        mime_type: blob.type
-      }, {
-        duration_ms: duration,
-        download_speed_mbps: downloadSpeed
-      })
+      // Classify activity: viewing/reading vs actual download
+      const mime = blob.type || ''
+      const isViewable = mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/') || mime === 'application/pdf'
+
+      if (isViewable) {
+        // Log as a read/access rather than a download
+        simpleActivityLogger.log('FILE_READ', { path: filePath, type: 'file', action: 'read', file_info: { size: downloadSize, mime_type: mime } }, {
+          duration_ms: duration,
+          download_speed_mbps: downloadSpeed
+        })
+      } else {
+        // Log download activity
+        simpleActivityLogger.logFileDownload(filePath, {
+          size: downloadSize,
+          mime_type: mime
+        }, {
+          duration_ms: duration,
+          download_speed_mbps: downloadSpeed
+        })
+      }
       
       return blob
       
@@ -989,6 +1024,13 @@ class NASAPIService {
   async downloadFileAsBlob(filePath, onProgress = null) {
     const blob = await this.downloadFile(filePath, onProgress)
     return { blob, fileName: this.getFilename(filePath) }
+  }
+
+  /**
+   * Log a file access/read event explicitly (useful for media streamed via tags)
+   */
+  logFileAccess(filePath, fileInfo = {}) {
+    simpleActivityLogger.log('FILE_READ', { path: filePath, type: 'file', action: 'read', file_info: fileInfo })
   }
 }
 

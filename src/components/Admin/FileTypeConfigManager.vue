@@ -412,7 +412,35 @@ const loadConfigs = async () => {
   
   try {
     const data = await fileTypeConfigAPI.getAllConfigs()
-    configs.value = data
+
+    // Normalize response: backend may return { configs: [...] } or an array directly
+    let list = []
+    if (Array.isArray(data)) {
+      list = data
+    } else if (data && Array.isArray(data.configs)) {
+      list = data.configs
+    } else if (data && Array.isArray(data.items)) {
+      list = data.items
+    } else {
+      // If the API returned a single object, wrap it for safety
+      list = data ? [data] : []
+    }
+
+    // Ensure every config has expected fields to avoid template runtime errors
+    configs.value = list.map(c => ({
+      id: c.id,
+      display_name: c.display_name || c.name || c.displayName || 'Type',
+      type_name: c.type_name || c.type || c.typeName || '',
+      icon_class: c.icon_class || c.icon || 'fas fa-file',
+      extensions: Array.isArray(c.extensions) ? c.extensions : (typeof c.extensions === 'string' ? c.extensions.split(',').map(s => s.trim()).filter(Boolean) : (c.extensions || [])),
+      mime_types: Array.isArray(c.mime_types) ? c.mime_types : (c.mime_types || []),
+      handler_name: c.handler_name || c.handler || '',
+      max_size_mb: c.max_size_mb || c.max_size || 100,
+      is_viewable: !!c.is_viewable,
+      is_editable: !!c.is_editable,
+      is_enabled: c.is_enabled === undefined ? true : !!c.is_enabled,
+      settings: c.settings || {}
+    }))
   } catch (err) {
     error.value = 'Erreur lors du chargement des configurations'
     console.error('Error loading configs:', err)
@@ -440,9 +468,9 @@ const initializeDefaults = async () => {
 
 const editConfig = (config) => {
   formData.value = { ...config }
-  mimeTypesText.value = config.mime_types.join('\n')
-  extensionsText.value = config.extensions.join('\n')
-  settingsText.value = JSON.stringify(config.settings, null, 2)
+  mimeTypesText.value = (config.mime_types || []).join('\n')
+  extensionsText.value = (config.extensions || []).join('\n')
+  settingsText.value = JSON.stringify(config.settings || {}, null, 2)
   showEditModal.value = true
 }
 

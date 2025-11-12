@@ -297,7 +297,16 @@ export function useAccessibility(options = {}) {
       descElement.id = descId
       descElement.className = 'sr-only'
       descElement.textContent = description
-      element.parentNode.insertBefore(descElement, element.nextSibling)
+
+      // Guard against cases where element has been removed from DOM
+      const parent = element.parentNode
+      if (parent && typeof parent.insertBefore === 'function') {
+        parent.insertBefore(descElement, element.nextSibling)
+      } else {
+        // Fallback to appending to body so aria-describedby still references an element
+        document.body.appendChild(descElement)
+      }
+
       element.setAttribute('aria-describedby', descId)
     }
 
@@ -439,8 +448,17 @@ export function useAccessibility(options = {}) {
 
   onUnmounted(() => {
     // Nettoyer la région d'annonce
-    if (announceRegion.value && announceRegion.value.parentNode) {
-      announceRegion.value.parentNode.removeChild(announceRegion.value)
+    if (announceRegion.value) {
+      const parent = announceRegion.value.parentNode
+      if (parent && typeof parent.removeChild === 'function') {
+        try {
+          parent.removeChild(announceRegion.value)
+        } catch (e) {
+          // If removal fails (element detached concurrently), ignore
+          console.debug('announceRegion removal failed or already removed:', e)
+        }
+      }
+      announceRegion.value = null
     }
 
     // Nettoyer les gestionnaires d'événements
