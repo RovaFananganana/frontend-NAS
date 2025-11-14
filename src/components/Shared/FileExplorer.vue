@@ -121,7 +121,7 @@
         </div>
 
         <!-- Composant de vue dynamique -->
-        <component v-if="!loading && !error" :is="currentViewComponent" :current-path="currentPath" :files="files" :loading="loading"
+        <component v-if="!loading && !error" :key="`view-${currentMode}-${files.length}`" :is="currentViewComponent" :current-path="currentPath" :files="files" :loading="loading"
           :error="error" :focused-index="focusedIndex" :user-role="userRole" :file-operations-state="{
             hasOperation,
             isCopyOperation,
@@ -560,10 +560,11 @@ const loadFiles = async (path = currentPath.value) => {
     allFiles.value = response.items || []
     console.log(`FileExplorer: Loaded ${allFiles.value.length} items:`, allFiles.value.map(f => ({ name: f.name, path: f.path })))
 
-    // Si une recherche est active, relancer la recherche avec les nouveaux fichiers
-    if (isSearchActive.value) {
-      await performSearch(searchQuery.value, currentPath.value, allFiles.value)
-    }
+    // Update displayed files directly (no search active after navigation)
+    updateDisplayedFiles(allFiles.value)
+
+    // Note: We don't re-trigger search on loadFiles because clearSearch() is called
+    // before loadFiles during navigation, ensuring a clean state
 
     // Nettoyer la sélection si on change de dossier
     if (path !== currentPath.value) {
@@ -606,7 +607,7 @@ const loadFiles = async (path = currentPath.value) => {
     console.error('FileExplorer: Error loading files:', err)
     error.value = err.message || 'Erreur lors du chargement des fichiers'
     allFiles.value = []
-    files.value = []
+    updateDisplayedFiles([])
 
     // Émettre l'erreur pour permettre la gestion parent
     emit('error', {
@@ -737,8 +738,9 @@ const handlePathSelected = async (path) => {
     const oldPath = currentPath.value
 
     // Clear search when navigating to a new path from search results
-    if (isSearchActive.value) {
-      clearFileSearch()
+    // Use local clearSearch to ensure all search state is cleaned up properly
+    if (simpleSearchResults.value.length > 0 || searchQuery.value.length > 0) {
+      clearSearch()
     }
 
     // Add to navigation history
@@ -1859,102 +1861,120 @@ const cancelAllUploads = () => {
 const simpleSearchResults = ref([])
 const isSimpleSearchActive = computed(() => searchQuery.value.length >= 2)
 
-// Computed pour afficher les fichiers (version simple qui fonctionne)
-const displayedFiles = computed(() => {
-  if (isSimpleSearchActive.value) {
-    console.log('🔍 Showing search results:', simpleSearchResults.value.length, 'results')
-    return simpleSearchResults.value
-  }
-  console.log('📁 Showing all files:', allFiles.value?.length || 0, 'files')
-  return allFiles.value || []
-})
+// Debounce timer for remote recursive search
+let searchDebounceTimer = null
 
-// Watcher pour mettre à jour les fichiers affichés (simplifié)
-watch(displayedFiles, (newFiles) => {
-  console.log('📋 Updating displayed files:', newFiles.length, 'files')
-  files.value = newFiles || []
-}, { immediate: true })
+// Direct assignment without complex dependency - just update files when displaying search results
+// This avoids circular dependencies and watchers that can block the UI
+const updateDisplayedFiles = (newFiles) => {
+  files.value = (newFiles && Array.isArray(newFiles)) ? newFiles : []
+  console.log('📋 Updated displayed files:', files.value.length, 'items')
+}
 
 // Méthodes de recherche simplifiées
 const handleSearchInput = async () => {
   console.log('🔍 Search input changed:', searchQuery.value)
+  // Only use local simple search - don't use the composable
   await performSimpleSearch(searchQuery.value)
 }
 
 const performSimpleSearch = async (query) => {
-  console.log('🔍 Simple search for:', query, 'in', allFiles.value?.length || 0, 'local files')
+  console.log('🔍 Simple search for:', query)
   
   if (!query || query.length < 2) {
     simpleSearchResults.value = []
+    updateDisplayedFiles([])
+    searchStats.localResults = 0
+    searchStats.remoteResults = 0
+    searchStats.totalFound = 0
     return
   }
   
   const searchTerm = query.toLowerCase().trim()
   
-  // 1. Recherche locale (répertoire courant)
+  // 1. Recherche locale IMMÉDIATE
   const localResults = (allFiles.value || []).filter(file => {
-    const nameMatch = file.name.toLowerCase().includes(searchTerm)
-    if (nameMatch) {
-      console.log('✅ Local match found:', file.name)
-    }
-    return nameMatch
+    return file && file.name && file.name.toLowerCase().includes(searchTerm)
   })
   
-  console.log('📍 Local search found:', localResults.length, 'results')
-  
-  // Afficher immédiatement les résultats locaux
+  console.log('📍 Local results:', localResults.length)
   simpleSearchResults.value = localResults
+  updateDisplayedFiles(localResults)
+  searchStats.localResults = localResults.length
+  searchStats.totalFound = localResults.length
   
-  // 2. Recherche récursive simplifiée - chercher dans les dossiers du niveau actuel
-  try {
-    console.log('🔍 Starting simplified recursive search...')
-    const folders = (allFiles.value || []).filter(file => file.is_directory)
-    console.log('📁 Found', folders.length, 'folders to search in')
-    
-    const allResults = [...localResults]
-    const seenPaths = new Set(localResults.map(f => f.path))
-    
-    // Chercher dans chaque dossier (limité aux premiers niveaux pour éviter la lenteur)
-    for (const folder of folders.slice(0, 5)) { // Limiter à 5 dossiers pour les performances
-      try {
-        console.log('🔍 Searching in folder:', folder.name)
-        const folderResponse = await nasAPI.browse(folder.path)
-        
-        if (folderResponse.success && folderResponse.items) {
-          const folderMatches = folderResponse.items.filter(item => 
-            item.name.toLowerCase().includes(searchTerm)
-          )
-          
-          folderMatches.forEach(match => {
-            if (!seenPaths.has(match.path)) {
-              allResults.push({
-                ...match,
-                source: 'folder_search',
-                parent_folder: folder.name
-              })
-              seenPaths.add(match.path)
-              console.log('✅ Found in', folder.name + ':', match.name)
-            }
-          })
-        }
-      } catch (error) {
-        console.warn('Error searching in folder', folder.name, ':', error.message)
-      }
-    }
-    
-    simpleSearchResults.value = allResults
-    console.log('🎯 Total search results:', allResults.length, '(local + folder search)')
-    
-  } catch (error) {
-    console.warn('Simplified recursive search error:', error.message)
-    // Garder les résultats locaux en cas d'erreur
+  // 2. Remote search - NON-DEBOUNCED pour tester
+  // Cancel any pending remote searches
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
   }
+  
+  // Schedule remote search
+  isSearching.value = true
+  searchDebounceTimer = setTimeout(async () => {
+    console.log('🔎 Starting remote search for:', query)
+    try {
+      const t0 = performance.now()
+      const resp = await nasAPI.search(query, currentPath.value || '/', {
+        recursive: true,
+        includeFiles: true,
+        includeFolders: true,
+        maxResults: 200
+      })
+      const duration = Math.round(performance.now() - t0)
+      
+      // Parse response
+      let remoteItems = []
+      if (resp && resp.results) {
+        remoteItems = Array.isArray(resp.results) ? resp.results : []
+      } else if (resp && resp.items) {
+        remoteItems = Array.isArray(resp.items) ? resp.items : []
+      }
+      
+      console.log('✅ Remote search returned:', remoteItems.length, 'items in', duration, 'ms')
+      
+      // Merge: keep local results + add unique remote results
+      const merged = [...localResults]
+      const seenPaths = new Set(localResults.map(f => f.path))
+      
+      for (const item of remoteItems) {
+        if (item && item.path && !seenPaths.has(item.path)) {
+          merged.push(item)
+          seenPaths.add(item.path)
+        }
+      }
+      
+      console.log('📊 Final merged:', merged.length, 'total items')
+      
+      simpleSearchResults.value = merged
+      updateDisplayedFiles(merged)
+      searchStats.remoteResults = remoteItems.length
+      searchStats.totalFound = merged.length
+      searchStats.searchTime = duration
+      
+    } catch (err) {
+      console.error('❌ Remote search error:', err)
+      // Keep local results visible even if remote fails
+    } finally {
+      isSearching.value = false
+      searchDebounceTimer = null
+    }
+  }, 300)
 }
 
 const clearSearch = () => {
-  console.log('🧹 Clearing simple search')
+  console.log('🧹 Clearing search')
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
+  isSearching.value = false
   searchQuery.value = ''
   simpleSearchResults.value = []
+  searchStats.localResults = 0
+  searchStats.remoteResults = 0
+  searchStats.totalFound = 0
+  updateDisplayedFiles(allFiles.value || [])
 }
 
 // Lifecycle hooks
@@ -1980,8 +2000,11 @@ onUnmounted(() => {
   // Deactivate keyboard shortcuts
   setKeyboardShortcutsActive(false)
   
-  // Cleanup search
-  cleanupSearch()
+  // Clean up any pending searches
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
   
   // Cleanup upload polling
   stopUploadPolling()
