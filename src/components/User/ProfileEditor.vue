@@ -4,146 +4,120 @@
 
     <div v-if="error" class="alert alert-error mb-3">{{ error }}</div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <!-- Basic info -->
+    <div class="grid grid-cols-1 gap-3">
       <div>
         <label class="text-sm">Nom d'utilisateur</label>
-        <input v-model="form.username" class="input w-full" />
+        <input v-model="form.username" class="input w-full" disabled />
       </div>
       <div>
-        <label class="text-sm">Email</label>
-        <input v-model="form.email" type="email" class="input w-full" />
-      </div>
-      <div class="md:col-span-2">
-        <label class="text-sm">Avatar (URL)</label>
-        <input v-model="form.avatar" class="input w-full" />
-        <div v-if="form.avatar" class="mt-2">
-          <img :src="form.avatar" alt="avatar" class="w-24 h-24 object-cover rounded" />
-        </div>
+        <label class="text-sm">Rôle</label>
+        <input v-model="form.role" class="input w-full" disabled />
       </div>
     </div>
 
-    <!-- Section changement de mot de passe -->
-    <div class="divider mt-6">Changer le mot de passe</div>
+    <!-- Section Stockage -->
+    <div class="divider mt-6">Stockage</div>
     
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <div>
-        <label class="text-sm">Nouveau mot de passe</label>
-        <input 
-          v-model="passwordForm.newPassword" 
-          type="password" 
-          class="input w-full" 
-          :class="{ 'input-error': passwordForm.newPassword && passwordForm.newPassword.length < 6 }"
-          placeholder="Minimum 6 caractères"
-        />
-        <div v-if="passwordForm.newPassword && passwordForm.newPassword.length < 6" class="text-error text-xs mt-1">
-          Le mot de passe doit contenir au moins 6 caractères
+    <div class="bg-base-100 p-4 rounded-lg border border-base-300">
+      <div class="grid grid-cols-3 gap-4 text-center mb-4">
+        <div>
+          <div class="text-2xl font-bold text-info">{{ formatBytes(storage.used) }}</div>
+          <div class="text-xs opacity-70">Utilisé</div>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-warning">{{ formatBytes(storage.quota) }}</div>
+          <div class="text-xs opacity-70">Quota</div>
+        </div>
+        <div>
+          <div class="text-2xl font-bold" :class="storage.percentage > 90 ? 'text-error' : 'text-success'">
+            {{ storage.percentage }}%
+          </div>
+          <div class="text-xs opacity-70">Utilisation</div>
         </div>
       </div>
-      <div>
-        <label class="text-sm">Confirmer le mot de passe</label>
-        <input 
-          v-model="passwordForm.confirmPassword" 
-          type="password" 
-          class="input w-full" 
-          :class="{ 
-            'input-error': passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword,
-            'input-success': passwordForm.confirmPassword && passwordForm.newPassword === passwordForm.confirmPassword && passwordForm.newPassword.length >= 6
+
+      <!-- Progress Bar -->
+      <div class="w-full">
+        <progress 
+          class="progress w-full"
+          :class="{
+            'progress-success': storage.percentage < 70,
+            'progress-warning': storage.percentage >= 70 && storage.percentage < 90,
+            'progress-error': storage.percentage >= 90
           }"
-          placeholder="Confirmez le nouveau mot de passe"
-        />
-        <div v-if="passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword" class="text-error text-xs mt-1">
-          Les mots de passe ne correspondent pas
-        </div>
-        <div v-if="passwordForm.confirmPassword && passwordForm.newPassword === passwordForm.confirmPassword && passwordForm.newPassword.length >= 6" class="text-success text-xs mt-1">
-          Les mots de passe correspondent ✓
-        </div>
+          :value="storage.percentage" 
+          max="100"
+        ></progress>
       </div>
-      
-      <div class="md:col-span-2 flex justify-end gap-2 mt-2">
-        <button 
-          class="btn" 
-          :disabled="!canUpdatePassword || updatingPassword" 
-          @click="updatePassword"
-        >
-          {{ updatingPassword ? 'Mise à jour...' : 'Changer le mot de passe' }}
-        </button>
+
+      <!-- Storage status message -->
+      <div class="mt-3 text-xs text-center">
+        <div v-if="storage.percentage < 70" class="text-success">
+          ✓ Espace de stockage suffisant
+        </div>
+        <div v-else-if="storage.percentage < 90" class="text-warning">
+          ⚠ Attention: espace limité
+        </div>
+        <div v-else class="text-error">
+          ⛔ Critique: espace presque plein
+        </div>
       </div>
     </div>
 
-    <div class="divider"></div>
-    
-    <div class="flex justify-end gap-2 mt-4">
-        <button class="btn" @click="load">Annuler</button>
-        <button class="btn primary" :disabled="saving" @click="save">
-          {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
-        </button>
-      </div>
+    <!-- Close button -->
+    <div class="flex justify-end gap-2 mt-6">
+      <button class="btn" @click="close">Fermer</button>
+    </div>
   </section>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { userAPI } from '@/services/api'
 
-const form = ref({ username: '', email: '', avatar: '' })
-const passwordForm = ref({ newPassword: '', confirmPassword: '' })
-const saving = ref(false)
-const updatingPassword = ref(false)
+const form = ref({ username: '', role: '' })
+const storage = ref({ used: 0, quota: 0, percentage: 0 })
 const error = ref('')
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B'
+  if (!bytes) return '—'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+async function loadStorage() {
+  try {
+    const { data } = await userAPI.getStorageInfo()
+    if (data) {
+      storage.value.used = data.used_bytes || 0
+      storage.value.quota = data.quota_bytes || data.total_bytes || 0
+      storage.value.percentage = data.usage_percentage || 0
+      console.log('Storage info loaded:', storage.value)
+    }
+  } catch (e) {
+    console.error('Error loading storage info:', e)
+  }
+}
 
 async function load() {
   error.value = ''
   try {
     const { data } = await userAPI.getProfile()
-    Object.assign(form.value, data || {})
+    form.value.username = data.username || ''
+    form.value.role = data.role || ''
+    await loadStorage()
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'Erreur récupération profil'
   }
 }
 
-const canUpdatePassword = computed(() => {
-  return passwordForm.value.newPassword && 
-         passwordForm.value.confirmPassword && 
-         passwordForm.value.newPassword === passwordForm.value.confirmPassword &&
-         passwordForm.value.newPassword.length >= 6
-})
-
-async function save() {
-  saving.value = true
-  try {
-    await userAPI.updateProfile(form.value)
-    alert('Profil mis à jour')
-  } catch (e) {
-    alert(e?.response?.data?.message || e?.message || 'Erreur sauvegarde')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function updatePassword() {
-  if (!canUpdatePassword.value) {
-    alert('Veuillez saisir un mot de passe valide (minimum 6 caractères) et le confirmer')
-    return
-  }
-
-  updatingPassword.value = true
-  try {
-    console.log('Updating password...')
-    const response = await userAPI.updatePassword({
-      password: passwordForm.value.newPassword
-    })
-    console.log('Password update response:', response)
-    
-    // Réinitialiser le formulaire
-    passwordForm.value = { newPassword: '', confirmPassword: '' }
-    alert('Mot de passe mis à jour avec succès')
-  } catch (e) {
-    console.error('Password update error:', e)
-    const errorMessage = e?.response?.data?.msg || e?.response?.data?.message || e?.message || 'Erreur lors de la mise à jour du mot de passe'
-    alert(errorMessage)
-  } finally {
-    updatingPassword.value = false
-  }
+function close() {
+  // Close/reset the profile editor - could emit an event or just reload
+  load()
 }
 
 onMounted(load)
@@ -155,34 +129,20 @@ onMounted(load)
   @apply px-3 py-2 rounded border transition-all duration-200;
 }
 
-.btn.primary {
-  @apply btn-primary; /* DaisyUI gère automatiquement la couleur selon le thème */
-}
-
-.btn.secondary {
-  @apply btn-secondary; /* Même principe que btn-primary */
-}
-
-.btn.accent {
-  @apply btn-accent;
-}
-
 /* Inputs */
 .input {
   @apply border rounded px-3 py-2 transition-colors duration-200;
+  @apply disabled:opacity-60 disabled:cursor-not-allowed;
+}
+
+/* Hover enhancements */
+.btn:hover {
+  @apply shadow-md;
 }
 
 /* Alerts */
-
-/* Hover et focus enhancements (sans couleur fixe) */
-.btn:hover,
-.input:focus {
-  @apply shadow-md transform -translate-y-0.5;
-}
-
-/* Pour les boutons désactivés */
-.btn:disabled {
-  @apply opacity-50 cursor-not-allowed;
+.alert-error {
+  @apply bg-red-50 border border-red-200 text-red-700 p-2 rounded;
 }
 </style>
 

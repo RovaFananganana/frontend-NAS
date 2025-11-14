@@ -139,12 +139,48 @@
     <div v-if="showProfileModal" class="modal modal-open">
       <div class="modal-box max-w-lg">
         <h3 class="font-bold text-lg mb-4">Mon profil</h3>
-        <div>
-          <p><strong>Nom d’utilisateur :</strong> {{ username }}</p>
+        
+        <!-- Infos basiques -->
+        <div class="mb-6">
+          <p class="mb-2"><strong>Nom d'utilisateur :</strong> {{ username }}</p>
           <p><strong>Rôle :</strong> {{ userRoleLabel }}</p>
         </div>
 
+        <!-- Stockage -->
+        <div v-if="!isAdmin" class="divider">Stockage</div>
+        
+        <div v-if="!isAdmin" class="mb-6 bg-base-100 p-4 rounded-lg border border-base-300">
+          <div class="grid grid-cols-3 gap-2 text-center mb-4 text-sm">
+            <div>
+              <div class="font-bold text-info">{{ formatBytes(storage.used) }}</div>
+              <div class="text-xs opacity-70">Utilisé</div>
+            </div>
+            <div>
+              <div class="font-bold text-warning">{{ formatBytes(storage.quota) }}</div>
+              <div class="text-xs opacity-70">Quota</div>
+            </div>
+            <div>
+              <div class="font-bold" :class="storage.percentage > 90 ? 'text-error' : 'text-success'">
+                {{ storage.percentage }}%
+              </div>
+              <div class="text-xs opacity-70">Utilisation</div>
+            </div>
+          </div>
 
+          <!-- Progress Bar -->
+          <div class="w-full">
+            <progress 
+              class="progress progress-sm w-full"
+              :class="{
+                'progress-success': storage.percentage < 70,
+                'progress-warning': storage.percentage >= 70 && storage.percentage < 90,
+                'progress-error': storage.percentage >= 90
+              }"
+              :value="storage.percentage" 
+              max="100"
+            ></progress>
+          </div>
+        </div>
 
         <div class="modal-action">
           <button class="btn" @click="showProfileModal = false">Fermer</button>
@@ -159,6 +195,7 @@ import { ref, computed, defineEmits, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import FavoritesPanel from './FavoritesPanel.vue'
+import { userAPI } from '@/services/api'
 
 const store = useStore()
 const router = useRouter()
@@ -182,6 +219,32 @@ const showProfileModal = ref(false)
 
 const currentTheme = ref('light')
 const storageUsage = ref('...')
+const storage = ref({ used: 0, quota: 0, percentage: 0 })
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B'
+  if (!bytes) return '—'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+async function loadStorageInfo() {
+  if (!isAdmin.value) {
+    try {
+      const { data } = await userAPI.getStorageInfo()
+      if (data) {
+        storage.value.used = data.used_bytes || 0
+        storage.value.quota = data.quota_bytes || data.total_bytes || 0
+        storage.value.percentage = data.usage_percentage || 0
+        console.log('Storage info loaded in Sidebar:', storage.value)
+      }
+    } catch (e) {
+      console.error('Error loading storage info:', e)
+    }
+  }
+}
 
 // État unifié de sélection
 const selectedItem = ref({ type: 'tab', value: props.activeTab })
@@ -226,7 +289,6 @@ const adminTabs = [
 
 const userTabs = [
   { key: 'files', label: 'Mes fichiers', icon: 'fas fa-folder' },
-  { key: 'storage', label: 'Stockage', icon: 'fas fa-hdd' },
   { key: 'logs', label: 'Journal d\'activité', icon: 'fas fa-clock' }
 ]
 
@@ -237,6 +299,7 @@ const selectTab = (tabKey) => {
 }
 
 const openProfileModal = () => {
+  loadStorageInfo()
   showProfileModal.value = true
 }
 

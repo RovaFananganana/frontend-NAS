@@ -348,9 +348,7 @@ const emit = defineEmits([
   'navigate',
   'info',
   'success',
-  'download-progress',
-  // Emit total visible storage (sum of sizes of visible files)
-  'visible-storage-updated'
+  'download-progress'
 ])
 
 // Composables
@@ -572,14 +570,6 @@ const loadFiles = async (path = currentPath.value) => {
     }
 
     currentPath.value = path
-
-    // Compute and emit visible storage (sum of file sizes visible in this folder)
-    try {
-      const totalVisibleBytes = (allFiles.value || []).filter(f => !f.is_directory).reduce((sum, f) => sum + (f.size || 0), 0)
-      emit('visible-storage-updated', totalVisibleBytes)
-    } catch (e) {
-      console.debug('Could not compute visible storage:', e)
-    }
 
     // Charger les permissions pour chaque fichier si nécessaire
     if (files.value.length > 0) {

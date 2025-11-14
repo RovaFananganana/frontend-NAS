@@ -25,8 +25,6 @@
           :is="currentComponent" 
           :user-role="'user'"
           :external-path="activeTab === 'files' ? currentPath : null"
-          @visible-storage-updated="handleVisibleStorageUpdated"
-          :visible-bytes="visibleStorageBytes"
           :key="activeTab === 'files' ? `files-${componentKey}` : activeTab"
           @path-changed="handlePathChanged"
           @error="handleFileExplorerError"
@@ -45,13 +43,11 @@ import Sidebar from '../components/Shared/Sidebar.vue'
 // Import User components
 import ProfileEditor from '@/components/User/ProfileEditor.vue'
 import FileExplorer from '@/components/Shared/FileExplorer.vue'
-import StorageInfo from '@/components/User/StorageInfo.vue'
 import ActivityLogs from '@/components/User/ActivityLogs.vue'
 
 // Tabs configuration
 const tabs = [
   { key: 'files', label: 'Mes fichiers', comp: FileExplorer },
-  { key: 'storage', label: 'Informations de stockage', comp: StorageInfo },
   { key: 'logs', label: 'Journal d\'activité', comp: ActivityLogs },
   { key: 'profile', label: 'Mon profil', comp: ProfileEditor },
 ]
@@ -94,19 +90,6 @@ const handleTabChange = (tabKey) => {
 const handlePathChanged = (event) => {
   currentPath.value = event.newPath
 }
-
-// Visible storage bytes reported by FileExplorer (sum of visible file sizes)
-const visibleStorageBytes = ref(null)
-
-const handleVisibleStorageUpdated = (bytes) => {
-  visibleStorageBytes.value = bytes
-}
-
-// Debug watcher to help confirm the visible storage flow
-import { watch } from 'vue'
-watch(visibleStorageBytes, (v) => {
-  console.debug('User.vue: visibleStorageBytes updated ->', v)
-})
 
 const handleFavoriteNavigation = (event) => {
   // If the favorite indicates an openFile, open that file directly via FileExplorer
