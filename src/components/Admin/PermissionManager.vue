@@ -13,6 +13,23 @@
           <i class="fas fa-users-cog mr-2"></i>
           Permissions groupées
         </button>
+
+        <button class="btn btn-sm btn-warning" @click="forceInvalidateAllCaches" :disabled="loading">
+          <i class="fas fa-shield-alt mr-2"></i>
+          Invalider tous les caches
+        </button>
+      </div>
+    </div>
+
+    <!-- Information sur le cache des permissions -->
+    <div class="alert alert-info">
+      <i class="fas fa-info-circle"></i>
+      <div>
+        <h4 class="font-bold">Cache des permissions</h4>
+        <div class="text-sm">
+          Les permissions sont mises en cache pendant 5 minutes. Après modification, les utilisateurs peuvent utiliser le bouton 
+          <i class="fas fa-shield-alt mx-1"></i> dans l'explorateur de fichiers pour actualiser leurs permissions immédiatement.
+        </div>
       </div>
     </div>
 
@@ -726,8 +743,12 @@ import { permissionAPI } from '@/services/api'
 import { useStore } from 'vuex'
 import { createCachedApiCall, permissionCache, PerformanceMonitor } from '@/services/performance'
 import httpClient from '@/services/httpClient.js'
+import { usePermissions } from '@/composables/usePermissions.js'
 
 const store = useStore()
+
+// Permissions composable
+const { invalidateAllCaches } = usePermissions()
 
 // Reactive data
 const folders = ref([])
@@ -1054,7 +1075,11 @@ const removePermission = async (folder, perm) => {
   try {
     await permissionAPI.deleteFolderPermission(folder.id, perm.id)
     folder.permissions = folder.permissions.filter(p => p.id !== perm.id)
-    store.dispatch('showSuccess', `Permission supprimée pour ${perm.target_name}`)
+    
+    // IMPORTANT: Invalider les caches des permissions après suppression
+    await invalidateAllCaches() // Invalide les caches frontend ET backend
+    
+    store.dispatch('showSuccess', `Permission supprimée pour ${perm.target_name} - Cache invalidé`)
   } catch (err) {
     console.error(err)
     store.dispatch('showError', 'Impossible de supprimer la permission')
@@ -1129,7 +1154,18 @@ const confirmSavePermission = async () => {
       } else {
         await permissionAPI.setFolderGroupPermission(modal.value.folder.id, permId, modal.value.permissions)
       }
-      store.dispatch('showSuccess', 'Permission modifiée')
+      
+      // IMPORTANT: Invalider les caches des permissions après modification
+      const cacheResult = await invalidateAllCaches() // Invalide les caches frontend ET backend
+      
+      let message = 'Permission modifiée'
+      if (cacheResult.backend_cache_cleared) {
+        message += ' - Caches invalidés'
+      } else if (cacheResult.backend_error) {
+        message += ' - Cache frontend invalidé (backend: erreur non critique)'
+      }
+      
+      store.dispatch('showSuccess', message)
       closeConfirmationModal()
       closeModal()
       loadFolders()
@@ -1142,10 +1178,21 @@ const confirmSavePermission = async () => {
         await permissionAPI.setFolderGroupPermission(modal.value.folder.id, targetId, modal.value.permissions)
       }
 
+      // IMPORTANT: Invalider les caches des permissions après ajout
+      const cacheResult = await invalidateAllCaches() // Invalide les caches frontend ET backend
+
       // Show success modal
       successModal.value.visible = true
       successModal.value.targetName = getTargetName()
       successModal.value.folderName = modal.value.folder.name
+      
+      // Afficher un message selon le résultat de l'invalidation
+      if (cacheResult.backend_cache_cleared) {
+        console.log('✅ Caches frontend et backend invalidés avec succès')
+      } else if (cacheResult.backend_error) {
+        console.warn('⚠️ Cache frontend invalidé, erreur backend non critique:', cacheResult.backend_error)
+      }
+      
       closeConfirmationModal()
       // Rafraîchir automatiquement les données
       await loadFolders()
@@ -1245,6 +1292,11 @@ const applyBulkPermissions = async () => {
       }
     }
 
+    // IMPORTANT: Invalider les caches des permissions après les modifications en masse
+    if (successCount > 0) {
+      await invalidateAllCaches() // Invalide les caches frontend ET backend
+    }
+
     // Show results
     if (successCount > 0) {
       const totalUsers = bulkModal.value.selectedUsers.length
@@ -1252,7 +1304,7 @@ const applyBulkPermissions = async () => {
       const totalFolders = bulkModal.value.selectedFolders.length
 
       store.dispatch('showSuccess',
-        `Permissions appliquées avec succès ! ${successCount} opération(s) réussie(s) sur ${totalFolders} dossier(s), ${totalUsers} utilisateur(s) et ${totalGroups} groupe(s).`
+        `Permissions appliquées avec succès ! ${successCount} opération(s) réussie(s) sur ${totalFolders} dossier(s), ${totalUsers} utilisateur(s) et ${totalGroups} groupe(s). Cache invalidé.`
       )
     }
 
@@ -1570,12 +1622,33 @@ const toggleRight = async (folder, permission, right, newValue = null) => {
     // Mettre à jour localement
     permission[right] = targetValue
     
-    // Invalider le cache
+    // IMPORTANT: Invalider les caches des permissions après modification
+    await invalidateAllCaches() // Invalide les caches frontend ET backend
+    
+    // Invalider le cache local aussi
     permissionCache.delete(`folder-permissions-${folder.id}`)
     
   } catch (error) {
     console.error('Erreur lors de la modification de la permission:', error)
     throw error
+  }
+}
+
+// Méthode pour forcer l'invalidation de tous les caches
+const forceInvalidateAllCaches = async () => {
+  try {
+    loading.value = true
+    await invalidateAllCaches()
+    
+    store.dispatch('showSuccess', 'Tous les caches de permissions ont été invalidés (frontend + backend)')
+    
+    // Recharger les données pour refléter les changements
+    await loadFolders()
+  } catch (error) {
+    console.error('Erreur lors de l\'invalidation forcée des caches:', error)
+    store.dispatch('showError', 'Erreur lors de l\'invalidation des caches de permissions')
+  } finally {
+    loading.value = false
   }
 }
 

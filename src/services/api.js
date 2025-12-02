@@ -213,7 +213,11 @@ const permissionAPI = {
     api.get('/permissions/matrix'),
   
   exportPermissions: () =>
-    api.get('/permissions/export')
+    api.get('/permissions/export'),
+  
+  // Invalidation du cache des permissions
+  invalidatePermissionCache: (options = {}) =>
+    api.post('/permissions/invalidate-cache', options)
 }
 
 // Étendez votre adminAPI existant

@@ -1,12 +1,40 @@
 <!-- components/Admin/AccessLogs.vue -->
 <template>
   <div class="p-6">
-    <!-- Header -->
+    <!-- Header avec filtres -->
     <div class="flex items-center justify-between mb-6">
-      <!-- <h1 class="text-3xl font-bold">Journaux d'accès</h1> -->
+      <!-- Filtres -->
+      <div class="flex items-center gap-4">
+        <!-- User Filter -->
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text">Utilisateur</span>
+          </label>
+          <select v-model="filters.userId" class="select select-bordered select-sm w-48" @change="applyFilters">
+            <option value="">Tous les utilisateurs</option>
+            <option v-for="user in users" :key="user.id" :value="user.id">
+              {{ user.username || user.user || `User ${user.id}` }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Date Filter -->
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text">Période</span>
+          </label>
+          <select v-model="filters.period" class="select select-bordered select-sm" @change="applyFilters">
+            <option value="">Toute période</option>
+            <option value="today">Aujourd'hui</option>
+            <option value="week">Cette semaine</option>
+            <option value="month">Ce mois</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Contrôles pagination et actualiser -->
       <div class="flex items-center gap-3">
         <select v-model="perPage" class="select select-bordered select-sm" @change="changePage(1)">
-          <option :value="20">20 par page</option>
           <option :value="50">50 par page</option>
           <option :value="100">100 par page</option>
         </select>
@@ -14,70 +42,6 @@
           <i class="fas fa-sync-alt mr-2"></i>
           Actualiser
         </button>
-      </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="card bg-base-100 shadow-xl mb-6">
-      <div class="card-body">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <!-- Search -->
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Rechercher</span>
-            </label>
-            <input v-model="filters.search" type="text" placeholder="Utilisateur, action, cible..."
-              class="input input-bordered input-sm" @input="debouncedFilter">
-          </div>
-
-          <!-- Action Filter -->
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Action</span>
-            </label>
-            <select v-model="filters.action" class="select select-bordered select-sm" @change="applyFilters">
-              <option value="">Toutes les actions</option>
-              <option value="CREATE">Création</option>
-              <option value="READ">Lecture</option>
-              <option value="UPDATE">Modification</option>
-              <option value="DELETE">Suppression</option>
-              <option value="CREATE_USER">Créer utilisateur</option>
-              <option value="UPDATE_USER">Modifier utilisateur</option>
-              <option value="DELETE_USER">Supprimer utilisateur</option>
-              <option value="CREATE_GROUP">Créer groupe</option>
-              <option value="UPDATE_GROUP">Modifier groupe</option>
-              <option value="DELETE_GROUP">Supprimer groupe</option>
-              <option value="CREATE_FOLDER">Créer dossier</option>
-              <option value="DELETE_FOLDER">Supprimer dossier</option>
-            </select>
-          </div>
-
-          <!-- User Filter -->
-          <div class="form-control relative z-20">
-            <label class="label">
-              <span class="label-text">Utilisateur ({{ users.length }} chargés)</span>
-            </label>
-            <select v-model="filters.userId" class="select select-bordered select-sm w-full" @change="applyFilters" style="z-index: 20;">
-              <option value="">Tous les utilisateurs</option>
-              <option v-for="user in users" :key="user.id" :value="user.id">
-                {{ user.username || user.user || `User ${user.id}` }}
-              </option>
-            </select>
-          </div>
-
-          <!-- Date Filter -->
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Période</span>
-            </label>
-            <select v-model="filters.period" class="select select-bordered select-sm" @change="applyFilters">
-              <option value="">Toute période</option>
-              <option value="today">Aujourd'hui</option>
-              <option value="week">Cette semaine</option>
-              <option value="month">Ce mois</option>
-            </select>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -236,13 +200,11 @@ const selectedLog = ref(null)
 
 // Filters
 const filters = ref({
-  search: '',
-  action: '',
   userId: '',
   period: ''
 })
 
-let debounceTimer = null
+
 
 // Computed properties
 const totalPages = computed(() => Math.ceil(totalLogs.value / perPage.value))
@@ -272,16 +234,6 @@ const visiblePages = computed(() => {
 
 const filteredLogs = computed(() => {
   return logs.value.filter(log => {
-    const matchesSearch = filters.value.search
-      ? (log.user?.toLowerCase().includes(filters.value.search.toLowerCase()) ||
-        log.action?.toLowerCase().includes(filters.value.search.toLowerCase()) ||
-        log.target?.toLowerCase().includes(filters.value.search.toLowerCase()))
-      : true
-
-    const matchesAction = filters.value.action
-      ? log.action === filters.value.action
-      : true
-
     const matchesUser = filters.value.userId
       ? (() => {
           // Trouver le nom d'utilisateur correspondant à l'ID sélectionné
@@ -315,7 +267,7 @@ const filteredLogs = computed(() => {
       return true
     })()
 
-    return matchesSearch && matchesAction && matchesUser && matchesPeriod
+    return matchesUser && matchesPeriod
   })
 })
 
@@ -511,13 +463,6 @@ const changePage = (page) => {
 const refreshLogs = () => {
   currentPage.value = 1
   loadLogs()
-}
-
-const debouncedFilter = () => {
-  clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => {
-    applyFilters()
-  }, 500)
 }
 
 const applyFilters = () => {

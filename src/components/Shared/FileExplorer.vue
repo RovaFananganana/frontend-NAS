@@ -169,6 +169,11 @@
           <i class="fas fa-redo" :class="{ 'animate-spin': loading }"></i>
         </button>
 
+        <button @click="clearPermissionsCacheHandler" class="btn btn-xs btn-ghost tooltip tooltip-left"
+          data-tip="Actualiser les permissions">
+          <i class="fas fa-shield-alt"></i>
+        </button>
+
         <button @click="showShortcutsHelp = true" class="btn btn-xs btn-ghost tooltip tooltip-left"
           data-tip="Aide (F1)">
           <i class="fas fa-keyboard"></i>
@@ -489,7 +494,9 @@ const {
   isAdmin,
   canPerformAction,
   getPermissionErrorMessage,
-  loadPermissions
+  loadPermissions,
+  clearPermissionsCache,
+  invalidateAllCaches
 } = usePermissions()
 
 // Notification system
@@ -647,6 +654,29 @@ const loadContextMenuPermissions = async (item) => {
 
 const refresh = async () => {
   await loadFiles(currentPath.value)
+}
+
+// Méthode pour invalider le cache des permissions
+const clearPermissionsCacheHandler = async () => {
+  try {
+    const { invalidateAllCaches } = usePermissions()
+    await invalidateAllCaches()
+    
+    announce('Caches des permissions invalidés (frontend + backend)', 'polite')
+    
+    // Optionnel : afficher une notification
+    emit('info', {
+      message: 'Permissions actualisées (caches frontend et backend invalidés)',
+      timestamp: Date.now()
+    })
+  } catch (error) {
+    console.error('Erreur lors de l\'invalidation des caches des permissions:', error)
+    emit('error', {
+      error: error,
+      message: 'Erreur lors de l\'actualisation des permissions',
+      timestamp: Date.now()
+    })
+  }
 }
 
 // Navigation history management

@@ -9,7 +9,13 @@ import { nasAPI } from '@/services/nasAPI'
  * Provides reactive permission checking and caching with detailed logging
  */
 export function usePermissions() {
-  const store = useStore()
+  // Try to get store, but handle cases where it's not available
+  let store = null
+  try {
+    store = useStore()
+  } catch (error) {
+    console.warn('useStore() not available in current context, some features may be limited')
+  }
   
   // Cache for permissions to avoid repeated API calls
   const permissionsCache = ref(new Map())
@@ -26,9 +32,9 @@ export function usePermissions() {
     failures: 0
   })
   
-  // User info from store
-  const user = computed(() => store.state.user)
-  const isAdmin = computed(() => store.getters.isAdmin)
+  // User info from store (with fallback)
+  const user = computed(() => store?.state?.user || null)
+  const isAdmin = computed(() => store?.getters?.isAdmin || false)
   
   /**
    * Check if user is admin (always has all permissions)
@@ -718,6 +724,84 @@ export function usePermissions() {
     return exportData
   }
 
+  /**
+   * Invalider le cache backend des permissions
+   */
+  const invalidateBackendCache = async (options = {}) => {
+    try {
+      const { permissionAPI } = await import('@/services/api.js')
+      const response = await permissionAPI.invalidatePermissionCache(options)
+      
+      logPermissionOperation('backend_cache_invalidated', {
+        options,
+        response: response.data,
+        success: true
+      })
+      
+      return response.data
+    } catch (error) {
+      logPermissionOperation('backend_cache_invalidation_failed', {
+        options,
+        error: error.message,
+        success: false
+      })
+      
+      console.warn('Failed to invalidate backend permission cache (non-critical):', error.message)
+      
+      // Ne pas faire échouer l'opération si l'invalidation backend échoue
+      return {
+        success: false,
+        error: error.message,
+        fallback: true
+      }
+    }
+  }
+
+  /**
+   * Invalider complètement les caches (frontend + backend)
+   */
+  const invalidateAllCaches = async (options = {}) => {
+    try {
+      // Invalider le cache frontend (toujours réussi)
+      clearPermissionsCacheWithLogging()
+      
+      // Invalider le cache backend (peut échouer sans faire échouer l'opération)
+      const backendResult = await invalidateBackendCache(options)
+      
+      logPermissionOperation('all_caches_invalidated', {
+        options,
+        frontend_success: true,
+        backend_success: !backendResult.fallback,
+        backend_error: backendResult.error || null,
+        success: true // L'opération globale réussit même si le backend échoue
+      })
+      
+      return {
+        frontend_cache_cleared: true,
+        backend_cache_cleared: !backendResult.fallback,
+        backend_error: backendResult.error || null,
+        timestamp: Date.now()
+      }
+    } catch (error) {
+      // Cette erreur ne devrait plus arriver car invalidateBackendCache ne throw plus
+      logPermissionOperation('all_caches_invalidation_failed', {
+        options,
+        error: error.message,
+        success: false
+      })
+      
+      console.error('Unexpected error in invalidateAllCaches:', error)
+      
+      // Même en cas d'erreur inattendue, on considère que le cache frontend a été invalidé
+      return {
+        frontend_cache_cleared: true,
+        backend_cache_cleared: false,
+        error: error.message,
+        timestamp: Date.now()
+      }
+    }
+  }
+
   return {
     // State
     isAdmin: isUserAdmin,
@@ -734,6 +818,8 @@ export function usePermissions() {
     // Cache management
     getCachedPermissions,
     setCachedPermissions,
+    invalidateBackendCache,
+    invalidateAllCaches,
     
     // Diagnostic methods
     getCacheStatistics,

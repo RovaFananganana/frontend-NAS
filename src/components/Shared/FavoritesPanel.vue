@@ -232,22 +232,34 @@ const navigateToFavorite = (favorite) => {
   try {
     console.log('🔄 Navigating to favorite:', favorite)
 
-    // If the favorite is a file, navigate to its parent folder (open location)
-    let targetPath = favorite.item_path || favorite.path || '/'
-    if (favorite.item_type === 'file' || favorite.type === 'file') {
-      const parts = (targetPath || '').split('/')
+    const itemPath = favorite.item_path || favorite.path || '/'
+    const isFile = favorite.item_type === 'file' || favorite.type === 'file'
+    
+    if (isFile) {
+      // Pour les fichiers : naviguer vers le dossier parent ET ouvrir le fichier
+      const parts = itemPath.split('/')
       parts.pop()
-      targetPath = parts.join('/') || '/'
+      const parentPath = parts.join('/') || '/'
+      
+      emit('navigate', {
+        path: parentPath,
+        source: 'favorite',
+        favorite: favorite,
+        openFile: itemPath  // Ouvrir le fichier après navigation
+      })
+      
+      console.log(`Navigation vers ${parentPath} et ouverture du fichier ${itemPath}`)
+    } else {
+      // Pour les dossiers : naviguer directement vers le dossier
+      emit('navigate', {
+        path: itemPath,
+        source: 'favorite',
+        favorite: favorite,
+        openFile: null
+      })
+      
+      console.log(`Navigation directe vers le dossier ${itemPath}`)
     }
-
-    emit('navigate', {
-      path: targetPath,
-      source: 'favorite',
-      favorite: favorite,
-      openFile: (favorite.item_type === 'file' || favorite.type === 'file') ? (favorite.item_path || favorite.path) : null
-    })
-
-    console.log(`Navigation vers ${targetPath} (from favorite ${favorite.item_name})`, 'info')
   } catch (error) {
     console.error('Erreur lors de la navigation:', error)
     console.log('Erreur lors de la navigation', 'error')
