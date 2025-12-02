@@ -48,7 +48,7 @@ import ActivityLogs from '@/components/User/ActivityLogs.vue'
 // Tabs configuration
 const tabs = [
   { key: 'files', label: 'Mes fichiers', comp: FileExplorer },
-  { key: 'logs', label: 'Journal d\'activité', comp: ActivityLogs },
+  { key: 'logs', label: 'Mes activités', comp: ActivityLogs },
   { key: 'profile', label: 'Mon profil', comp: ProfileEditor },
 ]
 

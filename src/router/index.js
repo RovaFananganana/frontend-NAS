@@ -7,7 +7,7 @@ import Login from '../views/Login.vue'
 import Admin from '../views/Admin.vue'
 import User from '../views/User.vue'
 import NotFound from '../views/NotFound.vue'
-import ForceLogin from '../components/Debug/ForceLogin.vue'
+
 
 
 
@@ -57,14 +57,7 @@ const routes = [
       requiresAdmin: false
     }
   },
-  {
-    path: '/force-login',
-    name: 'ForceLogin',
-    component: ForceLogin,
-    meta: { 
-      requiresAuth: false
-    }
-  },
+
   {
     path: '/404',
     name: 'NotFound',

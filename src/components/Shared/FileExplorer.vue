@@ -245,15 +245,7 @@
     @error="handleViewerError"
   />
 
-  <!-- Text Editor Modal -->
-<TextEditorModal
-  v-if="showTextEditor && fileToEdit"
-  :is-open="showTextEditor"
-  :file="fileToEdit"
-  :mode="textEditorMode"
-  @close="closeTextEditor"
-  @save="handleFileSave"
-/>
+
 
 </template>
 
@@ -301,8 +293,7 @@ import DragDropZone from './DragDropZone.vue'
 import UploadProgressPanel from './UploadProgressPanel.vue'
 import UploadProgressModal from './UploadProgressModal.vue'
 import { FileViewerModal } from '@/components/FileViewer/index.js'
-import TextEditorModal from '@/components/FileViewer/TextEditorModal.vue'
-import SimpleTextEditor from '@/components/FileViewer/SimpleTextEditor.vue'
+
 
 // Props
 const props = defineProps({

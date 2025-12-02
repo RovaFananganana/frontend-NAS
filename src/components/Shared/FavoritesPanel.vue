@@ -56,9 +56,6 @@
         compact ? 'p-2' : 'p-4'
       ]">
         <!-- Debug info -->
-        <div v-if="compact" class="text-xs text-red-500 mb-2">
-          Debug: {{ favorites?.length || 0 }} favoris
-        </div>
         <i :class="[
           'fas fa-star mb-3 opacity-30',
           compact ? 'text-2xl' : 'text-4xl'

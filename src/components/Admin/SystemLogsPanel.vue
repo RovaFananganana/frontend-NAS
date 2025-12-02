@@ -27,12 +27,18 @@
       <div class="tab-content">
         <!-- Onglet Activités Fichiers -->
         <div v-if="activeTab === 'activity'" class="tab-panel">
-          <ActivityLogsViewer />
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <span>Visualiseur de logs d'activité en cours de développement</span>
+          </div>
         </div>
 
         <!-- Onglet Permissions -->
         <div v-if="activeTab === 'permissions'" class="tab-panel">
-          <PermissionLogsViewer />
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <span>Visualiseur de logs de permissions en cours de développement</span>
+          </div>
         </div>
 
         <!-- Onglet Résumé -->
@@ -193,15 +199,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useActivityLogger } from '@/composables/useActivityLogger'
 import { usePermissions } from '@/composables/usePermissions'
-import ActivityLogsViewer from '@/components/Debug/ActivityLogsViewer.vue'
-import PermissionLogsViewer from '@/components/Debug/PermissionLogsViewer.vue'
+
 
 export default {
   name: 'SystemLogsPanel',
-  components: {
-    ActivityLogsViewer,
-    PermissionLogsViewer
-  },
+
   setup() {
     const activeTab = ref('summary')
     const loading = ref(false)

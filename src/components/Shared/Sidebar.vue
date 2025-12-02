@@ -289,7 +289,8 @@ const adminTabs = [
 
 const userTabs = [
   { key: 'files', label: 'Mes fichiers', icon: 'fas fa-folder' },
-  { key: 'logs', label: 'Journal d\'activité', icon: 'fas fa-clock' }
+  { key: 'recentfiles', label: 'Mes fichiers récents', icon: 'fas fa-clock' },
+  { key: 'logs', label: 'Mes activités', icon: 'fas fa-info' }
 ]
 
 // Methods
